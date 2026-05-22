@@ -16,7 +16,7 @@ export default function LandingNav() {
   }, []);
 
   return (
-    <header className={`sticky top-0 z-50 transition ${scrolled ? "border-b border-black/10 bg-[#fafafa]/85 backdrop-blur-xl" : "bg-[#fafafa]"}`}>
+    <header className={`sticky top-0 z-50 bg-white/80 backdrop-blur-md transition ${scrolled ? "border-b border-black/10" : ""}`}>
       <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-3" aria-label="SOON-EGG home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -36,7 +36,7 @@ export default function LandingNav() {
       </nav>
 
       {open && (
-        <div className="border-t border-black/10 bg-[#fafafa] px-6 py-4 sm:hidden">
+        <div className="border-t border-black/10 bg-white/90 px-6 py-4 backdrop-blur-md sm:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-3">
             <Link href="/login" className="rounded-xl px-3 py-3 text-sm font-semibold text-zinc-700">登入</Link>
             <Link href="/signup" className="rounded-full bg-[#0a0a0a] px-5 py-3 text-center text-sm font-bold text-white">免費開始 →</Link>

@@ -6,8 +6,17 @@ import { CountUp } from "./CountUp";
 
 export default function HeroSection() {
   return (
-    <section className="bg-[#fafafa] py-20 sm:py-28">
-      <div className="mx-auto grid max-w-7xl items-center gap-16 px-6 lg:grid-cols-[1fr_0.9fr]">
+    <section
+      className="relative flex min-h-screen items-center overflow-hidden py-20 sm:py-28"
+      style={{
+        backgroundImage: "url(/hero-bg.jpg)",
+        backgroundPosition: "center top",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
+      <div className="absolute inset-0 bg-white/30 backdrop-blur-[1px]" />
+      <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-16 px-6 lg:grid-cols-[1fr_0.9fr]">
         <div>
           <div className="inline-flex rounded-full border border-[#f5a623]/30 bg-[#f5a623]/10 px-4 py-2 text-sm font-bold text-[#9a6200]">
             亞洲創作者專屬平台

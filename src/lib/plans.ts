@@ -15,6 +15,6 @@ export const PLANS = {
     name: "專業版",
     price_hkd: 298,
     ai_credits: -1,
-    features: ["全部創作者功能", "無限數位產品", "0% 交易佣金", "MOON AI 無限對話", "品牌合作 CRM", "電郵行銷工具", "優先客戶支援", "專屬 Account Manager"],
+    features: ["全部創作者功能", "無限數位產品", "0% 交易佣金", "SOON AI 無限對話", "品牌合作 CRM", "電郵行銷工具", "優先客戶支援", "專屬 Account Manager"],
   },
 } as const;

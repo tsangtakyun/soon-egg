@@ -2,7 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export function CountUp({ end, prefix = "", duration = 2000 }: { end: number; prefix?: string; duration?: number }) {
+export function CountUp({
+  end,
+  prefix = "",
+  duration = 2000,
+  className,
+}: {
+  end: number;
+  prefix?: string;
+  duration?: number;
+  className?: string;
+}) {
   const [count, setCount] = useState(0);
   const ref = useRef<HTMLSpanElement>(null);
   const hasRun = useRef(false);
@@ -29,5 +39,5 @@ export function CountUp({ end, prefix = "", duration = 2000 }: { end: number; pr
     return () => observer.disconnect();
   }, [end, duration]);
 
-  return <span ref={ref}>{prefix}{count.toLocaleString()}</span>;
+  return <span ref={ref} className={className}>{prefix}{count.toLocaleString()}</span>;
 }

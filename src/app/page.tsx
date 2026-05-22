@@ -2,9 +2,9 @@ import CTASection from "@/components/landing/CTASection";
 import HeroSection from "@/components/landing/HeroSection";
 import LandingFooter from "@/components/landing/LandingFooter";
 import LandingNav from "@/components/landing/LandingNav";
-import MOONSection from "@/components/landing/MOONSection";
 import OneDoneSection from "@/components/landing/OneDoneSection";
 import PricingSection from "@/components/landing/PricingSection";
+import SOONAISection from "@/components/landing/SOONAISection";
 import ValuePropsSection from "@/components/landing/ValuePropsSection";
 
 export default function LandingPage() {
@@ -13,7 +13,7 @@ export default function LandingPage() {
       <LandingNav />
       <HeroSection />
       <OneDoneSection />
-      <MOONSection />
+      <SOONAISection />
       <ValuePropsSection />
       <PricingSection />
       <CTASection />

@@ -39,7 +39,7 @@ export function OnboardingFlow() {
           <div className="py-10 text-center">
             <Sparkles className="mx-auto h-10 w-10 text-amber-500" aria-hidden />
             <h1 className="mt-4 text-4xl font-black text-zinc-950">歡迎來到 SOON-EGG</h1>
-            <p className="mx-auto mt-4 max-w-2xl text-zinc-600">MOON 會幫你分析社交平台、建立 Link in Bio、生成 Media Kit，然後配對最適合你的亞洲品牌合作。</p>
+            <p className="mx-auto mt-4 max-w-2xl text-zinc-600">SOON AI 會幫你分析社交平台、建立 Link in Bio、生成 Media Kit，然後配對最適合你的亞洲品牌合作。</p>
           </div>
         )}
 
@@ -48,7 +48,7 @@ export function OnboardingFlow() {
         {step === 2 && (
           <div className="rounded-lg bg-white p-6 text-center shadow-sm">
             <Sparkles className="mx-auto h-8 w-8 animate-pulse text-amber-500" aria-hidden />
-            <h2 className="mt-4 text-2xl font-bold text-zinc-950">MOON 正在分析你的創作者輪廓</h2>
+            <h2 className="mt-4 text-2xl font-bold text-zinc-950">SOON AI 正在分析你的創作者輪廓</h2>
             <p className="mt-2 text-zinc-500">正在讀取公開 bio、followers、內容語言和受眾定位。</p>
           </div>
         )}

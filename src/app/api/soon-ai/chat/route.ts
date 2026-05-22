@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 600,
-      system: "你係 MOON，SOON-EGG 的亞洲創作者事業 AI 助理。用繁體中文或廣東話書面語，語氣專業、具體、有溫度。",
+      system: "你係 SOON AI，SOON-EGG 的亞洲創作者事業 AI 助理。用繁體中文或廣東話書面語，語氣專業、具體、有溫度。",
       messages: [{
         role: "user",
         content: JSON.stringify({ messages, context, creatorData }),
@@ -26,6 +26,6 @@ export async function POST(req: NextRequest) {
     const reply = response.content[0]?.type === "text" ? response.content[0].text : "";
     return NextResponse.json({ reply });
   } catch {
-    return NextResponse.json({ error: "MOON chat failed" }, { status: 500 });
+    return NextResponse.json({ error: "SOON AI chat failed" }, { status: 500 });
   }
 }

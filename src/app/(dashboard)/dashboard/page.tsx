@@ -14,7 +14,7 @@ export default function DashboardHome() {
             SOON-EGG Creator Network
           </div>
           <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight sm:text-5xl">亞洲創作者的品牌合作與變現中樞</h1>
-          <p className="mt-4 max-w-2xl text-white/70">MOON AI 幫你整理社交數據、生成 Media Kit、配對 HK/TW/SG 品牌，並起草繁體中文 pitch。</p>
+          <p className="mt-4 max-w-2xl text-white/70">SOON AI 幫你整理社交數據、生成 Media Kit、配對 HK/TW/SG 品牌，並起草繁體中文 pitch。</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/onboarding" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950">
               開始 onboarding

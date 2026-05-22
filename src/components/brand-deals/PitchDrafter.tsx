@@ -36,7 +36,7 @@ export function PitchDrafter() {
       <textarea
         value={pitch}
         onChange={(event) => setPitch(event.target.value)}
-        placeholder="按生成後，MOON 會在這裡寫出 pitch 草稿。"
+        placeholder="按生成後，SOON AI 會在這裡寫出 pitch 草稿。"
         className="mt-4 min-h-56 w-full rounded-md border border-zinc-200 p-3 text-sm leading-6 outline-none focus:border-zinc-950"
       />
     </section>

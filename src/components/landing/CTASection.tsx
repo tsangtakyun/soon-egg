@@ -14,7 +14,7 @@ export default function CTASection() {
           <br />
           由今日開始
         </h2>
-        <p className="mt-6 text-lg text-zinc-400">免費加入 2,400+ 亞洲創作者的行列</p>
+        <p className="mt-6 text-lg text-zinc-400">免費加入亞洲創作者的行列</p>
         <Link href="/signup" className="mt-10 inline-flex rounded-full bg-[#f5a623] px-9 py-4 text-base font-black text-[#0a0a0a] transition hover:-translate-y-0.5">
           免費開始 →
         </Link>

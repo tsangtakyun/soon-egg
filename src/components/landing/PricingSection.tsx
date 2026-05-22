@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const freeFeatures = [
@@ -19,7 +20,7 @@ const creatorFeatures = [
   ["✓", "全部免費功能"],
   ["✓", "0% 交易佣金", true],
   ["✓", "無限品牌配對"],
-  ["✓", "MOON AI 無限對話"],
+  ["✓", "SOON AI 無限對話"],
   ["✓", "自動更新 Media Kit"],
   ["✓", "自訂域名"],
   ["✓", "無限電郵發送"],
@@ -58,7 +59,10 @@ export default function PricingSection() {
           </article>
 
           <article className="relative rounded-2xl border-2 border-[#f5a623] bg-white p-8 shadow-xl">
-            <div className="absolute -top-4 right-8 rounded-full bg-[#f5a623] px-4 py-1.5 text-xs font-black text-[#0a0a0a]">🌟 推薦</div>
+            <div className="absolute -top-4 right-8 inline-flex items-center gap-1 rounded-full bg-[#f5a623] px-4 py-1.5 text-xs font-black text-[#0a0a0a]">
+              <Sparkles size={14} />
+              推薦
+            </div>
             <div className="flex items-center justify-between">
               <h3 className="text-2xl font-black text-[#0a0a0a]">創作者版</h3>
               <span className="rounded-full bg-[#00c853]/10 px-3 py-1 text-xs font-black text-[#008b3a]">多賺 30% 收入</span>

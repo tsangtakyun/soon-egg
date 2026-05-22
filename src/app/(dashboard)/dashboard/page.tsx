@@ -4,7 +4,7 @@ import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Sparkles, UserRou
 import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { demoBrandMatches, demoCreator } from "@/lib/mock-data";
 
-export default function Home() {
+export default function DashboardHome() {
   return (
     <div className="space-y-6">
       <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">

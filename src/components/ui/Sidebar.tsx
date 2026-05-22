@@ -6,7 +6,7 @@ import { BarChart3, BriefcaseBusiness, CreditCard, Home, Mail, Package, Settings
 import { CreditBadge } from "./CreditBadge";
 
 const items = [
-  { href: "/", label: "主頁", icon: Home },
+  { href: "/dashboard", label: "主頁", icon: Home },
   { href: "/profile", label: "我的主頁", icon: UserRound },
   { href: "/media-kit", label: "Media Kit", icon: WandSparkles },
   { href: "/brand-deals", label: "品牌合作", icon: BriefcaseBusiness },
@@ -22,7 +22,7 @@ export function Sidebar() {
 
   return (
     <aside className="hidden min-h-screen w-72 shrink-0 border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:block">
-      <Link href="/" className="flex items-center gap-3 px-2">
+      <Link href="/dashboard" className="flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950 text-sm font-black text-white">SE</div>
         <div>
           <div className="text-sm font-black tracking-wide text-zinc-950">SOON-EGG</div>
@@ -37,7 +37,7 @@ export function Sidebar() {
       <nav className="mt-6 space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
           return (
             <Link
               key={item.href}

@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, Geist_Mono, Noto_Serif_TC } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
+});
+
+const notoSerifTC = Noto_Serif_TC({
+  variable: "--font-noto-serif",
+  subsets: ["latin"],
+  weight: ["400", "700", "900"],
 });
 
 const geistMono = Geist_Mono({
@@ -24,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-HK" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="zh-HK" className={`${dmSans.variable} ${notoSerifTC.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

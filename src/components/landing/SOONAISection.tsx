@@ -9,27 +9,36 @@ export default function SOONAISection() {
   const ref = useScrollReveal();
 
   return (
-    <section className="bg-[#0a0a0a] py-28 text-white sm:py-32">
-      <div ref={ref} className="reveal mx-auto max-w-4xl px-6 text-center">
+    <section
+      className="relative overflow-hidden py-28 sm:py-32"
+      style={{
+        backgroundImage: "url(/hero-bg.jpg)",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
+      <div className="absolute inset-0 bg-white/20" />
+      <div ref={ref} className="reveal relative z-10 mx-auto max-w-4xl px-6 text-center">
         <div className="relative mx-auto flex h-32 w-32 items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(245,166,35,0.32),transparent_65%)] blur-xl" />
-          <div className="relative flex h-24 w-24 items-center justify-center rounded-full border border-[#f5a623]/40 bg-[#f5a623] text-3xl font-black text-[#0a0a0a] shadow-2xl shadow-[#f5a623]/20">
-            S
-          </div>
+          <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.78),transparent_65%)] blur-xl" />
+          <svg className="relative h-24 w-24 drop-shadow-2xl" viewBox="0 0 96 96" role="img" aria-label="SOON AI moon">
+            <path d="M62 12C45 17 32 32 32 50c0 18 13 33 30 38-5 3-11 5-18 5C21 93 3 75 3 52S21 11 44 11c7 0 13 2 18 5Z" fill="#f5a623" />
+          </svg>
         </div>
-        <div className="mt-8 text-sm font-black tracking-[0.28em] text-[#f5a623]">SOON AI</div>
-        <h2 className="mt-4 text-4xl font-black leading-tight sm:text-6xl">
+        <div className="mt-8 text-sm font-black tracking-[0.28em] text-blue-600">SOON AI</div>
+        <h2 className="mt-4 text-4xl font-black leading-tight text-gray-900 sm:text-6xl">
           認識 SOON AI
           <br />
           你的亞洲市場創作夥伴
         </h2>
-        <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-zinc-400">
+        <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-gray-700">
           SOON AI 24/7 為你工作：分析數據、配對品牌、起草繁體中文 pitch、建議合理報價，並提供協作創作者的工具。賦權創作者，而非取代創作者。
         </p>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           {tags.map((tag) => (
-            <span key={tag} className="shimmer-tag inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-zinc-200 ring-1 ring-white/10">
-              <Sparkles size={14} className="text-[#f5a623]" />
+            <span key={tag} className="shimmer-tag inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-sm font-bold text-gray-800 shadow-sm ring-1 ring-white/70">
+              <Sparkles size={14} className="text-blue-600" />
               {tag}
             </span>
           ))}

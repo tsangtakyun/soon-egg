@@ -25,7 +25,7 @@ export default function OneDoneSection() {
     <section className="bg-[#f4f1ec] py-24 sm:py-32">
       <div ref={ref} className="reveal mx-auto max-w-7xl px-6">
         <div className="text-sm font-black tracking-[0.28em] text-[#9a6200]">ONE AND DONE</div>
-        <h2 className="mt-4 text-4xl font-black text-[#0a0a0a] sm:text-6xl">一個平台，管理所有事</h2>
+        <h2 className="mt-4 text-4xl font-black text-[#0a0a0a] sm:text-6xl">一個平台 管理所有事</h2>
         <div className="mt-12 grid gap-6 md:grid-cols-2">
           {cards.map((card) => {
             const Icon = card.icon;

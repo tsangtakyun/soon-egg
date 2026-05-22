@@ -15,27 +15,27 @@ export default function HeroSection() {
         backgroundSize: "cover",
       }}
     >
-      <div className="absolute inset-0 bg-white/30 backdrop-blur-[1px]" />
+      <div className="absolute inset-0 bg-black/20" />
       <div className="relative z-10 mx-auto grid w-full max-w-7xl items-center gap-16 px-6 lg:grid-cols-[1fr_0.9fr]">
         <div>
-          <div className="inline-flex rounded-full border border-[#f5a623]/30 bg-[#f5a623]/10 px-4 py-2 text-sm font-bold text-[#9a6200]">
+          <span className="text-sm font-medium tracking-wide text-white">
             亞洲創作者專屬平台
-          </div>
-          <h1 className="mt-7 text-5xl font-black leading-[1.08] tracking-tight text-[#0a0a0a] sm:text-7xl">
+          </span>
+          <h1 className="mt-7 text-5xl font-black leading-[1.08] tracking-tight text-white sm:text-7xl">
             人人都可以成為
             <br />
             Content Creator
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-600">
+          <p className="mt-6 max-w-xl text-lg leading-8 text-white/90">
             SOON AI 幫你配對品牌，協助你提供最新創作工具，讓你專注創作。
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
-            <Link href="/signup" className="rounded-full bg-[#0a0a0a] px-7 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5">
+            <Link href="/onboarding" className="rounded-full bg-blue-500 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
               免費開始
             </Link>
-            <Link href="/soon_egg" className="rounded-full border border-black/15 px-7 py-3.5 text-sm font-bold text-[#0a0a0a] transition hover:border-black">
-              睇示範 →
-            </Link>
+            <button type="button" className="px-2 py-3.5 text-sm font-semibold text-blue-500 transition-colors hover:text-blue-600">
+              觀看示範 →
+            </button>
           </div>
         </div>
 

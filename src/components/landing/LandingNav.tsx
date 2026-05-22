@@ -25,7 +25,7 @@ export default function LandingNav() {
 
         <div className="hidden items-center gap-6 sm:flex">
           <Link href="/login" className="text-sm font-semibold text-zinc-700 transition hover:text-black">登入</Link>
-          <Link href="/signup" className="rounded-full bg-[#0a0a0a] px-5 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5">
+          <Link href="/onboarding" className="rounded-full bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
             免費開始 →
           </Link>
         </div>
@@ -39,7 +39,7 @@ export default function LandingNav() {
         <div className="border-t border-black/10 bg-white/90 px-6 py-4 backdrop-blur-md sm:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-3">
             <Link href="/login" className="rounded-xl px-3 py-3 text-sm font-semibold text-zinc-700">登入</Link>
-            <Link href="/signup" className="rounded-full bg-[#0a0a0a] px-5 py-3 text-center text-sm font-bold text-white">免費開始 →</Link>
+            <Link href="/onboarding" className="rounded-full bg-blue-500 px-5 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-600">免費開始 →</Link>
           </div>
         </div>
       )}

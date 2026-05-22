@@ -34,8 +34,17 @@ export default function PricingSection() {
   const creatorPrice = annual ? 78 : 98;
 
   return (
-    <section className="bg-[#f4f1ec] py-24 sm:py-32">
-      <div ref={ref} className="reveal mx-auto max-w-7xl px-6">
+    <section
+      className="relative overflow-hidden py-24 sm:py-32"
+      style={{
+        backgroundImage: "url(/secondbg.jpg)",
+        backgroundPosition: "center center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "cover",
+      }}
+    >
+      <div className="absolute inset-0 bg-white/40" />
+      <div ref={ref} className="reveal relative z-10 mx-auto max-w-7xl px-6">
         <div className="text-center">
           <div className="text-sm font-black tracking-[0.28em] text-[#9a6200]">定價</div>
           <h2 className="mt-4 text-4xl font-black text-[#0a0a0a] sm:text-6xl">免費開始，有需要才升級</h2>

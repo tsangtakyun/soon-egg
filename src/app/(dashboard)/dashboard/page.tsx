@@ -2,12 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Sparkles, UserRound } from "lucide-react";
 import { BrandCard } from "@/components/brand-deals/BrandCard";
+import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { demoBrandMatches, demoCreator } from "@/lib/mock-data";
 
 export default function DashboardHome() {
   return (
-    <div className="space-y-6">
-      <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+    <>
+      <DashboardShareHeader />
+      <div className="space-y-6 px-6 py-6">
+        <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
         <div className="rounded-lg bg-zinc-950 p-6 text-white">
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white/70">
             <Sparkles className="h-4 w-4" aria-hidden />
@@ -42,20 +45,21 @@ export default function DashboardHome() {
             <Metric icon={Sparkles} label="AI Credits" value="300" />
           </div>
         </div>
-      </section>
+        </section>
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-zinc-950">推薦品牌配對</h2>
-          <Link href="/brand-deals" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">查看全部</Link>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {demoBrandMatches.slice(0, 3).map((match) => (
-            <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />
-          ))}
-        </div>
-      </section>
-    </div>
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-xl font-bold text-zinc-950">推薦品牌配對</h2>
+            <Link href="/brand-deals" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">查看全部</Link>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {demoBrandMatches.slice(0, 3).map((match) => (
+              <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />
+            ))}
+          </div>
+        </section>
+      </div>
+    </>
   );
 }
 

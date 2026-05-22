@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
     let brands = ASIAN_BRANDS;
 
     if (supabase && creator_id) {
-      const { data: creatorData } = await supabase.from("creator_profiles").select("*").eq("id", creator_id).single();
-      const { data: brandData } = await supabase.from("brands").select("*");
+      const { data: creatorData } = await supabase.from("egg_creator_profiles").select("*").eq("id", creator_id).single();
+      const { data: brandData } = await supabase.from("egg_brands").select("*");
       creator = creatorData ?? creator;
       brands = brandData ?? brands;
     }
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     if (supabase && creator_id) {
       for (const match of matches) {
-        await supabase.from("brand_deals").upsert({
+        await supabase.from("egg_brand_deals").upsert({
           creator_id,
           brand_id: match.brand_id,
           status: "prospecting",

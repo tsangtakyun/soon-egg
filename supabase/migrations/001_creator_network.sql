@@ -1,6 +1,6 @@
 create extension if not exists "pgcrypto";
 
-create table if not exists creator_profiles (
+create table if not exists egg_creator_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade,
   username text unique not null,
@@ -29,9 +29,9 @@ create table if not exists creator_profiles (
   updated_at timestamptz default now()
 );
 
-create table if not exists profile_blocks (
+create table if not exists egg_profile_blocks (
   id uuid primary key default gen_random_uuid(),
-  creator_id uuid references creator_profiles(id) on delete cascade,
+  creator_id uuid references egg_creator_profiles(id) on delete cascade,
   block_type text not null,
   title text,
   url text,
@@ -43,9 +43,9 @@ create table if not exists profile_blocks (
   created_at timestamptz default now()
 );
 
-create table if not exists profile_themes (
+create table if not exists egg_profile_themes (
   id uuid primary key default gen_random_uuid(),
-  creator_id uuid references creator_profiles(id) on delete cascade,
+  creator_id uuid references egg_creator_profiles(id) on delete cascade,
   theme_name text,
   background_color text,
   background_gradient text,
@@ -58,7 +58,7 @@ create table if not exists profile_themes (
   created_at timestamptz default now()
 );
 
-create table if not exists brands (
+create table if not exists egg_brands (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   name_zh text,
@@ -78,10 +78,10 @@ create table if not exists brands (
   created_at timestamptz default now()
 );
 
-create table if not exists brand_deals (
+create table if not exists egg_brand_deals (
   id uuid primary key default gen_random_uuid(),
-  creator_id uuid references creator_profiles(id) on delete cascade,
-  brand_id uuid references brands(id) on delete cascade,
+  creator_id uuid references egg_creator_profiles(id) on delete cascade,
+  brand_id uuid references egg_brands(id) on delete cascade,
   status text default 'prospecting',
   deal_type text,
   platform text,
@@ -97,9 +97,9 @@ create table if not exists brand_deals (
   updated_at timestamptz default now()
 );
 
-create table if not exists digital_products (
+create table if not exists egg_digital_products (
   id uuid primary key default gen_random_uuid(),
-  creator_id uuid references creator_profiles(id) on delete cascade,
+  creator_id uuid references egg_creator_profiles(id) on delete cascade,
   title text not null,
   title_zh text,
   description text,
@@ -114,9 +114,9 @@ create table if not exists digital_products (
   created_at timestamptz default now()
 );
 
-create table if not exists product_orders (
+create table if not exists egg_product_orders (
   id uuid primary key default gen_random_uuid(),
-  product_id uuid references digital_products(id),
+  product_id uuid references egg_digital_products(id),
   buyer_email text not null,
   amount decimal(10,2),
   currency text default 'HKD',
@@ -125,93 +125,105 @@ create table if not exists product_orders (
   created_at timestamptz default now()
 );
 
-create table if not exists analytics_events (
+create table if not exists egg_analytics_events (
   id uuid primary key default gen_random_uuid(),
-  creator_id uuid references creator_profiles(id) on delete cascade,
+  creator_id uuid references egg_creator_profiles(id) on delete cascade,
   event_type text,
   source text,
   metadata jsonb,
   created_at timestamptz default now()
 );
 
-alter table creator_profiles enable row level security;
-alter table profile_blocks enable row level security;
-alter table profile_themes enable row level security;
-alter table brands enable row level security;
-alter table brand_deals enable row level security;
-alter table digital_products enable row level security;
-alter table product_orders enable row level security;
-alter table analytics_events enable row level security;
+alter table egg_creator_profiles enable row level security;
+alter table egg_profile_blocks enable row level security;
+alter table egg_profile_themes enable row level security;
+alter table egg_brands enable row level security;
+alter table egg_brand_deals enable row level security;
+alter table egg_digital_products enable row level security;
+alter table egg_product_orders enable row level security;
+alter table egg_analytics_events enable row level security;
 
-drop policy if exists "Users manage own profile" on creator_profiles;
-create policy "Users manage own profile" on creator_profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "egg_users_manage_own_profile" on egg_creator_profiles;
+create policy "egg_users_manage_own_profile" on egg_creator_profiles
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "Public profiles viewable" on creator_profiles;
-create policy "Public profiles viewable" on creator_profiles for select using (is_public = true);
+drop policy if exists "egg_public_profiles_viewable" on egg_creator_profiles;
+create policy "egg_public_profiles_viewable" on egg_creator_profiles
+  for select using (is_public = true);
 
-drop policy if exists "Users manage own blocks" on profile_blocks;
-create policy "Users manage own blocks" on profile_blocks for all using (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-) with check (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-);
+drop policy if exists "egg_users_manage_own_blocks" on egg_profile_blocks;
+create policy "egg_users_manage_own_blocks" on egg_profile_blocks
+  for all using (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  ) with check (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  );
 
-drop policy if exists "Public visible blocks viewable" on profile_blocks;
-create policy "Public visible blocks viewable" on profile_blocks for select using (
-  is_visible = true and creator_id in (select id from creator_profiles where is_public = true)
-);
+drop policy if exists "egg_public_visible_blocks_viewable" on egg_profile_blocks;
+create policy "egg_public_visible_blocks_viewable" on egg_profile_blocks
+  for select using (
+    is_visible = true and creator_id in (select id from egg_creator_profiles where is_public = true)
+  );
 
-drop policy if exists "Users manage own themes" on profile_themes;
-create policy "Users manage own themes" on profile_themes for all using (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-) with check (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-);
+drop policy if exists "egg_users_manage_own_themes" on egg_profile_themes;
+create policy "egg_users_manage_own_themes" on egg_profile_themes
+  for all using (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  ) with check (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  );
 
-drop policy if exists "Public active themes viewable" on profile_themes;
-create policy "Public active themes viewable" on profile_themes for select using (
-  is_active = true and creator_id in (select id from creator_profiles where is_public = true)
-);
+drop policy if exists "egg_public_active_themes_viewable" on egg_profile_themes;
+create policy "egg_public_active_themes_viewable" on egg_profile_themes
+  for select using (
+    is_active = true and creator_id in (select id from egg_creator_profiles where is_public = true)
+  );
 
-drop policy if exists "Brands are public" on brands;
-create policy "Brands are public" on brands for select using (true);
+drop policy if exists "egg_brands_are_public" on egg_brands;
+create policy "egg_brands_are_public" on egg_brands
+  for select using (true);
 
-drop policy if exists "Users manage own deals" on brand_deals;
-create policy "Users manage own deals" on brand_deals for all using (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-) with check (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-);
+drop policy if exists "egg_users_manage_own_deals" on egg_brand_deals;
+create policy "egg_users_manage_own_deals" on egg_brand_deals
+  for all using (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  ) with check (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  );
 
-drop policy if exists "Users manage own products" on digital_products;
-create policy "Users manage own products" on digital_products for all using (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-) with check (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-);
+drop policy if exists "egg_users_manage_own_products" on egg_digital_products;
+create policy "egg_users_manage_own_products" on egg_digital_products
+  for all using (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  ) with check (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  );
 
-drop policy if exists "Public active products viewable" on digital_products;
-create policy "Public active products viewable" on digital_products for select using (
-  is_active = true and creator_id in (select id from creator_profiles where is_public = true)
-);
+drop policy if exists "egg_public_active_products_viewable" on egg_digital_products;
+create policy "egg_public_active_products_viewable" on egg_digital_products
+  for select using (
+    is_active = true and creator_id in (select id from egg_creator_profiles where is_public = true)
+  );
 
-drop policy if exists "Users view product orders" on product_orders;
-create policy "Users view product orders" on product_orders for select using (
-  product_id in (
-    select digital_products.id from digital_products
-    join creator_profiles on creator_profiles.id = digital_products.creator_id
-    where creator_profiles.user_id = auth.uid()
-  )
-);
+drop policy if exists "egg_users_view_product_orders" on egg_product_orders;
+create policy "egg_users_view_product_orders" on egg_product_orders
+  for select using (
+    product_id in (
+      select egg_digital_products.id from egg_digital_products
+      join egg_creator_profiles on egg_creator_profiles.id = egg_digital_products.creator_id
+      where egg_creator_profiles.user_id = auth.uid()
+    )
+  );
 
-drop policy if exists "Users manage own analytics" on analytics_events;
-create policy "Users manage own analytics" on analytics_events for all using (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-) with check (
-  creator_id in (select id from creator_profiles where user_id = auth.uid())
-);
+drop policy if exists "egg_users_manage_own_analytics" on egg_analytics_events;
+create policy "egg_users_manage_own_analytics" on egg_analytics_events
+  for all using (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  ) with check (
+    creator_id in (select id from egg_creator_profiles where user_id = auth.uid())
+  );
 
-insert into brands (name, name_zh, category, region, min_followers, commission_rate, is_verified, description_zh)
+insert into egg_brands (name, name_zh, category, region, min_followers, commission_rate, is_verified, description_zh)
 values
   ('Bonjour', '卓悅', '美妝零售', array['HK'], 5000, 6, true, '香港美妝零售品牌，適合護膚、美妝、生活類創作者。'),
   ('Sasa', '莎莎', '美妝零售', array['HK','TW','SG'], 4000, 7, true, '亞洲美妝零售網絡，主打護膚和彩妝內容。'),

@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { ProfileBlock, ProfileTheme } from "@/lib/types";
 
 type PublicCreator = typeof demoCreator & {
-  profile_blocks?: ProfileBlock[];
-  profile_themes?: ProfileTheme[];
+  egg_profile_blocks?: ProfileBlock[];
+  egg_profile_themes?: ProfileTheme[];
 };
 
 export default async function CreatorPublicPage({ params }: { params: Promise<{ username: string }> }) {
@@ -17,8 +17,8 @@ export default async function CreatorPublicPage({ params }: { params: Promise<{ 
 
   if (supabase) {
     const { data } = await supabase
-      .from("creator_profiles")
-      .select("*, profile_blocks(*), profile_themes(*)")
+      .from("egg_creator_profiles")
+      .select("*, egg_profile_blocks(*), egg_profile_themes(*)")
       .eq("username", username)
       .eq("is_public", true)
       .single();
@@ -26,7 +26,7 @@ export default async function CreatorPublicPage({ params }: { params: Promise<{ 
     creator = data;
 
     if (creator) {
-      await supabase.from("analytics_events").insert({
+      await supabase.from("egg_analytics_events").insert({
         creator_id: creator.id,
         event_type: "profile_view",
         source: "direct",
@@ -35,13 +35,13 @@ export default async function CreatorPublicPage({ params }: { params: Promise<{ 
   }
 
   if (!creator && username === demoCreator.username) {
-    creator = { ...demoCreator, profile_blocks: demoBlocks, profile_themes: demoThemes };
+    creator = { ...demoCreator, egg_profile_blocks: demoBlocks, egg_profile_themes: demoThemes };
   }
 
   if (!creator) notFound();
 
-  const activeTheme = creator.profile_themes?.find((theme) => theme.is_active) ?? demoThemes[0];
-  const blocks = (creator.profile_blocks ?? demoBlocks).filter((block) => block.is_visible).sort((a, b) => a.sort_order - b.sort_order);
+  const activeTheme = creator.egg_profile_themes?.find((theme) => theme.is_active) ?? demoThemes[0];
+  const blocks = (creator.egg_profile_blocks ?? demoBlocks).filter((block) => block.is_visible).sort((a, b) => a.sort_order - b.sort_order);
 
   return (
     <main

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     let creator = demoCreator;
 
     if (supabase && creator_id) {
-      const { data } = await supabase.from("creator_profiles").select("*").eq("id", creator_id).single();
+      const { data } = await supabase.from("egg_creator_profiles").select("*").eq("id", creator_id).single();
       creator = data ?? creator;
     }
 

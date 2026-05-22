@@ -35,11 +35,11 @@ export default function HeroSection() {
           <img
             src="/hero-phone.png"
             alt="Creator jumping out of phone"
-            className="phone-mockup w-[380px] object-contain drop-shadow-2xl"
+            className="phone-mockup w-[92vw] max-w-[570px] object-contain drop-shadow-2xl sm:w-[570px]"
             style={{ filter: "drop-shadow(0 40px 60px rgba(0,0,0,0.15))" }}
           />
 
-          <div className="absolute top-[10%] -left-[10%] hidden min-w-[160px] rounded-2xl bg-white px-4 py-3 shadow-xl sm:block">
+          <div className="absolute top-[10%] -left-[16%] hidden min-w-[160px] rounded-2xl bg-white px-4 py-3 shadow-xl sm:block">
             <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
               <TrendingUp size={16} className="text-[#f5a623]" />
               今日流量
@@ -47,7 +47,7 @@ export default function HeroSection() {
             <p className="text-2xl font-bold text-gray-900">3,241 <span className="text-sm font-normal">views</span></p>
           </div>
 
-          <div className="absolute top-[5%] -right-[5%] hidden min-w-[180px] rounded-2xl bg-white px-4 py-3 shadow-xl sm:block">
+          <div className="absolute top-[5%] -right-[12%] hidden min-w-[180px] rounded-2xl bg-white px-4 py-3 shadow-xl sm:block">
             <div className="mb-1 flex items-center gap-2 text-xs font-medium text-gray-700">
               <Handshake size={16} className="text-[#f5a623]" />
               品牌合作邀請
@@ -56,7 +56,7 @@ export default function HeroSection() {
             <button className="mt-2 rounded-full bg-black px-3 py-1 text-xs text-white">查看</button>
           </div>
 
-          <div className="absolute bottom-[10%] -left-[5%] hidden min-w-[180px] rounded-2xl bg-[#0a0a0a] px-4 py-3 shadow-xl sm:block">
+          <div className="absolute bottom-[10%] -left-[12%] hidden min-w-[180px] rounded-2xl bg-[#0a0a0a] px-4 py-3 shadow-xl sm:block">
             <div className="mb-1 flex items-center gap-2 text-xs text-gray-400">
               <DollarSign size={16} className="text-[#f5a623]" />
               本月收入

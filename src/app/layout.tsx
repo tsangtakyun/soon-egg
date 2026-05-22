@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
-import { DM_Sans, Geist_Mono, Noto_Serif_TC } from "next/font/google";
+import { Nunito, Nunito_Sans } from "next/font/google";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
+const nunito = Nunito({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+  variable: "--font-nunito",
+  display: "swap",
 });
 
-const notoSerifTC = Noto_Serif_TC({
-  variable: "--font-noto-serif",
+const nunitoSans = Nunito_Sans({
   subsets: ["latin"],
-  weight: ["400", "700", "900"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-nunito-sans",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -30,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-HK" className={`${dmSans.variable} ${notoSerifTC.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="zh-HK" className="h-full antialiased">
+      <body className={`${nunito.variable} ${nunitoSans.variable} flex min-h-full flex-col`}>{children}</body>
     </html>
   );
 }

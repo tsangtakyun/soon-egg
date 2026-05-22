@@ -31,8 +31,8 @@ export const demoBlocks: ProfileBlock[] = [
 ];
 
 export const demoThemes: ProfileTheme[] = [
-  { id: "theme-neon", theme_name: "港風霓虹", background_gradient: "linear-gradient(160deg, #160b2e, #0c3b4d 48%, #ff4f7b)", text_color: "#ffffff", button_style: "rounded", button_color: "rgba(255,255,255,0.16)", font_family: "Geist, sans-serif", is_active: true },
-  { id: "theme-clear", theme_name: "日系清透", background_gradient: "linear-gradient(160deg, #f5fbff, #eef7ef)", text_color: "#243034", button_style: "pill", button_color: "#ffffff", font_family: "Geist, sans-serif", is_active: false },
+  { id: "theme-neon", theme_name: "港風霓虹", background_gradient: "linear-gradient(160deg, #160b2e, #0c3b4d 48%, #ff4f7b)", text_color: "#ffffff", button_style: "rounded", button_color: "rgba(255,255,255,0.16)", font_family: "Nunito Sans, PingFang TC, Noto Sans TC, sans-serif", is_active: true },
+  { id: "theme-clear", theme_name: "日系清透", background_gradient: "linear-gradient(160deg, #f5fbff, #eef7ef)", text_color: "#243034", button_style: "pill", button_color: "#ffffff", font_family: "Nunito Sans, PingFang TC, Noto Sans TC, sans-serif", is_active: false },
 ];
 
 export const demoBrandMatches = ASIAN_BRANDS.slice(0, 8).map((brand, index) => ({

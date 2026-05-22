@@ -23,11 +23,8 @@ export function Sidebar() {
   return (
     <aside className="hidden min-h-screen w-72 shrink-0 border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:block">
       <Link href="/dashboard" className="flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-950 text-sm font-black text-white">SE</div>
-        <div>
-          <div className="text-sm font-black tracking-wide text-zinc-950">SOON-EGG</div>
-          <div className="text-xs text-zinc-500">Creator Network</div>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/soon-egg.png" alt="SOON-EGG" className="h-7 w-auto object-contain" />
       </Link>
 
       <div className="mt-6 px-2">

@@ -19,8 +19,8 @@ export default function LandingNav() {
     <header className={`sticky top-0 z-50 transition ${scrolled ? "border-b border-black/10 bg-[#fafafa]/85 backdrop-blur-xl" : "bg-[#fafafa]"}`}>
       <nav className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-3" aria-label="SOON-EGG home">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0a0a0a] text-sm font-black text-[#f5a623]">SE</span>
-          <span className="text-lg font-black tracking-tight text-[#0a0a0a]">SOON-EGG</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/soon-egg.png" alt="SOON-EGG" className="h-8 w-auto object-contain" />
         </Link>
 
         <div className="hidden items-center gap-6 sm:flex">

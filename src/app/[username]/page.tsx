@@ -4,7 +4,9 @@ import {
   type PublicPageBlock,
   type PublicPageProfile,
   type PublicPageSection,
+  type PublicRateCard,
 } from "@/components/public/PublicPageClient";
+import type { PublicProduct } from "@/components/public/ProductCard";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
@@ -57,19 +59,6 @@ function getBackgroundStyle(profile: PublicPageProfile, theme: PublicTheme | nul
   return { backgroundColor: theme?.background_color ?? "#87CEEB" };
 }
 
-function isShopBlock(block: PublicPageBlock) {
-  const title = block.title?.toLowerCase() || "";
-  return (
-    block.block_type === "product" ||
-    title.includes("shop") ||
-    title.includes("store") ||
-    title.includes("product") ||
-    title.includes("貨品") ||
-    title.includes("產品") ||
-    title.includes("商品")
-  );
-}
-
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   if (RESERVED_ROUTES.includes(username)) notFound();
@@ -86,7 +75,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   if (!profile) notFound();
 
-  const [{ data: blocks }, { data: theme }, followsResult] = await Promise.all([
+  const [{ data: blocks }, { data: theme }, followsResult, { data: products }, { data: rateCards }] = await Promise.all([
     supabase
       .from("egg_profile_blocks")
       .select("*")
@@ -95,6 +84,18 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       .order("sort_order", { ascending: true }),
     supabase.from("egg_profile_themes").select("*").eq("creator_id", profile.id).eq("is_active", true).single(),
     supabase.from("egg_follows").select("id", { count: "exact", head: true }).eq("creator_id", profile.id),
+    supabase
+      .from("egg_digital_products")
+      .select("*")
+      .eq("creator_id", profile.id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("egg_rate_cards")
+      .select("*")
+      .eq("creator_id", profile.id)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
   ]);
 
   await supabase.from("egg_analytics_events").insert({
@@ -105,28 +106,24 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const typedProfile = profile as PublicPageProfile;
   const typedTheme = theme as PublicTheme | null;
-  const visibleBlocks = ((blocks ?? []) as PublicPageBlock[]).filter((block) => block.is_visible !== false);
-  const shopBlock = visibleBlocks.find(isShopBlock) ?? null;
-  const linkBlocks = visibleBlocks.filter((block) => block.id !== shopBlock?.id);
+  const visibleBlocks = ((blocks ?? []) as PublicPageBlock[]).filter((block) => {
+    const title = block.title?.trim().toLowerCase() || "";
+    return block.is_visible !== false && title !== "creator media kit 模板".toLowerCase();
+  });
+  const activeProducts = (products ?? []) as PublicProduct[];
+  const activeRateCards = (rateCards ?? []) as PublicRateCard[];
+
   const sections: PublicPageSection[] = [{ id: "hub", label: "主頁", icon: "home" }];
 
-  if (typedProfile.youtube_handle && typedProfile.youtube_latest_video_id) {
-    sections.push({ id: "video", label: "最新影片", icon: "video" });
+  if (typedProfile.contact_email || typedProfile.instagram_handle) {
+    sections.push({ id: "contact", label: "品牌合作查詢", icon: "contact" });
   }
 
-  if (linkBlocks.length > 0) {
-    sections.push({ id: "links", label: "我的連結", icon: "links" });
-  }
-
-  if (shopBlock) {
+  if (activeProducts.length > 0) {
     sections.push({ id: "shop", label: "我的貨品專區", icon: "shop" });
   }
 
-  if (typedProfile.buy_me_a_coffee_url) {
-    sections.push({ id: "coffee", label: "Buy Me A Coffee", icon: "coffee" });
-  }
-
-  sections.push({ id: "cta", label: "Media Kit", icon: "media-kit" });
+  sections.push({ id: "media-kit", label: "Media Kit", icon: "media-kit" });
 
   const btnColor = typedTheme?.button_color ?? "#3b82f6";
   const isRounded = (typedTheme?.button_style ?? "rounded") === "rounded";
@@ -136,8 +133,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     <PublicPageClient
       sections={sections}
       profile={typedProfile}
-      blocks={linkBlocks}
-      shopBlock={shopBlock}
+      blocks={visibleBlocks}
+      shopBlock={null}
+      products={activeProducts}
+      rateCards={activeRateCards}
       followerCount={followsResult.count ?? 0}
       bgStyle={getBackgroundStyle(typedProfile, typedTheme)}
       btnColor={btnColor}

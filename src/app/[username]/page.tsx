@@ -93,16 +93,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       .eq("creator_id", profile.id)
       .eq("is_visible", true)
       .order("sort_order", { ascending: true }),
-    supabase
-      .from("egg_profile_themes")
-      .select("*")
-      .eq("creator_id", profile.id)
-      .eq("is_active", true)
-      .single(),
-    supabase
-      .from("egg_follows")
-      .select("id", { count: "exact", head: true })
-      .eq("creator_id", profile.id),
+    supabase.from("egg_profile_themes").select("*").eq("creator_id", profile.id).eq("is_active", true).single(),
+    supabase.from("egg_follows").select("id", { count: "exact", head: true }).eq("creator_id", profile.id),
   ]);
 
   await supabase.from("egg_analytics_events").insert({
@@ -116,28 +108,27 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
   const visibleBlocks = ((blocks ?? []) as PublicPageBlock[]).filter((block) => block.is_visible !== false);
   const shopBlock = visibleBlocks.find(isShopBlock) ?? null;
   const linkBlocks = visibleBlocks.filter((block) => block.id !== shopBlock?.id);
-  const sections: PublicPageSection[] = [{ id: "hub", label: "主頁", icon: "⌂" }];
+  const sections: PublicPageSection[] = [{ id: "hub", label: "主頁", icon: "home" }];
 
   if (typedProfile.youtube_handle && typedProfile.youtube_latest_video_id) {
-    sections.push({ id: "video", label: "最新影片", icon: "▶" });
+    sections.push({ id: "video", label: "最新影片", icon: "video" });
   }
 
   if (linkBlocks.length > 0) {
-    sections.push({ id: "links", label: "我的連結", icon: "🔗" });
+    sections.push({ id: "links", label: "我的連結", icon: "links" });
   }
 
   if (shopBlock) {
-    sections.push({ id: "shop", label: "我的貨品專區", icon: "🛍️" });
+    sections.push({ id: "shop", label: "我的貨品專區", icon: "shop" });
   }
 
   if (typedProfile.buy_me_a_coffee_url) {
-    sections.push({ id: "coffee", label: "Buy Me A Coffee", icon: "☕" });
+    sections.push({ id: "coffee", label: "Buy Me A Coffee", icon: "coffee" });
   }
 
-  sections.push({ id: "cta", label: "Media Kit", icon: "📋" });
+  sections.push({ id: "cta", label: "Media Kit", icon: "media-kit" });
 
   const btnColor = typedTheme?.button_color ?? "#3b82f6";
-  const textColor = typedTheme?.text_color ?? "#ffffff";
   const isRounded = (typedTheme?.button_style ?? "rounded") === "rounded";
   const btnRadius = isRounded ? "50px" : "12px";
 
@@ -151,7 +142,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       bgStyle={getBackgroundStyle(typedProfile, typedTheme)}
       btnColor={btnColor}
       btnRadius={btnRadius}
-      textColor={textColor}
+      textColor={typedTheme?.text_color ?? "#ffffff"}
     />
   );
 }

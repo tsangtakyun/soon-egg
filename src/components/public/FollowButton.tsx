@@ -62,7 +62,7 @@ export function FollowButton({
           transition: "opacity 0.2s ease",
         }}
       >
-        {followed ? "✓ 已追蹤" : `＋ 追蹤 ${displayName}`}
+        {followed ? "已追蹤" : `追蹤 ${displayName}`}
       </button>
       {count > 0 && (
         <p style={{ marginTop: 8, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.55)" }}>

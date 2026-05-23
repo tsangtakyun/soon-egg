@@ -30,7 +30,7 @@ export default function HeroSection() {
             SOON AI 幫你配對品牌，協助你提供最新創作工具，讓你專注創作。
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
-            <Link href="/onboarding" className="rounded-full bg-blue-500 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
+            <Link href="/signup" className="rounded-full bg-blue-500 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
               免費開始
             </Link>
             <button type="button" className="px-2 py-3.5 text-sm font-semibold text-blue-500 transition-colors hover:text-blue-600">

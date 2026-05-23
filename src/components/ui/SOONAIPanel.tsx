@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Send, Sparkles, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 const QUICK_PROMPTS = [
   "我本週最大嘅成果係咩？",
@@ -79,7 +80,7 @@ export function SOONAIPanel() {
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm leading-relaxed">
         {messages.map((msg, index) => (
           <div
             key={`${msg.role}-${index}`}
@@ -87,7 +88,27 @@ export function SOONAIPanel() {
               msg.role === "user" ? "ml-auto rounded-br-sm bg-blue-500 text-white" : "rounded-bl-sm bg-gray-100 text-gray-800"
             }`}
           >
-            {msg.content}
+            {msg.role === "user" ? (
+              msg.content
+            ) : (
+              <ReactMarkdown
+                components={{
+                  h1: ({ children }) => <p className="mb-1 text-base font-bold">{children}</p>,
+                  h2: ({ children }) => <p className="mb-1 mt-2 text-sm font-bold">{children}</p>,
+                  h3: ({ children }) => <p className="mb-1 mt-1 text-sm font-semibold">{children}</p>,
+                  strong: ({ children }) => <span className="font-semibold text-gray-900">{children}</span>,
+                  em: ({ children }) => <span className="italic">{children}</span>,
+                  p: ({ children }) => <p className="mb-2 leading-relaxed last:mb-0">{children}</p>,
+                  ul: ({ children }) => <ul className="mb-2 list-disc space-y-1 pl-4 marker:text-blue-400">{children}</ul>,
+                  ol: ({ children }) => <ol className="mb-2 list-decimal space-y-1 pl-4 marker:text-blue-400">{children}</ol>,
+                  li: ({ children }) => <li className="pl-1">{children}</li>,
+                  code: ({ children }) => <code className="rounded bg-white/60 px-1 py-0.5 font-mono text-xs">{children}</code>,
+                  hr: () => <hr className="my-2 border-gray-300" />,
+                }}
+              >
+                {msg.content}
+              </ReactMarkdown>
+            )}
           </div>
         ))}
         {loading && (

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(req: NextRequest) {
   const baseUrl = new URL(req.url).origin;
   const redirectUri = `${baseUrl}/api/auth/instagram/callback`;
-  const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
+  const appId = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
 
   if (!appId) {
     return NextResponse.redirect(`${baseUrl}/onboarding?instagram_error=missing_app_id`);

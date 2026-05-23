@@ -52,7 +52,7 @@ export function PhonePreview({
         backgroundImage: `url(${profile.cover_url})`,
         backgroundPosition: "center",
         backgroundSize: "cover",
-        color: theme?.text_color ?? "#1a1a1a",
+        color: "#ffffff",
       }
     : theme?.background_image
     ? {
@@ -89,8 +89,8 @@ export function PhonePreview({
             <Camera className="h-5 w-5 text-white" aria-hidden />
           </span>
         </button>
-        <h2 className="mt-4 text-xl font-bold">{displayName}</h2>
-        <p className="mt-2 text-sm opacity-75">{bio}</p>
+        <h2 className={`mt-4 text-xl font-bold ${profile.cover_url ? "text-white drop-shadow" : ""}`}>{displayName}</h2>
+        <p className={`mt-2 text-sm ${profile.cover_url ? "text-white drop-shadow" : "opacity-75"}`}>{bio}</p>
         <div className="mt-6 space-y-3">
           {blocks.map((block) => (
             <div

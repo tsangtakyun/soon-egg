@@ -186,7 +186,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           )}
           <div>
             <h1 className="text-xl font-bold text-white">{displayName}</h1>
-            {bio && <p className="text-xs text-white/80">{bio}</p>}
+            {bio && <p className="text-xs text-white drop-shadow">{bio}</p>}
           </div>
         </div>
       </div>

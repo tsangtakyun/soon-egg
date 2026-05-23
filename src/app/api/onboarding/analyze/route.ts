@@ -176,7 +176,7 @@ async function fetchStoredInstagramData(): Promise<InstagramData | null> {
     }
 
     const igRes = await fetch(
-      `https://graph.instagram.com/v21.0/${encodeURIComponent(String(profile.instagram_user_id))}?fields=followers_count,biography,name,username,media_count,profile_picture_url&access_token=${encodeURIComponent(String(profile.instagram_access_token))}`,
+      `https://graph.facebook.com/v21.0/${encodeURIComponent(String(profile.instagram_user_id))}?fields=followers_count,biography,name,username,media_count,profile_picture_url&access_token=${encodeURIComponent(String(profile.instagram_access_token))}`,
       { next: { revalidate: 900 } },
     );
     const igData = await igRes.json();

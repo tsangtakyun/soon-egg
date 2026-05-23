@@ -4,6 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 const INSTAGRAM_REDIRECT_URI = "https://egg.sooncreator.network/api/auth/instagram/callback";
 const ONBOARDING_URL = "https://egg.sooncreator.network/onboarding";
 
+type FacebookPage = {
+  id: string;
+  access_token?: string;
+  name?: string;
+};
+
 type InstagramProfile = {
   id?: string;
   username?: string;
@@ -15,6 +21,48 @@ type InstagramProfile = {
   website?: string;
 };
 
+async function fetchGraph(path: string, accessToken: string) {
+  const url = new URL(`https://graph.facebook.com/v21.0/${path}`);
+  url.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(url.toString(), { next: { revalidate: 0 } });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(JSON.stringify(data));
+  }
+
+  return data;
+}
+
+async function findInstagramProfile(userAccessToken: string): Promise<{
+  profile: InstagramProfile;
+  pageAccessToken: string;
+} | null> {
+  const pagesResponse = await fetchGraph("me/accounts?fields=id,name,access_token", userAccessToken);
+  const pages = (pagesResponse?.data || []) as FacebookPage[];
+
+  for (const page of pages) {
+    if (!page.access_token) continue;
+
+    try {
+      const pageResponse = await fetchGraph(
+        `${page.id}?fields=instagram_business_account{id,username,name,biography,followers_count,media_count,profile_picture_url,website}`,
+        page.access_token,
+      );
+      const profile = pageResponse?.instagram_business_account as InstagramProfile | undefined;
+
+      if (profile?.id && profile.username) {
+        return { profile, pageAccessToken: page.access_token };
+      }
+    } catch (error) {
+      console.error("Instagram page lookup error:", error);
+    }
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
@@ -24,51 +72,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=true`);
   }
 
-  const appId = process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID;
-  const appSecret = process.env.INSTAGRAM_APP_SECRET || process.env.FACEBOOK_APP_SECRET;
+  const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
+  const appSecret = process.env.FACEBOOK_APP_SECRET || process.env.INSTAGRAM_APP_SECRET;
 
   if (!appId || !appSecret) {
     return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=missing_credentials`);
   }
 
   try {
-    const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: appId,
-        client_secret: appSecret,
-        grant_type: "authorization_code",
-        redirect_uri: INSTAGRAM_REDIRECT_URI,
-        code,
-      }),
-    });
+    const tokenUrl = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
+    tokenUrl.searchParams.set("client_id", appId);
+    tokenUrl.searchParams.set("client_secret", appSecret);
+    tokenUrl.searchParams.set("redirect_uri", INSTAGRAM_REDIRECT_URI);
+    tokenUrl.searchParams.set("code", code);
+
+    const tokenRes = await fetch(tokenUrl.toString());
     const tokenData = await tokenRes.json();
 
     if (!tokenRes.ok || !tokenData.access_token) {
-      console.error("Instagram short token error:", tokenData);
-      throw new Error("No Instagram access token received");
+      console.error("Facebook token error:", tokenData);
+      throw new Error("No Facebook access token received");
     }
 
-    const shortToken = tokenData.access_token as string;
-    const igUserId = String(tokenData.user_id || "");
+    const userAccessToken = tokenData.access_token as string;
+    const match = await findInstagramProfile(userAccessToken);
 
-    const longTokenRes = await fetch(
-      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(appSecret)}&access_token=${encodeURIComponent(shortToken)}`,
-    );
-    const longTokenData = await longTokenRes.json();
-    const longToken = (longTokenData.access_token as string | undefined) || shortToken;
-
-    const profileRes = await fetch(
-      `https://graph.instagram.com/v21.0/${encodeURIComponent(igUserId)}?fields=id,username,name,biography,followers_count,media_count,profile_picture_url,website&access_token=${encodeURIComponent(longToken)}`,
-    );
-    const profile = await profileRes.json() as InstagramProfile;
-
-    if (!profileRes.ok || !profile.username) {
-      console.error("Instagram profile error:", profile);
-      throw new Error("Instagram profile fetch failed");
+    if (!match) {
+      return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=no_connected_ig`);
     }
 
+    const { profile, pageAccessToken } = match;
     const supabase = await createClient();
     const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
 
@@ -77,8 +110,8 @@ export async function GET(req: NextRequest) {
         instagram_handle: profile.username,
         instagram_followers: profile.followers_count || 0,
         avatar_url: profile.profile_picture_url || null,
-        instagram_access_token: longToken,
-        instagram_user_id: igUserId,
+        instagram_access_token: pageAccessToken,
+        instagram_user_id: profile.id || null,
       };
 
       const { error: updateError } = await supabase

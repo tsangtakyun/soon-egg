@@ -259,3 +259,7 @@ values
   ('Vitasoy', '維他奶', '食品飲料', array['HK','SG'], 3500, 4, true, '香港飲品品牌，適合校園、懷舊、本地文化內容。'),
   ('Want Want', '旺旺', '零食', array['TW','HK'], 3000, 4, false, '台灣零食品牌，適合童年回憶、零食開箱和節慶內容。')
 on conflict do nothing;
+
+alter table egg_creator_profiles
+  add column if not exists instagram_access_token text,
+  add column if not exists instagram_user_id text;

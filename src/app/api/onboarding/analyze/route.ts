@@ -158,6 +158,50 @@ async function fetchInstagramData(handle: string): Promise<InstagramData | null>
   }
 }
 
+async function fetchStoredInstagramData(): Promise<InstagramData | null> {
+  const supabase = await createClient();
+  const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+
+  if (!supabase || !user) return null;
+
+  try {
+    const { data: profile, error } = await supabase
+      .from("egg_creator_profiles")
+      .select("instagram_access_token, instagram_user_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error || !profile?.instagram_access_token || !profile?.instagram_user_id) {
+      return null;
+    }
+
+    const igRes = await fetch(
+      `https://graph.instagram.com/v21.0/${encodeURIComponent(String(profile.instagram_user_id))}?fields=followers_count,biography,name,username,media_count,profile_picture_url&access_token=${encodeURIComponent(String(profile.instagram_access_token))}`,
+      { next: { revalidate: 900 } },
+    );
+    const igData = await igRes.json();
+
+    if (!igRes.ok || !igData.followers_count) {
+      console.error("Instagram refresh error:", igData);
+      return null;
+    }
+
+    return {
+      fullName: igData.name || igData.username || "",
+      bio: igData.biography || "",
+      followerCount: igData.followers_count || 0,
+      followingCount: 0,
+      postCount: igData.media_count || 0,
+      profilePicUrl: igData.profile_picture_url || null,
+      isVerified: false,
+      category: "Instagram OAuth",
+    };
+  } catch (error) {
+    console.error("Instagram refresh error:", error);
+    return null;
+  }
+}
+
 async function saveCreatorProfile(
   handles: Handles,
   analysis: Analysis,
@@ -244,10 +288,12 @@ export async function POST(req: NextRequest) {
     const normalizedHandles = normalizeHandles(handles);
     const normalizedFollowerCounts = normalizeFollowerCounts(followerCounts);
 
-    const [youtubeData, instagramData] = await Promise.all([
+    const [youtubeData, publicInstagramData, storedInstagramData] = await Promise.all([
       fetchYouTubeData(normalizedHandles.youtube || ""),
       fetchInstagramData(normalizedHandles.instagram || ""),
+      fetchStoredInstagramData(),
     ]);
+    const instagramData = storedInstagramData || publicInstagramData;
 
     const realDataContext: string[] = [];
 

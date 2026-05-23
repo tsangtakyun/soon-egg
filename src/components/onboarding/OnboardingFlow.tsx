@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeDollarSign, BriefcaseBusiness, ClipboardList } from "lucide-react";
+import { BadgeDollarSign, BriefcaseBusiness, CheckCircle, ClipboardList } from "lucide-react";
 import { SOONMascot } from "./SOONMascot";
 
 const totalSteps = 5;
@@ -30,6 +31,13 @@ const THEME_OPTIONS = [
 
 type Handles = Record<string, string>;
 type FollowerCounts = Record<string, string>;
+
+type InstagramConnection = {
+  username: string;
+  followers: number;
+  name: string;
+  avatar: string;
+};
 
 type AnalysisResult = {
   display_name?: string;
@@ -71,6 +79,7 @@ export function OnboardingFlow() {
   const [followerCounts, setFollowerCounts] = useState<FollowerCounts>(initialFollowerCounts);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [selectedTheme, setSelectedTheme] = useState("藍天白雲");
+  const [igData, setIgData] = useState<InstagramConnection | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
   const [error, setError] = useState("");
@@ -118,6 +127,37 @@ export function OnboardingFlow() {
       void analyzeProfiles();
     }
   }, [analyzeProfiles, currentStep]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("instagram_connected");
+    const username = params.get("ig_username");
+
+    if (connected === "true" && username) {
+      const nextIgData = {
+        username,
+        followers: Number.parseInt(params.get("ig_followers") || "0", 10) || 0,
+        name: params.get("ig_name") || "",
+        avatar: params.get("ig_avatar") || "",
+      };
+
+      queueMicrotask(() => {
+        setIgData(nextIgData);
+        setHandles((current) => ({
+          ...current,
+          instagram: username,
+          threads: current.threads || username,
+        }));
+        analyzedRef.current = false;
+        router.replace("/onboarding");
+      });
+    } else if (params.get("instagram_error")) {
+      queueMicrotask(() => {
+        setError("Instagram 連接失敗，您仍可以手動輸入用戶名稱。");
+        router.replace("/onboarding");
+      });
+    }
+  }, [router]);
 
   const stepMeta = useMemo(() => {
     switch (currentStep) {
@@ -200,6 +240,7 @@ export function OnboardingFlow() {
             currentStep={currentStep}
             handles={handles}
             followerCounts={followerCounts}
+            igData={igData}
             updateHandle={updateHandle}
             updateFollowerCount={updateFollowerCount}
             analyzing={analyzing}
@@ -238,6 +279,7 @@ function StepContent({
   currentStep,
   handles,
   followerCounts,
+  igData,
   updateHandle,
   updateFollowerCount,
   analyzing,
@@ -248,6 +290,7 @@ function StepContent({
   currentStep: number;
   handles: Handles;
   followerCounts: FollowerCounts;
+  igData: InstagramConnection | null;
   updateHandle: (platform: string, value: string) => void;
   updateFollowerCount: (platform: string, value: string) => void;
   analyzing: boolean;
@@ -270,8 +313,63 @@ function StepContent({
       <div className="mt-5 space-y-4">
         <p className="text-center text-sm leading-6 text-gray-500">我會幫您分析受眾，配對最合適的品牌。</p>
         <div className="space-y-3">
-          {PLATFORMS.map((platform) => (
-            <div key={platform.id} className="rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
+          {PLATFORMS.map((platform) => {
+            if (platform.id === "instagram") {
+              return (
+                <div
+                  key={platform.id}
+                  className={`overflow-hidden rounded-2xl border transition-all ${
+                    igData ? "border-green-200 bg-green-50" : "border-gray-100 bg-gray-50"
+                  }`}
+                >
+                  {igData ? (
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={platform.logoUrl} alt={platform.label} className="h-6 w-6 shrink-0 object-contain" />
+                      {igData.avatar && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={igData.avatar} alt="" className="h-8 w-8 rounded-full object-cover" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-gray-900">@{igData.username}</p>
+                        <p className="text-xs text-gray-500">{igData.followers.toLocaleString()} 粉絲</p>
+                      </div>
+                      <CheckCircle size={18} className="text-green-500" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 px-3 py-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={platform.logoUrl}
+                        alt={platform.label}
+                        className="h-6 w-6 shrink-0 object-contain"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                          event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                        }}
+                      />
+                      <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
+                      <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                      <input
+                        value={handles.instagram ?? ""}
+                        onChange={(event) => updateHandle("instagram", event.target.value)}
+                        placeholder={platform.placeholder}
+                        className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                      />
+                      <Link
+                        href="/api/auth/instagram"
+                        className="shrink-0 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                      >
+                        OAuth 連接
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            return (
+              <div key={platform.id} className="rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
               <label className="flex items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -305,7 +403,8 @@ function StepContent({
                 </label>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );

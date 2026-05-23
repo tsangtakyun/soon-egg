@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { ExternalLink, Share2 } from "lucide-react";
 
-export function DashboardShareHeader() {
+export function DashboardShareHeader({ username = "soon_egg" }: { username?: string }) {
+  const profileUrl = `https://sooncreator.network/${username}`;
+
   const copyProfileLink = async () => {
-    await navigator.clipboard.writeText("https://sooncreator.network/soon_egg");
+    await navigator.clipboard.writeText(profileUrl);
     alert("連結已複製！");
   };
 
@@ -19,8 +21,8 @@ export function DashboardShareHeader() {
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2">
           <span className="text-xs text-gray-500">sooncreator.network/</span>
-          <span className="text-xs font-semibold text-gray-900">soon_egg</span>
-          <Link href="/soon_egg" target="_blank" className="text-gray-400 transition-colors hover:text-blue-500" aria-label="開啟公開主頁">
+          <span className="text-xs font-semibold text-gray-900">{username}</span>
+          <Link href={`/${username}`} target="_blank" className="text-gray-400 transition-colors hover:text-blue-500" aria-label="開啟公開主頁">
             <ExternalLink size={12} />
           </Link>
         </div>

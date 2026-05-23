@@ -155,6 +155,7 @@ export function OnboardingFlow() {
           threads: nextIgData.threadsUsername,
           facebook: current.facebook || nextIgData.facebookPageName,
         }));
+        setCurrentStep(2);
         analyzedRef.current = false;
         router.replace("/onboarding");
       });
@@ -404,6 +405,46 @@ function StepContent({
                         OAuth 連接
                       </Link>
                     </div>
+                  )}
+                </div>
+              );
+            }
+
+            if (platform.id === "youtube") {
+              const hasYoutubeHandle = Boolean(handles.youtube?.trim());
+
+              return (
+                <div
+                  key={platform.id}
+                  className={`rounded-2xl border px-3 py-2 transition-all ${
+                    hasYoutubeHandle ? "border-green-200 bg-green-50" : "border-gray-100 bg-gray-50"
+                  }`}
+                >
+                  <label className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={platform.logoUrl}
+                      alt={platform.label}
+                      className="h-6 w-6 shrink-0 object-contain"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                        event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                      }}
+                    />
+                    <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
+                    <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                    <input
+                      value={handles.youtube ?? ""}
+                      onChange={(event) => updateHandle("youtube", event.target.value)}
+                      placeholder={platform.placeholder}
+                      className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                    />
+                    {hasYoutubeHandle && <CheckCircle size={18} className="shrink-0 text-green-500" />}
+                  </label>
+                  {hasYoutubeHandle && (
+                    <p className="mt-2 border-t border-green-100 pt-2 text-xs text-green-700">
+                      已加入分析；下一步會用 YouTube API 嘗試讀取頻道訂閱數。
+                    </p>
                   )}
                 </div>
               );

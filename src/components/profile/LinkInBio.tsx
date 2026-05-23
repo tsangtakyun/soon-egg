@@ -108,11 +108,11 @@ export function LinkInBio({
   };
 
   return (
-    <div className="flex gap-8 items-start">
+    <div className="p-6 flex gap-8 items-start">
       <div className="flex-1 flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-black text-zinc-950">我的主頁</h1>
-          <p className="mt-2 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold mb-1 text-zinc-950">我的主頁</h1>
+          <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
             編輯你的 Link in Bio，公開網址為{" "}
             <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
               egg.sooncreator.network/{profile.username}

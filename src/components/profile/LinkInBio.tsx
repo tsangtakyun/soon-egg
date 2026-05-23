@@ -23,7 +23,7 @@ export function LinkInBio({
   const [copied, setCopied] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
-  const publicUrl = `https://sooncreator.network/${profile.username}`;
+  const publicUrl = `https://egg.sooncreator.network/${profile.username}`;
 
   const copyPublicUrl = async () => {
     await navigator.clipboard.writeText(publicUrl);
@@ -69,7 +69,7 @@ export function LinkInBio({
           <p className="mt-2 text-sm text-gray-500">
             編輯你的 Link in Bio，公開網址為{" "}
             <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-              sooncreator.network/{profile.username}
+              egg.sooncreator.network/{profile.username}
             </a>
             <button
               type="button"

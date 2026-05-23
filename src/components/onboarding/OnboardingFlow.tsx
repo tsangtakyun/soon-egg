@@ -1,20 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BadgeDollarSign, BriefcaseBusiness, Camera, Check, ClipboardList, Music2, PlayCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BadgeDollarSign, BriefcaseBusiness, Check, ClipboardList } from "lucide-react";
 import { SOONMascot } from "./SOONMascot";
 
 const totalSteps = 5;
 
-const socialPlatforms = [
-  { name: "Instagram", icon: Camera, placeholder: "@soon_egg", color: "bg-pink-500" },
-  { name: "YouTube", icon: PlayCircle, placeholder: "@soon_egg", color: "bg-red-500" },
-  { name: "小紅書", icon: ClipboardList, placeholder: "soon_egg", color: "bg-rose-500" },
-  { name: "TikTok", icon: Music2, placeholder: "@soon_egg", color: "bg-zinc-900" },
-  { name: "Threads", icon: Music2, placeholder: "@soon_egg", color: "bg-gray-700" },
+const PLATFORMS = [
+  { id: "instagram", label: "Instagram", placeholder: "用戶名稱", color: "#E1306C" },
+  { id: "facebook", label: "Facebook", placeholder: "用戶名稱或專頁名稱", color: "#1877F2" },
+  { id: "threads", label: "Threads", placeholder: "用戶名稱", color: "#000000" },
+  { id: "youtube", label: "YouTube", placeholder: "頻道名稱", color: "#FF0000" },
+  { id: "tiktok", label: "TikTok", placeholder: "用戶名稱", color: "#000000" },
+  { id: "douyin", label: "抖音", placeholder: "抖音號", color: "#161823" },
+  { id: "xiaohongshu", label: "小紅書", placeholder: "小紅書號", color: "#FF2442" },
 ];
 
-const themes = [
+const THEMES = [
   { name: "日系清透", swatch: "linear-gradient(135deg,#f8fbff,#dceee5)" },
   { name: "韓系黃昏", swatch: "linear-gradient(135deg,#ffdfb8,#e6a6b8)" },
   { name: "港風霓虹", swatch: "linear-gradient(135deg,#160b2e,#00b8d4,#ff4f7b)" },
@@ -22,28 +25,136 @@ const themes = [
   { name: "現代極簡", swatch: "linear-gradient(135deg,#111,#f5f5f4)" },
 ];
 
+type Handles = Record<string, string>;
+
+type AnalysisResult = {
+  display_name?: string;
+  bio?: string;
+  content_categories?: string[];
+  content_language?: string;
+  ai_profile_summary?: string;
+  suggested_theme?: string;
+};
+
+const initialHandles = {
+  instagram: "",
+  facebook: "",
+  threads: "",
+  youtube: "",
+  tiktok: "",
+  douyin: "",
+  xiaohongshu: "",
+};
+
 export function OnboardingFlow() {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedTheme, setSelectedTheme] = useState("日系清透");
+  const [handles, setHandles] = useState<Handles>(initialHandles);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState("現代極簡");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [savingTheme, setSavingTheme] = useState(false);
+  const [error, setError] = useState("");
+  const analyzedRef = useRef(false);
   const progress = (currentStep / totalSteps) * 100;
+
+  const analyzeProfiles = useCallback(async () => {
+    setAnalyzing(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/onboarding/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handles }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Analysis failed");
+      }
+
+      setAnalysisResult(data.analysis);
+      if (data.analysis?.suggested_theme) {
+        setSelectedTheme(data.analysis.suggested_theme);
+      }
+      setTimeout(() => setCurrentStep(4), 1000);
+    } catch {
+      setError("暫時無法完成分析，請稍後再試。");
+      setAnalysisResult({
+        display_name: "您的創作者檔案",
+        bio: "專注亞洲創作者內容與品牌合作。",
+        content_categories: ["品牌合作", "內容創作", "創作者工具"],
+        ai_profile_summary: "系統暫時未能連線至 AI 分析服務，您仍可繼續選擇頁面風格。",
+      });
+      setTimeout(() => setCurrentStep(4), 1000);
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [handles]);
+
+  useEffect(() => {
+    if (currentStep === 3 && !analyzedRef.current) {
+      analyzedRef.current = true;
+      void analyzeProfiles();
+    }
+  }, [analyzeProfiles, currentStep]);
 
   const stepMeta = useMemo(() => {
     switch (currentStep) {
       case 1:
         return { title: "你好！我係 SOON AI", mood: "excited" as const };
       case 2:
-        return { title: "告訴我你喺邊度活躍", mood: "thinking" as const };
+        return { title: "請告訴我您活躍的社交平台", mood: "thinking" as const };
       case 3:
-        return { title: "SOON AI 分析緊你的數據...", mood: "thinking" as const };
+        return { title: "SOON AI 正在分析您的社交平台數據...", mood: "thinking" as const };
       case 4:
-        return { title: "係咁架！呢個係你嗎？", mood: "excited" as const };
+        return { title: "以下是您的創作者檔案，請確認是否正確", mood: "excited" as const };
       default:
-        return { title: "揀一個你鍾意的風格", mood: "happy" as const };
+        return { title: "請選擇您偏好的頁面風格", mood: "happy" as const };
     }
   }, [currentStep]);
 
-  const nextStep = () => setCurrentStep((step) => Math.min(totalSteps, step + 1));
+  const nextStep = () => {
+    if (currentStep === 5) {
+      void handleThemeConfirm();
+      return;
+    }
+    setCurrentStep((step) => Math.min(totalSteps, step + 1));
+  };
+
   const prevStep = () => setCurrentStep((step) => Math.max(1, step - 1));
+
+  const updateHandle = (platform: string, value: string) => {
+    setHandles((current) => ({ ...current, [platform]: value }));
+    if (currentStep < 3) {
+      analyzedRef.current = false;
+    }
+  };
+
+  const handleThemeConfirm = async () => {
+    setSavingTheme(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/onboarding/save-theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ themeName: selectedTheme }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Save failed");
+      }
+
+      router.push("/dashboard");
+    } catch {
+      setError("未能儲存頁面風格。請確認您已登入，再重試。");
+    } finally {
+      setSavingTheme(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#fafafa]">
@@ -59,11 +170,20 @@ export function OnboardingFlow() {
         <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
           <SOONMascot mood={stepMeta.mood} />
           <h2 className="mb-2 text-center text-xl font-bold text-gray-900">{stepMeta.title}</h2>
-          <StepContent currentStep={currentStep} selectedTheme={selectedTheme} onSelectTheme={setSelectedTheme} />
+          <StepContent
+            currentStep={currentStep}
+            handles={handles}
+            updateHandle={updateHandle}
+            analyzing={analyzing}
+            analysisResult={analysisResult}
+            selectedTheme={selectedTheme}
+            onSelectTheme={setSelectedTheme}
+          />
+          {error && <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
         </div>
 
         <div className="mt-6 flex w-full max-w-md gap-3">
-          {currentStep > 1 && (
+          {currentStep > 1 && currentStep !== 3 && (
             <button
               type="button"
               onClick={prevStep}
@@ -75,9 +195,10 @@ export function OnboardingFlow() {
           <button
             type="button"
             onClick={nextStep}
-            className="flex-1 rounded-2xl bg-blue-500 py-3 font-semibold text-white transition-colors hover:bg-blue-600"
+            disabled={analyzing || savingTheme}
+            className="flex-1 rounded-2xl bg-blue-500 py-3 font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
           >
-            {currentStep === totalSteps ? "完成設定" : "下一步 →"}
+            {currentStep === 5 ? (savingTheme ? "儲存中..." : "完成設定") : "下一步 →"}
           </button>
         </div>
       </div>
@@ -87,19 +208,27 @@ export function OnboardingFlow() {
 
 function StepContent({
   currentStep,
+  handles,
+  updateHandle,
+  analyzing,
+  analysisResult,
   selectedTheme,
   onSelectTheme,
 }: {
   currentStep: number;
+  handles: Handles;
+  updateHandle: (platform: string, value: string) => void;
+  analyzing: boolean;
+  analysisResult: AnalysisResult | null;
   selectedTheme: string;
   onSelectTheme: (theme: string) => void;
 }) {
   if (currentStep === 1) {
     return (
       <div className="mt-6 space-y-3">
-        <FeatureRow icon={BriefcaseBusiness} text="配對最適合你的亞洲品牌" />
+        <FeatureRow icon={BriefcaseBusiness} text="配對最適合您的亞洲品牌" />
         <FeatureRow icon={ClipboardList} text="自動生成繁體中文 Media Kit" />
-        <FeatureRow icon={BadgeDollarSign} text="協助你談到理想報價" />
+        <FeatureRow icon={BadgeDollarSign} text="協助您談到理想報價" />
       </div>
     );
   }
@@ -107,23 +236,25 @@ function StepContent({
   if (currentStep === 2) {
     return (
       <div className="mt-5 space-y-4">
-        <p className="text-center text-sm leading-6 text-gray-500">我會幫你分析受眾，配對最合適的品牌</p>
+        <p className="text-center text-sm leading-6 text-gray-500">我會幫您分析受眾，配對最合適的品牌。</p>
         <div className="space-y-3">
-          {socialPlatforms.map((platform) => {
-            const Icon = platform.icon;
-            return (
-              <label key={platform.name} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-full text-white ${platform.color}`}>
-                  <Icon size={16} />
-                </span>
-                <span className="w-20 text-sm font-semibold text-gray-700">{platform.name}</span>
-                <input
-                  placeholder={platform.placeholder}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-                />
-              </label>
-            );
-          })}
+          {PLATFORMS.map((platform) => (
+            <label key={platform.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
+              <div
+                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
+                style={{ backgroundColor: platform.color }}
+              >
+                {platform.label[0]}
+              </div>
+              <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+              <input
+                value={handles[platform.id] ?? ""}
+                onChange={(event) => updateHandle(platform.id, event.target.value)}
+                placeholder={platform.placeholder}
+                className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+              />
+            </label>
+          ))}
         </div>
       </div>
     );
@@ -137,34 +268,51 @@ function StepContent({
           <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:120ms]" />
           <span className="h-2 w-2 animate-bounce rounded-full bg-blue-500 [animation-delay:240ms]" />
         </div>
-        <p className="mt-4 text-sm leading-6 text-gray-600">正在整理你的平台數據、內容定位、受眾輪廓同品牌合作機會。</p>
+        <p className="mt-4 text-sm leading-6 text-gray-600">
+          {analyzing ? "正在整理您的平台數據、內容定位、受眾輪廓與品牌合作機會。" : "分析完成，正在準備您的創作者檔案。"}
+        </p>
       </div>
     );
   }
 
   if (currentStep === 4) {
+    const connectedHandles = Object.entries(handles).filter(([, value]) => value.trim());
+
     return (
-      <div className="mt-6 rounded-3xl border border-gray-100 bg-gray-50 p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-cyan-300 font-black text-white">SE</div>
-          <div>
-            <h3 className="font-bold text-gray-900">SOON-EGG</h3>
-            <p className="text-sm text-gray-500">@soon_egg</p>
+      <div className="mt-6 space-y-4">
+        <div className="rounded-2xl bg-gray-50 p-4">
+          <h3 className="text-lg font-bold text-gray-900">{analysisResult?.display_name || "您的創作者檔案"}</h3>
+          <p className="mt-1 text-sm text-gray-600">{analysisResult?.bio || "正在建立您的創作者定位。"}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(analysisResult?.content_categories ?? []).map((category) => (
+              <span key={category} className="rounded-full bg-blue-100 px-3 py-1 text-xs text-blue-700">
+                {category}
+              </span>
+            ))}
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-          <Metric label="Followers" value="128K" />
-          <Metric label="Engagement" value="5.8%" />
-          <Metric label="Region" value="HK" />
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-500">已連接平台</p>
+          {connectedHandles.length > 0 ? connectedHandles.map(([platform, handle]) => (
+            <div key={platform} className="flex items-center gap-2 text-sm text-gray-700">
+              <div className="h-5 w-5 rounded-full bg-gray-200" />
+              <span className="capitalize">{platform}</span>
+              <span className="text-gray-400">@{handle}</span>
+            </div>
+          )) : (
+            <p className="text-sm text-gray-400">尚未輸入平台資料。</p>
+          )}
         </div>
-        <p className="mt-4 text-sm leading-6 text-gray-600">專注亞洲創作者工具、品牌合作同內容變現的創作者。</p>
+
+        <p className="text-xs italic leading-relaxed text-gray-500">{analysisResult?.ai_profile_summary}</p>
       </div>
     );
   }
 
   return (
     <div className="mt-6 grid grid-cols-2 gap-3">
-      {themes.map((theme) => (
+      {THEMES.map((theme) => (
         <button
           key={theme.name}
           type="button"
@@ -191,15 +339,6 @@ function FeatureRow({ icon: Icon, text }: { icon: React.ElementType; text: strin
         <Icon size={17} />
       </span>
       <span className="text-sm font-medium text-gray-700">{text}</span>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-white p-3">
-      <div className="text-[10px] uppercase tracking-wide text-gray-400">{label}</div>
-      <div className="mt-1 text-sm font-bold text-gray-900">{value}</div>
     </div>
   );
 }

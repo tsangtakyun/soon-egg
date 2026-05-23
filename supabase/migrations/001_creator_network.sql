@@ -11,6 +11,8 @@ create table if not exists egg_creator_profiles (
   instagram_handle text,
   instagram_followers integer,
   instagram_engagement_rate decimal(5,2),
+  facebook_handle text,
+  threads_handle text,
   youtube_handle text,
   youtube_subscribers integer,
   youtube_avg_views integer,
@@ -18,6 +20,7 @@ create table if not exists egg_creator_profiles (
   xiaohongshu_followers integer,
   tiktok_handle text,
   tiktok_followers integer,
+  douyin_handle text,
   content_categories text[],
   content_language text default 'zh-HK',
   audience_demographics jsonb,
@@ -25,9 +28,15 @@ create table if not exists egg_creator_profiles (
   is_public boolean default true,
   ai_credits integer default 30,
   plan text default 'free',
+  onboarding_completed boolean default false,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+alter table egg_creator_profiles add column if not exists facebook_handle text;
+alter table egg_creator_profiles add column if not exists threads_handle text;
+alter table egg_creator_profiles add column if not exists douyin_handle text;
+alter table egg_creator_profiles add column if not exists onboarding_completed boolean default false;
 
 create table if not exists egg_profile_blocks (
   id uuid primary key default gen_random_uuid(),

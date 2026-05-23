@@ -17,6 +17,8 @@ const PLATFORMS = [
   { id: "xiaohongshu", label: "小紅書", placeholder: "小紅書號", logoUrl: "https://cdn.simpleicons.org/xiaohongshu/FF2442" },
 ];
 
+const MANUAL_METRIC_PLATFORMS = new Set(["tiktok", "douyin", "xiaohongshu"]);
+
 const THEME_OPTIONS = [
   { name: "藍天白雲", bg: "/hero-bg.jpg" },
   { name: "萬天星空", bg: "/star-bg.jpg" },
@@ -27,6 +29,7 @@ const THEME_OPTIONS = [
 ];
 
 type Handles = Record<string, string>;
+type FollowerCounts = Record<string, string>;
 
 type AnalysisResult = {
   display_name?: string;
@@ -37,8 +40,12 @@ type AnalysisResult = {
   suggested_theme?: string;
   instagram_followers?: number;
   youtube_subscribers?: number;
+  tiktok_followers?: number;
+  douyin_followers?: number;
+  xiaohongshu_followers?: number;
   avatar_url?: string | null;
   real_data_fetched?: boolean;
+  provided_data_sources?: string[];
 };
 
 const initialHandles = {
@@ -51,10 +58,17 @@ const initialHandles = {
   xiaohongshu: "",
 };
 
+const initialFollowerCounts = {
+  tiktok: "",
+  douyin: "",
+  xiaohongshu: "",
+};
+
 export function OnboardingFlow() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [handles, setHandles] = useState<Handles>(initialHandles);
+  const [followerCounts, setFollowerCounts] = useState<FollowerCounts>(initialFollowerCounts);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [selectedTheme, setSelectedTheme] = useState("藍天白雲");
   const [analyzing, setAnalyzing] = useState(false);
@@ -71,7 +85,7 @@ export function OnboardingFlow() {
       const response = await fetch("/api/onboarding/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handles }),
+        body: JSON.stringify({ handles, followerCounts }),
       });
       const data = await response.json();
 
@@ -96,7 +110,7 @@ export function OnboardingFlow() {
     } finally {
       setAnalyzing(false);
     }
-  }, [handles]);
+  }, [followerCounts, handles]);
 
   useEffect(() => {
     if (currentStep === 3 && !analyzedRef.current) {
@@ -132,6 +146,13 @@ export function OnboardingFlow() {
 
   const updateHandle = (platform: string, value: string) => {
     setHandles((current) => ({ ...current, [platform]: value }));
+    if (currentStep < 3) {
+      analyzedRef.current = false;
+    }
+  };
+
+  const updateFollowerCount = (platform: string, value: string) => {
+    setFollowerCounts((current) => ({ ...current, [platform]: value.replace(/[^\d]/g, "") }));
     if (currentStep < 3) {
       analyzedRef.current = false;
     }
@@ -178,7 +199,9 @@ export function OnboardingFlow() {
           <StepContent
             currentStep={currentStep}
             handles={handles}
+            followerCounts={followerCounts}
             updateHandle={updateHandle}
+            updateFollowerCount={updateFollowerCount}
             analyzing={analyzing}
             analysisResult={analysisResult}
             selectedTheme={selectedTheme}
@@ -214,7 +237,9 @@ export function OnboardingFlow() {
 function StepContent({
   currentStep,
   handles,
+  followerCounts,
   updateHandle,
+  updateFollowerCount,
   analyzing,
   analysisResult,
   selectedTheme,
@@ -222,7 +247,9 @@ function StepContent({
 }: {
   currentStep: number;
   handles: Handles;
+  followerCounts: FollowerCounts;
   updateHandle: (platform: string, value: string) => void;
+  updateFollowerCount: (platform: string, value: string) => void;
   analyzing: boolean;
   analysisResult: AnalysisResult | null;
   selectedTheme: string;
@@ -244,26 +271,40 @@ function StepContent({
         <p className="text-center text-sm leading-6 text-gray-500">我會幫您分析受眾，配對最合適的品牌。</p>
         <div className="space-y-3">
           {PLATFORMS.map((platform) => (
-            <label key={platform.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={platform.logoUrl}
-                alt={platform.label}
-                className="h-6 w-6 shrink-0 object-contain"
-                onError={(event) => {
-                  event.currentTarget.style.display = "none";
-                  event.currentTarget.nextElementSibling?.classList.remove("hidden");
-                }}
-              />
-              <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
-              <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
-              <input
-                value={handles[platform.id] ?? ""}
-                onChange={(event) => updateHandle(platform.id, event.target.value)}
-                placeholder={platform.placeholder}
-                className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
-              />
-            </label>
+            <div key={platform.id} className="rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
+              <label className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={platform.logoUrl}
+                  alt={platform.label}
+                  className="h-6 w-6 shrink-0 object-contain"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                    event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                  }}
+                />
+                <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
+                <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                <input
+                  value={handles[platform.id] ?? ""}
+                  onChange={(event) => updateHandle(platform.id, event.target.value)}
+                  placeholder={platform.placeholder}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                />
+              </label>
+              {MANUAL_METRIC_PLATFORMS.has(platform.id) && handles[platform.id]?.trim() && (
+                <label className="mt-2 flex items-center gap-2 border-t border-gray-100 pt-2">
+                  <span className="w-[7.5rem] text-xs font-medium text-gray-400">粉絲數</span>
+                  <input
+                    inputMode="numeric"
+                    value={followerCounts[platform.id] ?? ""}
+                    onChange={(event) => updateFollowerCount(platform.id, event.target.value)}
+                    placeholder="由創作者提供"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                  />
+                </label>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -289,6 +330,11 @@ function StepContent({
     const connectedHandles = Object.entries(handles).filter(([, value]) => value.trim());
     const instagramFollowers = analysisResult?.instagram_followers ?? 0;
     const youtubeSubscribers = analysisResult?.youtube_subscribers ?? 0;
+    const creatorProvidedStats = [
+      { platform: "TikTok", value: analysisResult?.tiktok_followers },
+      { platform: "抖音", value: analysisResult?.douyin_followers },
+      { platform: "小紅書", value: analysisResult?.xiaohongshu_followers },
+    ].filter((item) => (item.value ?? 0) > 0);
 
     return (
       <div className="mt-6 space-y-4">
@@ -310,20 +356,29 @@ function StepContent({
               </span>
             ))}
           </div>
-          {(instagramFollowers > 0 || youtubeSubscribers > 0) && (
-            <div className="mt-4 flex gap-4">
+          {(instagramFollowers > 0 || youtubeSubscribers > 0 || creatorProvidedStats.length > 0) && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
               {instagramFollowers > 0 && (
-                <div className="text-center">
+                <div className="rounded-xl bg-white px-3 py-2 text-center">
                   <p className="font-bold text-gray-900">{instagramFollowers.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">Instagram 粉絲</p>
+                  <p className="mt-1 text-[10px] font-medium text-blue-500">自動驗證</p>
                 </div>
               )}
               {youtubeSubscribers > 0 && (
-                <div className="text-center">
+                <div className="rounded-xl bg-white px-3 py-2 text-center">
                   <p className="font-bold text-gray-900">{youtubeSubscribers.toLocaleString()}</p>
                   <p className="text-xs text-gray-500">YouTube 訂閱</p>
+                  <p className="mt-1 text-[10px] font-medium text-blue-500">自動驗證</p>
                 </div>
               )}
+              {creatorProvidedStats.map((stat) => (
+                <div key={stat.platform} className="rounded-xl bg-white px-3 py-2 text-center">
+                  <p className="font-bold text-gray-900">{Number(stat.value).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">{stat.platform} 粉絲</p>
+                  <p className="mt-1 text-[10px] font-medium text-amber-500">創作者提供</p>
+                </div>
+              ))}
             </div>
           )}
         </div>

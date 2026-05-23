@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 type Handles = Record<string, string>;
+type FollowerCounts = Record<string, string | number>;
 
 type YouTubeData = {
   title: string;
@@ -33,9 +34,13 @@ type Analysis = {
   ai_profile_summary: string;
   instagram_followers: number;
   youtube_subscribers: number;
+  tiktok_followers: number;
+  douyin_followers: number;
+  xiaohongshu_followers: number;
   suggested_theme: string;
   avatar_url?: string | null;
   real_data_fetched?: boolean;
+  provided_data_sources?: string[];
 };
 
 const fallbackAnalysis: Analysis = {
@@ -46,9 +51,13 @@ const fallbackAnalysis: Analysis = {
   ai_profile_summary: "這是一位正在建立個人品牌的創作者。SOON AI 會根據已連接的平台資料，協助完善 Media Kit、品牌配對與合作報價。",
   instagram_followers: 0,
   youtube_subscribers: 0,
+  tiktok_followers: 0,
+  douyin_followers: 0,
+  xiaohongshu_followers: 0,
   suggested_theme: "藍天白雲",
   avatar_url: null,
   real_data_fetched: false,
+  provided_data_sources: [],
 };
 
 function normalizeHandles(handles: Handles = {}) {
@@ -58,6 +67,15 @@ function normalizeHandles(handles: Handles = {}) {
       String(value ?? "").replace(/^@/, "").trim(),
     ]),
   ) as Handles;
+}
+
+function normalizeFollowerCounts(followerCounts: FollowerCounts = {}) {
+  return Object.fromEntries(
+    Object.entries(followerCounts).map(([key, value]) => [
+      key,
+      Number.parseInt(String(value ?? "").replace(/[^\d]/g, ""), 10) || 0,
+    ]),
+  ) as Record<string, number>;
 }
 
 async function fetchYouTubeData(handle: string): Promise<YouTubeData | null> {
@@ -144,6 +162,7 @@ async function saveCreatorProfile(
   handles: Handles,
   analysis: Analysis,
   avatarUrl: string | null,
+  followerCounts: Record<string, number>,
 ) {
   const supabase = await createClient();
   const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
@@ -168,10 +187,16 @@ async function saveCreatorProfile(
     youtube_handle: handles.youtube || null,
     youtube_subscribers: analysis.youtube_subscribers ?? 0,
     tiktok_handle: handles.tiktok || null,
+    tiktok_followers: followerCounts.tiktok || analysis.tiktok_followers || 0,
     xiaohongshu_handle: handles.xiaohongshu || null,
+    xiaohongshu_followers: followerCounts.xiaohongshu || analysis.xiaohongshu_followers || 0,
     content_categories: analysis.content_categories,
     content_language: analysis.content_language || "zh-HK",
-    audience_demographics: { social_handles: handles },
+    audience_demographics: {
+      social_handles: handles,
+      creator_provided_followers: followerCounts,
+      provided_data_sources: analysis.provided_data_sources ?? [],
+    },
     ai_profile_summary: analysis.ai_profile_summary,
   };
 
@@ -180,6 +205,7 @@ async function saveCreatorProfile(
     threads_handle: handles.threads || null,
     facebook_handle: handles.facebook || null,
     douyin_handle: handles.douyin || null,
+    douyin_followers: followerCounts.douyin || analysis.douyin_followers || 0,
   };
 
   const savePayload = async (payload: Record<string, unknown>) => {
@@ -198,7 +224,7 @@ async function saveCreatorProfile(
 
   const { error } = await savePayload(payloadWithOptionalColumns);
 
-  if (error && /column|schema|facebook_handle|threads_handle|douyin_handle/i.test(error.message)) {
+  if (error && /column|schema|facebook_handle|threads_handle|douyin_handle|douyin_followers/i.test(error.message)) {
     const { error: fallbackError } = await savePayload(basePayload);
     if (fallbackError) console.error("Supabase profile save error:", fallbackError);
     return !fallbackError;
@@ -210,8 +236,13 @@ async function saveCreatorProfile(
 
 export async function POST(req: NextRequest) {
   try {
-    const { handles = {} } = await req.json() as { handles?: Handles; userId?: string };
+    const { handles = {}, followerCounts = {} } = await req.json() as {
+      handles?: Handles;
+      followerCounts?: FollowerCounts;
+      userId?: string;
+    };
     const normalizedHandles = normalizeHandles(handles);
+    const normalizedFollowerCounts = normalizeFollowerCounts(followerCounts);
 
     const [youtubeData, instagramData] = await Promise.all([
       fetchYouTubeData(normalizedHandles.youtube || ""),
@@ -241,6 +272,26 @@ Instagram 帳號真實數據：
 - 帖子數：${instagramData.postCount}
 - 帳號類別：${instagramData.category || "未知"}
 - 已認證：${instagramData.isVerified ? "是" : "否"}
+`);
+    }
+
+    const hasAutoData = realDataContext.length > 0;
+    const providedMetricsContext = [
+      normalizedHandles.tiktok && normalizedFollowerCounts.tiktok
+        ? `TikTok：@${normalizedHandles.tiktok}，粉絲數 ${normalizedFollowerCounts.tiktok.toLocaleString()}（創作者提供）`
+        : "",
+      normalizedHandles.douyin && normalizedFollowerCounts.douyin
+        ? `抖音：@${normalizedHandles.douyin}，粉絲數 ${normalizedFollowerCounts.douyin.toLocaleString()}（創作者提供）`
+        : "",
+      normalizedHandles.xiaohongshu && normalizedFollowerCounts.xiaohongshu
+        ? `小紅書：@${normalizedHandles.xiaohongshu}，粉絲數 ${normalizedFollowerCounts.xiaohongshu.toLocaleString()}（創作者提供）`
+        : "",
+    ].filter(Boolean);
+
+    if (providedMetricsContext.length > 0) {
+      realDataContext.push(`
+創作者提供的平台數據：
+${providedMetricsContext.join("\n")}
 `);
     }
 
@@ -274,6 +325,9 @@ ${hasRealData ? realDataContext.join("\n") : platformInfo}
   "ai_profile_summary": "兩至三句專業描述（繁體中文，書面語，根據真實數據）",
   "instagram_followers": ${instagramData?.followerCount || 0},
   "youtube_subscribers": ${youtubeData?.subscriberCount || 0},
+  "tiktok_followers": ${normalizedFollowerCounts.tiktok || 0},
+  "douyin_followers": ${normalizedFollowerCounts.douyin || 0},
+  "xiaohongshu_followers": ${normalizedFollowerCounts.xiaohongshu || 0},
   "suggested_theme": "藍天白雲"
 }`,
         }],
@@ -290,19 +344,27 @@ ${hasRealData ? realDataContext.join("\n") : platformInfo}
       ...analysis,
       instagram_followers: instagramData?.followerCount || analysis.instagram_followers || 0,
       youtube_subscribers: youtubeData?.subscriberCount || analysis.youtube_subscribers || 0,
+      tiktok_followers: normalizedFollowerCounts.tiktok || analysis.tiktok_followers || 0,
+      douyin_followers: normalizedFollowerCounts.douyin || analysis.douyin_followers || 0,
+      xiaohongshu_followers: normalizedFollowerCounts.xiaohongshu || analysis.xiaohongshu_followers || 0,
       avatar_url: instagramData?.profilePicUrl || youtubeData?.thumbnailUrl || null,
-      real_data_fetched: hasRealData,
+      real_data_fetched: hasAutoData,
+      provided_data_sources: Object.entries(normalizedFollowerCounts)
+        .filter(([, value]) => value > 0)
+        .map(([platform]) => platform),
     };
 
     const saved = await saveCreatorProfile(
       normalizedHandles,
       enrichedAnalysis,
       enrichedAnalysis.avatar_url || null,
+      normalizedFollowerCounts,
     );
 
     return NextResponse.json({
       analysis: enrichedAnalysis,
       handles: normalizedHandles,
+      followerCounts: normalizedFollowerCounts,
       youtubeData,
       instagramData,
       saved,

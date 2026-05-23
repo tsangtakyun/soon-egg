@@ -20,10 +20,12 @@ export function BlockEditor({
   creatorId,
   blocks,
   onBlocksChange,
+  blocksError,
 }: {
   creatorId: string;
   blocks: ProfileBlock[];
   onBlocksChange: (blocks: ProfileBlock[]) => void;
+  blocksError?: string;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
@@ -172,8 +174,14 @@ export function BlockEditor({
       </div>
 
       {toast && <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{toast}</div>}
+      {blocksError && <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">連結未能載入：{blocksError}</div>}
 
       <div className="mt-4 space-y-3">
+        {!blocksError && sortedBlocks.length === 0 && (
+          <div className="rounded-lg border border-dashed border-zinc-200 p-6 text-center text-sm text-zinc-500">
+            暫時未有連結，按「新增」建立第一個 Link in Bio 連結。
+          </div>
+        )}
         {sortedBlocks.map((block) => {
           const isEditing = editingId === block.id;
           const isVisible = block.is_visible !== false;

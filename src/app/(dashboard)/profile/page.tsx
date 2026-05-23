@@ -31,6 +31,7 @@ export default async function ProfilePage() {
   let profile = fallbackProfile;
   let theme: Theme | null = null;
   let blocks: ProfileBlock[] = [];
+  let blocksError = "";
 
   if (supabase) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -45,23 +46,23 @@ export default async function ProfilePage() {
       if (creatorProfile) {
         profile = creatorProfile as Profile;
 
-        const [{ data: activeTheme }, { data: profileBlocks }] = await Promise.all([
-          supabase
-            .from("egg_profile_themes")
-            .select("background_gradient, background_color, text_color")
-            .eq("creator_id", creatorProfile.id)
-            .eq("is_active", true)
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from("egg_profile_blocks")
-            .select("id, creator_id, block_type, title, url, is_visible, sort_order, click_count")
-            .eq("creator_id", creatorProfile.id)
-            .order("sort_order", { ascending: true }),
-        ]);
+        const { data: activeTheme } = await supabase
+          .from("egg_profile_themes")
+          .select("background_gradient, background_color, text_color")
+          .eq("creator_id", creatorProfile.id)
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+
+        const { data: profileBlocks, error: profileBlocksError } = await supabase
+          .from("egg_profile_blocks")
+          .select("*")
+          .eq("creator_id", creatorProfile.id)
+          .order("sort_order", { ascending: true });
 
         theme = activeTheme as Theme | null;
         blocks = (profileBlocks ?? []) as ProfileBlock[];
+        blocksError = profileBlocksError?.message ?? "";
       }
     }
   }
@@ -72,7 +73,7 @@ export default async function ProfilePage() {
         <h1 className="text-3xl font-black text-zinc-950">我的主頁</h1>
         <p className="mt-2 text-zinc-500">編輯你的 Link in Bio，公開網址為 sooncreator.network/{profile.username}。</p>
       </div>
-      <LinkInBio profile={profile} theme={theme} blocks={blocks} />
+      <LinkInBio profile={profile} theme={theme} blocks={blocks} blocksError={blocksError} />
     </div>
   );
 }

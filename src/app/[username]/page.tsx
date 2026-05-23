@@ -1,151 +1,141 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { demoBlocks, demoCreator, demoThemes } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/server";
-import type { ProfileBlock, ProfileTheme } from "@/lib/types";
+import { notFound } from "next/navigation";
 
-type PublicCreator = typeof demoCreator & {
-  egg_profile_blocks?: ProfileBlock[];
-  egg_profile_themes?: ProfileTheme[];
+const RESERVED_ROUTES = [
+  "dashboard",
+  "profile",
+  "login",
+  "signup",
+  "onboarding",
+  "media-kit",
+  "brand-deals",
+  "brands",
+  "analytics",
+  "settings",
+  "products",
+  "api",
+  "auth",
+];
+
+type PublicProfile = {
+  id: string;
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  avatar_url: string | null;
+  ai_profile_summary: string | null;
 };
 
-const buttonRadius: Record<string, string> = {
-  rounded: "rounded-xl",
-  pill: "rounded-full",
-  square: "rounded-none",
+type PublicBlock = {
+  id: string;
+  title: string | null;
+  url: string | null;
 };
 
-export default async function CreatorPublicPage({ params }: { params: Promise<{ username: string }> }) {
+type PublicTheme = {
+  background_image: string | null;
+  background_gradient: string | null;
+  background_color: string | null;
+  button_color: string | null;
+  text_color: string | null;
+};
+
+export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
+  if (RESERVED_ROUTES.includes(username)) notFound();
+
   const supabase = await createClient();
-  let creator: PublicCreator | null = null;
+  if (!supabase) notFound();
 
-  if (supabase) {
-    const { data } = await supabase
-      .from("egg_creator_profiles")
-      .select("*, egg_profile_blocks(*), egg_profile_themes(*)")
-      .eq("username", username)
-      .eq("is_public", true)
-      .single();
+  const { data: profile } = await supabase
+    .from("egg_creator_profiles")
+    .select("*")
+    .eq("username", username)
+    .eq("is_public", true)
+    .single();
 
-    creator = data;
+  if (!profile) notFound();
 
-    if (creator) {
-      await supabase.from("egg_analytics_events").insert({
-        creator_id: creator.id,
-        event_type: "profile_view",
-        source: "direct",
-      });
-    }
-  }
+  const [{ data: blocks }, { data: theme }] = await Promise.all([
+    supabase
+      .from("egg_profile_blocks")
+      .select("*")
+      .eq("creator_id", profile.id)
+      .eq("is_visible", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("egg_profile_themes")
+      .select("*")
+      .eq("creator_id", profile.id)
+      .eq("is_active", true)
+      .single(),
+  ]);
 
-  if (!creator && username === demoCreator.username) {
-    creator = { ...demoCreator, egg_profile_blocks: demoBlocks, egg_profile_themes: demoThemes };
-  }
+  await supabase.from("egg_analytics_events").insert({
+    creator_id: profile.id,
+    event_type: "profile_view",
+    source: "direct",
+  });
 
-  if (!creator) notFound();
-
-  const activeTheme = creator.egg_profile_themes?.find((theme) => theme.is_active) ?? demoThemes[0];
-  const bgStyle = activeTheme.background_image
+  const typedProfile = profile as PublicProfile;
+  const typedTheme = theme as PublicTheme | null;
+  const bgStyle = typedTheme?.background_image
     ? {
-        backgroundImage: `url(${activeTheme.background_image})`,
+        backgroundImage: `url(${typedTheme.background_image})`,
         backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
         backgroundSize: "cover",
       }
-    : {
-        background: activeTheme.background_gradient || activeTheme.background_color || "#ffffff",
-      };
-  const textColor = activeTheme.text_color || "#000000";
-  const blocks = (creator.egg_profile_blocks ?? demoBlocks)
-    .filter((block) => block.is_visible)
-    .sort((a, b) => a.sort_order - b.sort_order);
+    : typedTheme?.background_gradient
+      ? { background: typedTheme.background_gradient }
+      : { backgroundColor: typedTheme?.background_color ?? "#87CEEB" };
+  const btnColor = typedTheme?.button_color ?? "#3b82f6";
+  const textColor = typedTheme?.text_color ?? "#1a1a1a";
+  const displayName = typedProfile.display_name || typedProfile.username;
+  const bio = typedProfile.bio ?? typedProfile.ai_profile_summary;
 
   return (
-    <main className="min-h-screen" style={bgStyle}>
-      <div className="min-h-screen bg-black/10">
-        <div className="mx-auto max-w-md px-6 py-12">
-          <div className="mb-8 flex flex-col items-center">
-            <div className="mb-3 h-20 w-20 overflow-hidden rounded-full bg-white/30 backdrop-blur-sm">
-              {creator.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={creator.avatar_url} alt={creator.display_name} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <span className="text-2xl font-bold" style={{ color: textColor }}>
-                    {creator.display_name?.[0] || "C"}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <h1 className="mb-1 text-xl font-bold" style={{ color: textColor }}>
-              {creator.display_name || creator.username}
-            </h1>
-
-            {creator.bio && (
-              <p className="mb-3 text-center text-sm opacity-80" style={{ color: textColor }}>
-                {creator.bio}
-              </p>
-            )}
-
-            <div className="flex gap-3">
-              {creator.instagram_handle && (
-                <a href={`https://instagram.com/${creator.instagram_handle}`} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-bold" style={{ color: textColor }}>
-                  IG
-                </a>
-              )}
-              {creator.youtube_handle && (
-                <a href={`https://youtube.com/@${creator.youtube_handle}`} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-bold" style={{ color: textColor }}>
-                  YT
-                </a>
-              )}
-              {creator.tiktok_handle && (
-                <a href={`https://tiktok.com/@${creator.tiktok_handle}`} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-bold" style={{ color: textColor }}>
-                  TK
-                </a>
-              )}
-            </div>
+    <main className="flex min-h-screen flex-col items-center justify-start px-4 pt-16" style={bgStyle}>
+      <div className="mb-4">
+        {typedProfile.avatar_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={typedProfile.avatar_url}
+            alt={displayName}
+            className="h-20 w-20 rounded-full border-2 border-white/50 object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-20 w-20 items-center justify-center rounded-full bg-white/30 text-2xl font-bold"
+            style={{ color: textColor }}
+          >
+            {displayName?.[0] ?? "?"}
           </div>
+        )}
+      </div>
 
-          <div className="space-y-3">
-            {blocks.map((block) => (
-              <LinkBlock key={block.id} block={block} theme={activeTheme} />
-            ))}
-          </div>
+      <h1 className="mb-1 text-center text-xl font-bold" style={{ color: textColor }}>
+        {displayName}
+      </h1>
+      {bio && (
+        <p className="mb-8 max-w-xs text-center text-sm opacity-80" style={{ color: textColor }}>
+          {bio}
+        </p>
+      )}
 
-          <div className="mt-10 text-center">
-            <p className="text-xs opacity-40" style={{ color: textColor }}>
-              Powered by <Link href="/">SOON-EGG</Link>
-            </p>
-          </div>
-        </div>
+      <div className="flex w-full max-w-sm flex-col gap-3">
+        {(blocks as PublicBlock[] | null)?.map((block) => (
+          <a
+            key={block.id}
+            href={block.url || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full rounded-xl px-4 py-3 text-center font-medium text-white transition hover:opacity-90"
+            style={{ backgroundColor: btnColor }}
+          >
+            {block.title}
+          </a>
+        ))}
       </div>
     </main>
-  );
-}
-
-function LinkBlock({ block, theme }: { block: ProfileBlock; theme: ProfileTheme }) {
-  const radius = buttonRadius[theme.button_style] || "rounded-xl";
-  const content = (
-    <div
-      className={`block w-full px-4 py-3 text-center font-medium transition-opacity hover:opacity-90 ${radius}`}
-      style={{
-        backgroundColor: theme.button_color || "#000000",
-        color: "#ffffff",
-      }}
-    >
-      {block.title}
-    </div>
-  );
-
-  if (!block.url) {
-    return content;
-  }
-
-  return (
-    <a href={block.url} target="_blank" rel="noopener noreferrer">
-      {content}
-    </a>
   );
 }

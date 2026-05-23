@@ -12,9 +12,11 @@ type Profile = {
 };
 
 type Theme = {
+  background_image: string | null;
   background_gradient: string | null;
   background_color: string | null;
   text_color: string | null;
+  button_color: string | null;
 };
 
 const fallbackProfile: Profile = {
@@ -22,7 +24,7 @@ const fallbackProfile: Profile = {
   username: "soon_egg",
   display_name: "SOON-EGG",
   bio: "完成設定後，您的創作者介紹會顯示在這裡。",
-  avatar_url: "/soon-egg.png",
+  avatar_url: null,
   ai_profile_summary: null,
 };
 
@@ -48,7 +50,7 @@ export default async function ProfilePage() {
 
         const { data: activeTheme } = await supabase
           .from("egg_profile_themes")
-          .select("background_gradient, background_color, text_color")
+          .select("background_image, background_gradient, background_color, text_color, button_color")
           .eq("creator_id", creatorProfile.id)
           .eq("is_active", true)
           .limit(1)
@@ -67,13 +69,5 @@ export default async function ProfilePage() {
     }
   }
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-3xl font-black text-zinc-950">我的主頁</h1>
-        <p className="mt-2 text-zinc-500">編輯你的 Link in Bio，公開網址為 sooncreator.network/{profile.username}。</p>
-      </div>
-      <LinkInBio profile={profile} theme={theme} blocks={blocks} blocksError={blocksError} />
-    </div>
-  );
+  return <LinkInBio profile={profile} theme={theme} blocks={blocks} blocksError={blocksError} />;
 }

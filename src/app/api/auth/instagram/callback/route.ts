@@ -163,6 +163,7 @@ export async function GET(req: NextRequest) {
       ig_avatar: profile.profile_picture_url || "",
       fb_page_id: page.id || "",
       fb_page_name: page.name || "",
+      threads_username: profile.username || "",
     });
 
     return NextResponse.redirect(`${ONBOARDING_URL}?${params.toString()}`);

@@ -9,6 +9,7 @@ type CreatorProfile = {
   id: string;
   username: string;
   instagram_handle: string | null;
+  contact_email?: string | null;
   mediakit_bg_color: string | null;
   mediakit_text_color: string | null;
   mediakit_accent_color: string | null;
@@ -16,13 +17,20 @@ type CreatorProfile = {
   mediakit_font: string | null;
   mediakit_is_public: boolean | null;
   mediakit_allow_matching?: boolean | null;
+  mediakit_layout?: string | null;
   mediakit_lock_contact: boolean | null;
   mediakit_lock_about: boolean | null;
   mediakit_lock_case_studies: boolean | null;
   mediakit_lock_brand_partners: boolean | null;
   mediakit_lock_rates: boolean | null;
   mediakit_lock_analytics?: boolean | null;
+  mediakit_collab_title?: string | null;
+  mediakit_collab_message?: string | null;
+  mediakit_about_title?: string | null;
+  mediakit_bio?: string | null;
 };
+
+type ProfileField = keyof CreatorProfile;
 
 type RateCard = {
   id: string;
@@ -37,6 +45,7 @@ type RateCard = {
 };
 
 type TabKey = "design" | "permissions" | "rates";
+type SectionKey = "contact" | "about" | "cases" | "partners" | "rates" | "analytics";
 
 const emptyRate = {
   service_name: "",
@@ -46,12 +55,12 @@ const emptyRate = {
 };
 
 const colorPresets = [
-  { name: "Warm Editorial", bg: "#FFF5E6", text: "#1a1a1a", accent: "#E63946", accentText: "#FFFFFF" },
-  { name: "Midnight Blue", bg: "#111827", text: "#F9FAFB", accent: "#60A5FA", accentText: "#0B1220" },
-  { name: "Soft Matcha", bg: "#F4F7ED", text: "#1F2933", accent: "#6A994E", accentText: "#FFFFFF" },
-  { name: "Studio Pink", bg: "#FFF1F5", text: "#2A1720", accent: "#DB2777", accentText: "#FFFFFF" },
-  { name: "Clean Mono", bg: "#F8FAFC", text: "#0F172A", accent: "#111827", accentText: "#FFFFFF" },
-  { name: "Sunset Gold", bg: "#FFF7ED", text: "#24140A", accent: "#F59E0B", accentText: "#1A1200" },
+  { name: "暖調雜誌", bg: "#FFF5E6", text: "#1a1a1a", accent: "#E63946", accentText: "#FFFFFF" },
+  { name: "深夜藍", bg: "#111827", text: "#F9FAFB", accent: "#60A5FA", accentText: "#0B1220" },
+  { name: "抹茶柔和", bg: "#F4F7ED", text: "#1F2933", accent: "#6A994E", accentText: "#FFFFFF" },
+  { name: "工作室粉紅", bg: "#FFF1F5", text: "#2A1720", accent: "#DB2777", accentText: "#FFFFFF" },
+  { name: "極簡黑白", bg: "#F8FAFC", text: "#0F172A", accent: "#111827", accentText: "#FFFFFF" },
+  { name: "日落金", bg: "#FFF7ED", text: "#24140A", accent: "#F59E0B", accentText: "#1A1200" },
 ];
 
 const fonts = ["Poppins", "Saira", "Roboto", "Jost", "Helvetica", "Quicksand", "Merriweather", "Arvo"];
@@ -65,6 +74,24 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
     >
       <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${value ? "translate-x-5" : "translate-x-1"}`} />
     </button>
+  );
+}
+
+function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <div className="border-b border-zinc-100 last:border-b-0">
+      <button
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between px-4 py-3 hover:bg-gray-50"
+        type="button"
+      >
+        <span className="text-sm font-medium text-zinc-900">{title}</span>
+        <span className="text-xs text-gray-400">{open ? "∧" : "∨"}</span>
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
   );
 }
 
@@ -110,6 +137,156 @@ function ToggleRow({
         {description && <p className="mt-1 text-xs leading-relaxed text-zinc-400">{description}</p>}
       </div>
       <Toggle value={value} onChange={onChange} />
+    </div>
+  );
+}
+
+function TextField({
+  label,
+  value,
+  placeholder,
+  multiline,
+  onSave,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  multiline?: boolean;
+  onSave: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-zinc-500">{label}</span>
+      {multiline ? (
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => onSave(draft)}
+          placeholder={placeholder}
+          rows={4}
+          className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      ) : (
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => onSave(draft)}
+          placeholder={placeholder}
+          className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      )}
+    </label>
+  );
+}
+
+function SectionEditor({
+  sectionKey,
+  profile,
+  onUpdate,
+}: {
+  sectionKey: SectionKey;
+  profile: CreatorProfile;
+  onUpdate: (updates: Partial<CreatorProfile>) => void;
+}) {
+  if (sectionKey === "contact") {
+    return (
+      <div className="space-y-3 p-4">
+        <TextField
+          label="標題"
+          value={profile.mediakit_collab_title ?? ""}
+          placeholder="品牌合作查詢"
+          onSave={(value) => onUpdate({ mediakit_collab_title: value })}
+        />
+        <TextField
+          label="說明文字"
+          value={profile.mediakit_collab_message ?? ""}
+          placeholder="歡迎發送合作邀請，我會盡快回覆！"
+          multiline
+          onSave={(value) => onUpdate({ mediakit_collab_message: value })}
+        />
+        <TextField
+          label="聯絡電郵"
+          value={profile.contact_email ?? ""}
+          placeholder="hello@example.com"
+          onSave={(value) => onUpdate({ contact_email: value })}
+        />
+      </div>
+    );
+  }
+
+  if (sectionKey === "about") {
+    return (
+      <div className="space-y-3 p-4">
+        <TextField
+          label="區塊標題"
+          value={profile.mediakit_about_title ?? ""}
+          placeholder="ABOUT ME"
+          onSave={(value) => onUpdate({ mediakit_about_title: value })}
+        />
+        <TextField
+          label="個人簡介"
+          value={profile.mediakit_bio ?? ""}
+          placeholder="介紹你的內容定位、受眾和合作亮點"
+          multiline
+          onSave={(value) => onUpdate({ mediakit_bio: value })}
+        />
+      </div>
+    );
+  }
+
+  if (sectionKey === "rates") {
+    return <p className="p-4 text-sm text-zinc-500">服務報價可在「報價」分頁新增、刪除和排序。</p>;
+  }
+
+  if (sectionKey === "analytics") {
+    return <p className="p-4 text-sm text-zinc-500">數據分析會根據已連結社交帳號自動顯示。</p>;
+  }
+
+  if (sectionKey === "cases") {
+    return <p className="p-4 text-sm text-zinc-500">過往項目內容會顯示在公開 Media Kit，稍後可加入案例管理。</p>;
+  }
+
+  return <p className="p-4 text-sm text-zinc-500">品牌合作內容會顯示在公開 Media Kit，稍後可加入品牌管理。</p>;
+}
+
+function LockedBlockRow({
+  label,
+  toggleField,
+  sectionKey,
+  profile,
+  onUpdate,
+}: {
+  label: string;
+  toggleField: ProfileField;
+  sectionKey: SectionKey;
+  profile: CreatorProfile;
+  onUpdate: (updates: Partial<CreatorProfile>) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = !Boolean(profile[toggleField]);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-zinc-100 bg-white">
+      <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+        <span className="text-sm font-medium text-zinc-900">{label}</span>
+        <div className="flex items-center gap-3">
+          <Toggle value={visible} onChange={(value) => onUpdate({ [toggleField]: !value } as Partial<CreatorProfile>)} />
+          <button
+            onClick={() => setExpanded((current) => !current)}
+            className="text-base text-gray-300 hover:text-gray-600"
+            type="button"
+          >
+            {expanded ? "∧" : "›"}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="border-t border-zinc-100 bg-gray-50">
+          <SectionEditor sectionKey={sectionKey} profile={profile} onUpdate={onUpdate} />
+        </div>
+      )}
     </div>
   );
 }
@@ -220,14 +397,14 @@ export default function MediaKitPage() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-zinc-950">Media Kit</h1>
-          <p className="mt-2 text-zinc-500">自訂你的公開 Media Kit，讓品牌快速了解你的受眾、風格和合作報價。</p>
+          <p className="mt-2 text-zinc-500">編輯你的公開 Media Kit，讓品牌快速了解你的受眾、作品和合作報價。</p>
         </div>
         <a
           href={profile ? `/${profile.username}/mediakit` : "#"}
           target="_blank"
           className="rounded-full bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
         >
-          查看公開頁
+          分享
         </a>
       </div>
 
@@ -235,9 +412,9 @@ export default function MediaKitPage() {
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <div className="flex border-b border-zinc-100 bg-zinc-50 p-2">
             {[
-              { key: "design", label: "Design" },
-              { key: "permissions", label: "Permissions" },
-              { key: "rates", label: "Rate Cards" },
+              { key: "design", label: "設計" },
+              { key: "permissions", label: "權限" },
+              { key: "rates", label: "報價" },
             ].map((tab) => (
               <button
                 key={tab.key}
@@ -252,17 +429,16 @@ export default function MediaKitPage() {
             ))}
           </div>
 
-          <div className="max-h-[calc(100vh-210px)] overflow-y-auto p-5">
+          <div className="max-h-[calc(100vh-210px)] overflow-y-auto">
             {loading || !profile ? (
               <p className="py-12 text-center text-sm text-zinc-400">載入 Media Kit 設定中...</p>
             ) : (
               <>
                 {activeTab === "design" && (
-                  <div className="space-y-6">
-                    <div>
-                      <h2 className="text-base font-semibold text-zinc-950">Color presets</h2>
-                      <p className="mt-1 text-sm text-zinc-400">選擇一組品牌色，會即時更新背景、文字和重點色。</p>
-                      <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <CollapsibleSection title="色彩預設">
+                      <p className="mb-4 text-sm text-zinc-400">選擇一組適合你個人品牌的色彩組合。</p>
+                      <div className="grid grid-cols-2 gap-3">
                         {colorPresets.map((preset) => (
                           <button
                             key={preset.name}
@@ -285,22 +461,22 @@ export default function MediaKitPage() {
                           </button>
                         ))}
                       </div>
-                    </div>
+                    </CollapsibleSection>
 
-                    <div className="space-y-3">
-                      <h2 className="text-base font-semibold text-zinc-950">Individual colors</h2>
-                      <ColorPicker label="Page Background" value={bgColor} onChange={(value) => saveProfile({ mediakit_bg_color: value })} />
-                      <ColorPicker label="Accent Color" value={accentColor} onChange={(value) => saveProfile({ mediakit_accent_color: value })} />
-                      <ColorPicker
-                        label="Accent Text"
-                        value={accentTextColor}
-                        onChange={(value) => saveProfile({ mediakit_accent_text_color: value })}
-                      />
-                    </div>
+                    <CollapsibleSection title="自訂顏色">
+                      <div className="space-y-3">
+                        <ColorPicker label="頁面背景" value={bgColor} onChange={(value) => saveProfile({ mediakit_bg_color: value })} />
+                        <ColorPicker label="主題色" value={accentColor} onChange={(value) => saveProfile({ mediakit_accent_color: value })} />
+                        <ColorPicker
+                          label="主題文字色"
+                          value={accentTextColor}
+                          onChange={(value) => saveProfile({ mediakit_accent_text_color: value })}
+                        />
+                      </div>
+                    </CollapsibleSection>
 
-                    <div>
-                      <h2 className="text-base font-semibold text-zinc-950">Font</h2>
-                      <div className="mt-3 grid grid-cols-2 gap-3">
+                    <CollapsibleSection title="字型">
+                      <div className="grid grid-cols-2 gap-3">
                         {fonts.map((font) => (
                           <button
                             key={font}
@@ -315,90 +491,107 @@ export default function MediaKitPage() {
                           </button>
                         ))}
                       </div>
+                    </CollapsibleSection>
+
+                    <div className="px-4 py-4">
+                      <h2 className="mb-3 text-sm font-medium text-zinc-900">版面佈局</h2>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { value: "webpage", label: "網頁版" },
+                          { value: "resume", label: "履歷版" },
+                        ].map((layout) => (
+                          <button
+                            key={layout.value}
+                            onClick={() => saveProfile({ mediakit_layout: layout.value })}
+                            className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                              (profile.mediakit_layout ?? "webpage") === layout.value
+                                ? "border-black bg-zinc-950 text-white"
+                                : "border-zinc-100 text-zinc-700 hover:border-zinc-300"
+                            }`}
+                            type="button"
+                          >
+                            {layout.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {activeTab === "permissions" && (
-                  <div className="space-y-6">
+                  <div className="space-y-6 p-5">
                     <div className="space-y-3">
-                      <h2 className="text-base font-semibold text-zinc-950">General Access</h2>
+                      <h2 className="text-base font-semibold text-zinc-950">公開設定</h2>
                       <ToggleRow
-                        title="Enable my media kit"
+                        title="公開我的 Media Kit"
                         value={Boolean(profile.mediakit_is_public)}
                         onChange={(value) => saveProfile({ mediakit_is_public: value })}
                       />
                       <ToggleRow
-                        title="Allow SOON-EGG to match me with brands"
-                        description="Let SOON-EGG share your media kit with relevant brand opportunities"
+                        title="允許 SOON-EGG 幫我配對品牌合作機會"
+                        description="SOON-EGG 會在合適的品牌合作機會中分享你的 Media Kit"
                         value={Boolean(profile.mediakit_allow_matching)}
                         onChange={(value) => saveProfile({ mediakit_allow_matching: value })}
                       />
                     </div>
 
                     <div className="space-y-3">
-                      <h2 className="text-base font-semibold text-zinc-950">Locked Blocks</h2>
-                      <ToggleRow
-                        title="Contact form"
-                        value={!profile.mediakit_lock_contact}
-                        onChange={(value) => saveProfile({ mediakit_lock_contact: !value })}
+                      <h2 className="text-base font-semibold text-zinc-950">內容區塊</h2>
+                      <LockedBlockRow label="聯絡表單" toggleField="mediakit_lock_contact" sectionKey="contact" profile={profile} onUpdate={saveProfile} />
+                      <LockedBlockRow label="關於我" toggleField="mediakit_lock_about" sectionKey="about" profile={profile} onUpdate={saveProfile} />
+                      <LockedBlockRow
+                        label="過往項目"
+                        toggleField="mediakit_lock_case_studies"
+                        sectionKey="cases"
+                        profile={profile}
+                        onUpdate={saveProfile}
                       />
-                      <ToggleRow
-                        title="About me"
-                        value={!profile.mediakit_lock_about}
-                        onChange={(value) => saveProfile({ mediakit_lock_about: !value })}
+                      <LockedBlockRow
+                        label="品牌合作"
+                        toggleField="mediakit_lock_brand_partners"
+                        sectionKey="partners"
+                        profile={profile}
+                        onUpdate={saveProfile}
                       />
-                      <ToggleRow
-                        title="Past projects"
-                        value={!profile.mediakit_lock_case_studies}
-                        onChange={(value) => saveProfile({ mediakit_lock_case_studies: !value })}
-                      />
-                      <ToggleRow
-                        title="Brand partnerships"
-                        value={!profile.mediakit_lock_brand_partners}
-                        onChange={(value) => saveProfile({ mediakit_lock_brand_partners: !value })}
-                      />
-                      <ToggleRow
-                        title="Rates card"
-                        value={!profile.mediakit_lock_rates}
-                        onChange={(value) => saveProfile({ mediakit_lock_rates: !value })}
-                      />
-                      <ToggleRow
-                        title="Analytics"
-                        value={!profile.mediakit_lock_analytics}
-                        onChange={(value) => saveProfile({ mediakit_lock_analytics: !value })}
+                      <LockedBlockRow label="服務報價" toggleField="mediakit_lock_rates" sectionKey="rates" profile={profile} onUpdate={saveProfile} />
+                      <LockedBlockRow
+                        label="數據分析"
+                        toggleField="mediakit_lock_analytics"
+                        sectionKey="analytics"
+                        profile={profile}
+                        onUpdate={saveProfile}
                       />
                     </div>
 
                     <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
-                      <h2 className="text-base font-semibold text-zinc-950">Connected Accounts</h2>
+                      <h2 className="text-base font-semibold text-zinc-950">已連結帳號</h2>
                       <div className="mt-4 flex items-center justify-between rounded-xl bg-white px-4 py-3">
                         <div>
                           <p className="text-sm font-medium text-zinc-900">Instagram</p>
-                          <p className="text-xs text-zinc-400">{profile.instagram_handle ? `@${profile.instagram_handle}` : "未連接"}</p>
+                          <p className="text-xs text-zinc-400">{profile.instagram_handle ? `@${profile.instagram_handle}` : "尚未連結"}</p>
                         </div>
                         {profile.instagram_handle ? (
-                          <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">● Fully connected</span>
+                          <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">● 已完整連結</span>
                         ) : (
-                          <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-400">Not connected</span>
+                          <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-400">未連結</span>
                         )}
                       </div>
                       <Link
                         href="/onboarding"
                         className="mt-3 block rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-center text-sm font-medium text-zinc-600 transition hover:border-zinc-500 hover:text-zinc-900"
                       >
-                        + Add social account
+                        + 新增社交帳號
                       </Link>
                     </div>
                   </div>
                 )}
 
                 {activeTab === "rates" && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 p-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h2 className="text-base font-semibold text-zinc-950">Rate Cards</h2>
-                        <p className="mt-1 text-sm text-zinc-400">設定品牌可參考的服務報價。</p>
+                        <h2 className="text-base font-semibold text-zinc-950">報價</h2>
+                        <p className="mt-1 text-sm text-zinc-400">設定品牌合作服務和收費。</p>
                       </div>
                       <button
                         onClick={() => setShowAddRate(true)}
@@ -410,7 +603,7 @@ export default function MediaKitPage() {
                     </div>
 
                     {rateCards.length === 0 ? (
-                      <p className="rounded-2xl bg-zinc-50 py-10 text-center text-sm text-zinc-400">尚未設定報價，點擊「新增服務」開始</p>
+                      <p className="rounded-2xl bg-zinc-50 py-10 text-center text-sm text-zinc-400">尚未設定報價，點擊「新增服務」開始。</p>
                     ) : (
                       <div className="divide-y divide-zinc-100 rounded-2xl border border-zinc-100">
                         {rateCards.map((rate) => (
@@ -439,7 +632,7 @@ export default function MediaKitPage() {
         <section className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100 shadow-sm">
           <div className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-zinc-950">Live Preview</p>
+              <p className="text-sm font-semibold text-zinc-950">即時預覽</p>
               <p className="text-xs text-zinc-400">{profile ? `/${profile.username}/mediakit` : "載入中..."}</p>
             </div>
             <button
@@ -448,7 +641,7 @@ export default function MediaKitPage() {
               type="button"
             >
               <RefreshCw size={14} />
-              Refresh
+              重新整理
             </button>
           </div>
           <div className="h-[calc(100vh-220px)] min-h-[620px] bg-white">

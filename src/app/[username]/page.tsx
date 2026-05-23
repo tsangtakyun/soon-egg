@@ -24,6 +24,7 @@ const RESERVED_ROUTES = [
   "products",
   "api",
   "auth",
+  "mediakit",
 ];
 
 type PublicTheme = {

@@ -9,6 +9,7 @@ type CreatorProfile = {
   id: string;
   username: string;
   instagram_handle: string | null;
+  instagram_followers?: number | null;
   contact_email?: string | null;
   mediakit_bg_color: string | null;
   mediakit_text_color: string | null;
@@ -415,6 +416,8 @@ function SectionEditor({
   profile: CreatorProfile;
   onUpdate: (updates: Partial<CreatorProfile>) => void;
 }) {
+  const [syncing, setSyncing] = useState(false);
+
   if (sectionKey === "contact") {
     return (
       <div className="space-y-3 p-4">
@@ -462,7 +465,37 @@ function SectionEditor({
   }
 
   if (sectionKey === "analytics") {
-    return <p className="p-4 text-sm text-zinc-500">數據分析會根據已連結社交帳號自動顯示。</p>;
+    return (
+      <div className="space-y-3 p-4">
+        <div className="rounded-2xl border border-zinc-100 bg-white p-4">
+          <p className="text-sm font-medium text-zinc-900">Instagram</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {profile.instagram_handle ? `@${profile.instagram_handle} · ${Number(profile.instagram_followers ?? 0).toLocaleString()} followers` : "尚未連結"}
+          </p>
+          <button
+            onClick={async () => {
+              setSyncing(true);
+              const res = await fetch("/api/instagram/sync", { method: "POST" });
+              const data = await res.json();
+
+              if (data.success) {
+                onUpdate({ instagram_followers: data.followers });
+                alert(`已同步！追蹤人數：${Number(data.followers ?? 0).toLocaleString()}`);
+              } else {
+                alert(`同步失敗：${data.error}`);
+              }
+
+              setSyncing(false);
+            }}
+            disabled={syncing}
+            className="mt-3 w-full rounded-lg border border-zinc-200 py-2 text-sm text-gray-600 transition hover:bg-gray-50 disabled:opacity-50"
+            type="button"
+          >
+            {syncing ? "同步中..." : "↻ 同步追蹤人數"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (sectionKey === "cases") {

@@ -133,10 +133,11 @@ export async function GET(req: NextRequest) {
         },
       };
 
-      const { error: updateError } = await supabase
+      const { data: updatedRows, error: updateError } = await supabase
         .from("egg_creator_profiles")
         .update(payloadWithToken)
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .select("id");
 
       if (updateError && /column|schema|instagram_access_token|instagram_user_id/i.test(updateError.message)) {
         const { error: fallbackError } = await supabase
@@ -152,6 +153,19 @@ export async function GET(req: NextRequest) {
         if (fallbackError) console.error("Instagram profile fallback save error:", fallbackError);
       } else if (updateError) {
         console.error("Instagram profile save error:", updateError);
+      } else if (!updatedRows || updatedRows.length === 0) {
+        const username = (profile.username || `user_${user.id.slice(0, 8)}`).replace("@", "").toLowerCase();
+        const { error: upsertError } = await supabase
+          .from("egg_creator_profiles")
+          .upsert({
+            user_id: user.id,
+            username,
+            display_name: profile.name || profile.username || username,
+            bio: profile.biography || null,
+            ...payloadWithToken,
+          }, { onConflict: "user_id" });
+
+        if (upsertError) console.error("Instagram profile upsert save error:", upsertError);
       }
     }
 

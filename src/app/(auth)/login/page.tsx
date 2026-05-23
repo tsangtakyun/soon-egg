@@ -16,6 +16,11 @@ function GoogleLogo() {
   );
 }
 
+function getAuthRedirectUrl(next: string) {
+  const origin = window.location.hostname === "localhost" ? window.location.origin : "https://egg.sooncreator.network";
+  return `${origin}/auth/callback?next=${next}`;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -31,7 +36,7 @@ export default function LoginPage() {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=auto`,
+        redirectTo: getAuthRedirectUrl("auto"),
       },
     });
 

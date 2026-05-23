@@ -4,9 +4,16 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const pathname = request.nextUrl.pathname;
+  const host = request.headers.get("host");
   const protectedRoutes = ["/onboarding", "/dashboard", "/profile", "/media-kit", "/brand-deals", "/products", "/analytics"];
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (host === "soon-egg.vercel.app") {
+    const canonicalUrl = request.nextUrl.clone();
+    canonicalUrl.hostname = "egg.sooncreator.network";
+    return NextResponse.redirect(canonicalUrl, 308);
+  }
 
   if (!url || !key) {
     return response;

@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+function getAuthRedirectUrl(next: string) {
+  const origin = window.location.hostname === "localhost" ? window.location.origin : "https://egg.sooncreator.network";
+  return `${origin}/auth/callback?next=${next}`;
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const [creatorName, setCreatorName] = useState("");
@@ -38,7 +43,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { display_name: creatorName },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        emailRedirectTo: getAuthRedirectUrl("/onboarding"),
       },
     });
 
@@ -60,7 +65,7 @@ export default function SignupPage() {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        redirectTo: getAuthRedirectUrl("/onboarding"),
       },
     });
 

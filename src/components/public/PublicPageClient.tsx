@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FollowButton } from "./FollowButton";
 
 export type PublicPageProfile = {
@@ -62,10 +62,6 @@ function getSectionStyle(overrides: React.CSSProperties = {}): React.CSSProperti
   };
 }
 
-function scrollToSection(index: number) {
-  document.getElementById(`section-${index}`)?.scrollIntoView({ behavior: "smooth" });
-}
-
 function SocialIcon({ href, icon }: { href: string; icon: "instagram" | "youtube" | "tiktok" | "xhs" | "email" }) {
   return (
     <a
@@ -118,6 +114,7 @@ export function PublicPageClient({
   btnRadius,
   textColor,
 }: PublicPageClientProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeSection, setActiveSection] = useState(0);
   const displayName = profile.display_name || profile.username;
   const bio = profile.bio ?? profile.ai_profile_summary;
@@ -127,8 +124,20 @@ export function PublicPageClient({
     [sections],
   );
 
+  const goTo = (index: number) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const target = container.children[index] as HTMLElement | undefined;
+    if (!target) return;
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   useEffect(() => {
-    const root = document.getElementById("scroll-container");
+    const root = scrollContainerRef.current;
+    if (!root) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -143,8 +152,7 @@ export function PublicPageClient({
       { root, threshold: [0.55, 0.75] },
     );
 
-    sections.forEach((_, index) => {
-      const section = document.getElementById(`section-${index}`);
+    Array.from(root.children).forEach((section) => {
       if (section) observer.observe(section);
     });
 
@@ -155,11 +163,13 @@ export function PublicPageClient({
     <main style={{ ...bgStyle, minHeight: "100vh" }}>
       <div style={{ minHeight: "100vh", backgroundColor: "rgba(0,0,0,0.35)" }}>
         <div
+          ref={scrollContainerRef}
           id="scroll-container"
           style={{
             height: "100vh",
             overflowY: "scroll",
             scrollSnapType: "y mandatory",
+            scrollBehavior: "smooth",
             scrollbarWidth: "none",
           }}
         >
@@ -261,7 +271,7 @@ export function PublicPageClient({
                     <button
                       key={section.id}
                       type="button"
-                      onClick={() => scrollToSection(sectionIndex[section.id])}
+                      onClick={() => goTo(sectionIndex[section.id])}
                       style={{
                         width: "100%",
                         background: "rgba(255,255,255,0.12)",
@@ -563,7 +573,7 @@ export function PublicPageClient({
               key={section.id}
               type="button"
               aria-label={`前往${section.label}`}
-              onClick={() => scrollToSection(index)}
+              onClick={() => goTo(index)}
               style={{
                 width: activeSection === index ? 9 : 7,
                 height: activeSection === index ? 9 : 7,

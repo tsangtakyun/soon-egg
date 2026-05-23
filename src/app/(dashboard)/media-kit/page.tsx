@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PitchDrafter } from "@/components/brand-deals/PitchDrafter";
+import { MediaKitCard } from "@/components/media-kit/MediaKitCard";
 import { createClient } from "@/lib/supabase/client";
 
 type CreatorProfile = {
   id: string;
-  display_name: string | null;
-  ai_profile_summary: string | null;
-  instagram_followers: number | null;
-  youtube_subscribers: number | null;
-  instagram_engagement_rate: number | null;
 };
 
 type RateCard = {
@@ -32,54 +29,51 @@ const emptyRate = {
 };
 
 export default function MediaKitPage() {
+  const supabase = useMemo(() => createClient(), []);
   const [profile, setProfile] = useState<CreatorProfile | null>(null);
   const [rateCards, setRateCards] = useState<RateCard[]>([]);
   const [showAddRate, setShowAddRate] = useState(false);
   const [newRate, setNewRate] = useState(emptyRate);
-  const [loading, setLoading] = useState(true);
-  const supabase = useMemo(() => createClient(), []);
+  const [loadingRates, setLoadingRates] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      setLoading(true);
+    async function loadRateCards() {
+      setLoadingRates(true);
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        setLoading(false);
+        if (!cancelled) setLoadingRates(false);
         return;
       }
 
-      const { data: creator } = await supabase
-        .from("egg_creator_profiles")
-        .select("id, display_name, ai_profile_summary, instagram_followers, youtube_subscribers, instagram_engagement_rate")
-        .eq("user_id", user.id)
-        .single();
+      const { data: creator } = await supabase.from("egg_creator_profiles").select("id").eq("user_id", user.id).single();
 
-      if (!creator || cancelled) {
-        setLoading(false);
+      if (!creator) {
+        if (!cancelled) setLoadingRates(false);
         return;
       }
 
-      setProfile(creator as CreatorProfile);
-
+      const creatorProfile = creator as CreatorProfile;
       const { data } = await supabase
         .from("egg_rate_cards")
         .select("*")
-        .eq("creator_id", creator.id)
+        .eq("creator_id", creatorProfile.id)
         .eq("is_active", true)
         .order("sort_order", { ascending: true });
 
       if (!cancelled) {
+        setProfile(creatorProfile);
         setRateCards((data ?? []) as RateCard[]);
-        setLoading(false);
+        setLoadingRates(false);
       }
     }
 
-    load();
+    loadRateCards();
 
     return () => {
       cancelled = true;
@@ -117,52 +111,34 @@ export default function MediaKitPage() {
     setRateCards((current) => current.filter((rate) => rate.id !== id));
   }
 
-  const totalReach = Number(profile?.instagram_followers ?? 0) + Number(profile?.youtube_subscribers ?? 0);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">Media Kit</h1>
-        <p className="mt-2 text-zinc-500">整理你的品牌合作資料、受眾數據和服務報價。</p>
+        <p className="mt-2 text-zinc-500">用 SOON AI 整理你的品牌合作資料、受眾數據和服務報價。</p>
       </div>
 
-      <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Creator Profile</p>
-        <h2 className="mt-2 text-2xl font-black text-zinc-950">{profile?.display_name || "你的 Media Kit"}</h2>
-        <p className="mt-3 max-w-2xl text-zinc-600">{profile?.ai_profile_summary || "完成 onboarding 後，SOON AI 會自動整理你的創作者定位。"}</p>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl bg-zinc-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-zinc-400">Total Reach</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-950">{loading ? "..." : totalReach.toLocaleString()}</p>
-          </div>
-          <div className="rounded-xl bg-zinc-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-zinc-400">IG Followers</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-950">{loading ? "..." : Number(profile?.instagram_followers ?? 0).toLocaleString()}</p>
-          </div>
-          <div className="rounded-xl bg-zinc-50 p-4">
-            <p className="text-xs uppercase tracking-wide text-zinc-400">Engagement</p>
-            <p className="mt-1 text-2xl font-bold text-zinc-950">{profile?.instagram_engagement_rate ? `${profile.instagram_engagement_rate}%` : "—"}</p>
-          </div>
-        </div>
-      </section>
+      <MediaKitCard />
+      <PitchDrafter />
 
       <section className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-medium text-zinc-950">Rate Cards</h2>
             <p className="text-sm text-zinc-400">設定品牌可參考的服務報價。</p>
           </div>
           <button
             onClick={() => setShowAddRate(true)}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+            className="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
             type="button"
           >
             + 新增服務
           </button>
         </div>
 
-        {rateCards.length === 0 ? (
+        {loadingRates ? (
+          <p className="py-8 text-center text-sm text-zinc-400">載入報價中...</p>
+        ) : rateCards.length === 0 ? (
           <p className="py-8 text-center text-sm text-zinc-400">尚未設定報價，點擊「新增服務」開始</p>
         ) : (
           <div className="divide-y divide-zinc-100">

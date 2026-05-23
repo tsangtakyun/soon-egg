@@ -37,6 +37,7 @@ async function fetchGraph(path: string, accessToken: string) {
 
 async function findInstagramProfile(userAccessToken: string): Promise<{
   profile: InstagramProfile;
+  page: FacebookPage;
   pageAccessToken: string;
 } | null> {
   const pagesResponse = await fetchGraph("me/accounts?fields=id,name,access_token", userAccessToken);
@@ -53,7 +54,7 @@ async function findInstagramProfile(userAccessToken: string): Promise<{
       const profile = pageResponse?.instagram_business_account as InstagramProfile | undefined;
 
       if (profile?.id && profile.username) {
-        return { profile, pageAccessToken: page.access_token };
+        return { profile, page, pageAccessToken: page.access_token };
       }
     } catch (error) {
       console.error("Instagram page lookup error:", error);
@@ -101,17 +102,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=no_connected_ig`);
     }
 
-    const { profile, pageAccessToken } = match;
+    const { profile, page, pageAccessToken } = match;
     const supabase = await createClient();
     const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
 
     if (supabase && user) {
+      const { data: existingProfile } = await supabase
+        .from("egg_creator_profiles")
+        .select("audience_demographics")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const currentAudience = (
+        typeof existingProfile?.audience_demographics === "object" &&
+        existingProfile.audience_demographics !== null &&
+        !Array.isArray(existingProfile.audience_demographics)
+      ) ? existingProfile.audience_demographics : {};
       const payloadWithToken = {
         instagram_handle: profile.username,
         instagram_followers: profile.followers_count || 0,
+        facebook_handle: page.name || null,
         avatar_url: profile.profile_picture_url || null,
         instagram_access_token: pageAccessToken,
         instagram_user_id: profile.id || null,
+        audience_demographics: {
+          ...currentAudience,
+          connected_facebook_page: {
+            id: page.id,
+            name: page.name || "",
+          },
+        },
       };
 
       const { error: updateError } = await supabase
@@ -125,6 +144,7 @@ export async function GET(req: NextRequest) {
           .update({
             instagram_handle: profile.username,
             instagram_followers: profile.followers_count || 0,
+            facebook_handle: page.name || null,
             avatar_url: profile.profile_picture_url || null,
           })
           .eq("user_id", user.id);
@@ -141,6 +161,8 @@ export async function GET(req: NextRequest) {
       ig_followers: String(profile.followers_count || 0),
       ig_name: profile.name || "",
       ig_avatar: profile.profile_picture_url || "",
+      fb_page_id: page.id || "",
+      fb_page_name: page.name || "",
     });
 
     return NextResponse.redirect(`${ONBOARDING_URL}?${params.toString()}`);

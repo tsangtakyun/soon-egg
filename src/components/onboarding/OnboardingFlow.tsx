@@ -37,6 +37,8 @@ type InstagramConnection = {
   followers: number;
   name: string;
   avatar: string;
+  facebookPageId: string;
+  facebookPageName: string;
 };
 
 type AnalysisResult = {
@@ -139,6 +141,8 @@ export function OnboardingFlow() {
         followers: Number.parseInt(params.get("ig_followers") || "0", 10) || 0,
         name: params.get("ig_name") || "",
         avatar: params.get("ig_avatar") || "",
+        facebookPageId: params.get("fb_page_id") || "",
+        facebookPageName: params.get("fb_page_name") || "",
       };
 
       queueMicrotask(() => {
@@ -147,6 +151,7 @@ export function OnboardingFlow() {
           ...current,
           instagram: username,
           threads: current.threads || username,
+          facebook: current.facebook || nextIgData.facebookPageName,
         }));
         analyzedRef.current = false;
         router.replace("/onboarding");
@@ -314,6 +319,23 @@ function StepContent({
         <p className="text-center text-sm leading-6 text-gray-500">我會幫您分析受眾，配對最合適的品牌。</p>
         <div className="space-y-3">
           {PLATFORMS.map((platform) => {
+            if (platform.id === "facebook" && igData?.facebookPageName) {
+              return (
+                <div key={platform.id} className="overflow-hidden rounded-2xl border border-green-200 bg-green-50">
+                  <div className="flex items-center gap-3 px-3 py-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={platform.logoUrl} alt={platform.label} className="h-6 w-6 shrink-0 object-contain" />
+                    <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-900">{igData.facebookPageName}</p>
+                      <p className="text-xs text-gray-500">已連接 Facebook Page</p>
+                    </div>
+                    <CheckCircle size={18} className="text-green-500" />
+                  </div>
+                </div>
+              );
+            }
+
             if (platform.id === "instagram") {
               return (
                 <div

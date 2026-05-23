@@ -112,7 +112,7 @@ export default function MediaKitPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-20">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">Media Kit</h1>
         <p className="mt-2 text-zinc-500">用 SOON AI 整理你的品牌合作資料、受眾數據和服務報價。</p>

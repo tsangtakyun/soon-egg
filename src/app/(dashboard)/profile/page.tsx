@@ -8,7 +8,10 @@ type Profile = {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  cover_url?: string | null;
   ai_profile_summary: string | null;
+  buy_me_a_coffee_url?: string | null;
+  youtube_latest_video_id?: string | null;
 };
 
 type Theme = {
@@ -25,7 +28,10 @@ const fallbackProfile: Profile = {
   display_name: "SOON-EGG",
   bio: "亞洲創作者的品牌合作與變現中樞",
   avatar_url: null,
+  cover_url: null,
   ai_profile_summary: null,
+  buy_me_a_coffee_url: null,
+  youtube_latest_video_id: null,
 };
 
 export default async function ProfilePage() {
@@ -41,7 +47,7 @@ export default async function ProfilePage() {
     if (user) {
       const { data: creatorProfile } = await supabase
         .from("egg_creator_profiles")
-        .select("id, username, display_name, bio, avatar_url, ai_profile_summary")
+        .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
 

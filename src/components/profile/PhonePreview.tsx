@@ -6,7 +6,10 @@ export type PhonePreviewProfile = {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  cover_url?: string | null;
   ai_profile_summary: string | null;
+  buy_me_a_coffee_url?: string | null;
+  youtube_latest_video_id?: string | null;
 };
 
 export type PhonePreviewTheme = {

@@ -16,7 +16,6 @@ export async function GET() {
     "pages_show_list",
     "pages_read_engagement",
     "instagram_basic",
-    "instagram_manage_insights",
     "business_management",
   ].join(","));
   authUrl.searchParams.set("response_type", "code");

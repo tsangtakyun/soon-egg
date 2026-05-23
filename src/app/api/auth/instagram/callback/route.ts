@@ -1,9 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
-const INSTAGRAM_REDIRECT_URI = "https://egg.sooncreator.network/api/auth/instagram/callback";
-const ONBOARDING_URL = "https://egg.sooncreator.network/onboarding";
-
 type FacebookPage = {
   id: string;
   access_token?: string;
@@ -65,26 +62,29 @@ async function findInstagramProfile(userAccessToken: string): Promise<{
 }
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+  const requestUrl = new URL(req.url);
+  const { searchParams } = requestUrl;
+  const onboardingUrl = `${requestUrl.origin}/onboarding`;
+  const redirectUri = `${requestUrl.origin}/api/auth/instagram/callback`;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
 
   if (error || !code) {
-    return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=true`);
+    return NextResponse.redirect(`${onboardingUrl}?instagram_error=true`);
   }
 
   const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
   const appSecret = process.env.FACEBOOK_APP_SECRET || process.env.INSTAGRAM_APP_SECRET;
 
   if (!appId || !appSecret) {
-    return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=missing_credentials`);
+    return NextResponse.redirect(`${onboardingUrl}?instagram_error=missing_credentials`);
   }
 
   try {
     const tokenUrl = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
     tokenUrl.searchParams.set("client_id", appId);
     tokenUrl.searchParams.set("client_secret", appSecret);
-    tokenUrl.searchParams.set("redirect_uri", INSTAGRAM_REDIRECT_URI);
+    tokenUrl.searchParams.set("redirect_uri", redirectUri);
     tokenUrl.searchParams.set("code", code);
 
     const tokenRes = await fetch(tokenUrl.toString());
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
     const match = await findInstagramProfile(userAccessToken);
 
     if (!match) {
-      return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=no_connected_ig`);
+      return NextResponse.redirect(`${onboardingUrl}?instagram_error=no_connected_ig`);
     }
 
     const { profile, page, pageAccessToken } = match;
@@ -166,9 +166,9 @@ export async function GET(req: NextRequest) {
       threads_username: profile.username || "",
     });
 
-    return NextResponse.redirect(`${ONBOARDING_URL}?${params.toString()}`);
+    return NextResponse.redirect(`${onboardingUrl}?${params.toString()}`);
   } catch (err) {
     console.error("Instagram OAuth error:", err);
-    return NextResponse.redirect(`${ONBOARDING_URL}?instagram_error=true`);
+    return NextResponse.redirect(`${onboardingUrl}?instagram_error=true`);
   }
 }

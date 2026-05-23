@@ -67,9 +67,8 @@ export function SOONAIPanel() {
     <aside className="fixed right-0 top-0 z-40 flex h-full w-[320px] flex-col border-l border-gray-100 bg-white shadow-xl">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500">
-            <Sparkles size={14} className="text-white" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/soon-egg.png" alt="SOON AI" className="h-8 w-8 object-contain" style={{ animation: "spin-slow 4s linear infinite" }} />
           <div>
             <p className="text-sm font-semibold text-gray-900">SOON AI</p>
             <p className="text-xs text-gray-400">你的創作夥伴</p>

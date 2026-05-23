@@ -20,6 +20,7 @@ type CreatorProfile = {
   tiktok_followers?: number | null;
   xiaohongshu_handle?: string | null;
   xiaohongshu_followers?: number | null;
+  facebook_handle?: string | null;
   facebook_followers?: number | null;
   threads_followers?: number | null;
   mediakit_is_public?: boolean | null;
@@ -44,9 +45,6 @@ type CreatorProfile = {
   mediakit_case_studies_enabled?: boolean | null;
   mediakit_lock_case_studies?: boolean | null;
   mediakit_links_enabled?: boolean | null;
-  mediakit_links_title?: string | null;
-  mediakit_links_subtitle?: string | null;
-  mediakit_links_layout?: string | null;
 };
 
 type RateCard = {
@@ -103,6 +101,67 @@ function money(value: number | null | undefined) {
   return `HK$${Number(value ?? 0).toLocaleString()}`;
 }
 
+function truncate(value: string | null | undefined, length: number) {
+  if (!value) return null;
+  return value.length > length ? `${value.slice(0, length).trim()}...` : value;
+}
+
+function isLightColor(hex: string) {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return true;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+}
+
+function InstagramIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden>
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0Zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324ZM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881Z" />
+    </svg>
+  );
+}
+
+function YouTubeIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden>
+      <path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805ZM9.609 15.601V8.408l6.264 3.602Z" />
+    </svg>
+  );
+}
+
+function TikTokIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden>
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.77a4.85 4.85 0 0 1-1.01-.08Z" />
+    </svg>
+  );
+}
+
+function SocialCircle({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: "50%",
+        background: "rgba(255,255,255,0.2)",
+        color: "white",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        textDecoration: "none",
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 export default async function PublicMediaKitPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const supabase = await createClient();
@@ -128,7 +187,9 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
   ]);
 
   const bgColor = profile.mediakit_bg_color ?? "#FFF5E6";
-  const textColor = profile.mediakit_text_color ?? "#1a1a1a";
+  const bodyTextColor = isLightColor(bgColor) ? "#1a1a1a" : "#f8fafc";
+  const mutedTextColor = isLightColor(bgColor) ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.55)";
+  const borderColor = isLightColor(bgColor) ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.12)";
   const accentColor = profile.mediakit_accent_color ?? "#E63946";
   const accentText = profile.mediakit_accent_text_color ?? "#FFFFFF";
   const font = profile.mediakit_font ?? "Poppins";
@@ -139,14 +200,23 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
   const activeRateCards = (rateCards ?? []) as RateCard[];
   const activeBrandPartners = (brandPartners ?? []) as BrandPartner[];
   const activeCaseStudies = (caseStudies ?? []) as CaseStudy[];
-  const activeBlocks = (blocks ?? []) as ProfileBlock[];
+  const activeBlocks = ((blocks ?? []) as ProfileBlock[]).filter((block) => block.title?.trim() !== "Creator Media Kit 模板");
+  const tagline = truncate(profile.bio, 80);
+  const hasSocials = Boolean(profile.instagram_handle || profile.youtube_handle || profile.tiktok_handle || profile.xiaohongshu_handle);
+  const platformBreakdown = [
+    { handle: profile.instagram_handle, count: profile.instagram_followers, label: "Instagram", icon: "IG" },
+    { handle: profile.youtube_handle, count: profile.youtube_subscribers, label: "YouTube", icon: "YT" },
+    { handle: profile.tiktok_handle, count: profile.tiktok_followers, label: "TikTok", icon: "TT" },
+    { handle: profile.xiaohongshu_handle, count: profile.xiaohongshu_followers, label: "小紅書", icon: "紅" },
+    { handle: profile.facebook_handle, count: profile.facebook_followers, label: "Facebook", icon: "FB" },
+  ].filter((platform) => platform.handle);
 
   return (
     <>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       <link rel="stylesheet" href={fontHref(font)} />
-      <main style={{ minHeight: "100vh", background: bgColor, color: textColor, fontFamily: `${font}, sans-serif` }}>
+      <main style={{ minHeight: "100vh", background: bgColor, color: bodyTextColor, fontFamily: `${font}, sans-serif` }}>
         <header
           style={{
             position: "relative",
@@ -196,8 +266,49 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
               )}
               <div>
                 <h1 style={{ color: "white", fontSize: 32, fontWeight: 700, margin: 0 }}>{displayName}</h1>
+                {tagline && (
+                  <p
+                    style={{
+                      color: "rgba(255,255,255,0.82)",
+                      fontSize: 14,
+                      margin: "6px 0 0",
+                      maxWidth: 520,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {tagline}
+                  </p>
+                )}
                 {profile.pronouns && <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14, margin: "4px 0 0" }}>{profile.pronouns}</p>}
                 {profile.location && <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 13, margin: "2px 0 0" }}>{profile.location}</p>}
+
+                {hasSocials && (
+                  <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
+                    {profile.instagram_handle && (
+                      <SocialCircle href={`https://instagram.com/${profile.instagram_handle}`} label="Instagram">
+                        <InstagramIcon />
+                      </SocialCircle>
+                    )}
+                    {profile.youtube_handle && (
+                      <SocialCircle href={`https://youtube.com/@${profile.youtube_handle}`} label="YouTube">
+                        <YouTubeIcon />
+                      </SocialCircle>
+                    )}
+                    {profile.tiktok_handle && (
+                      <SocialCircle href={`https://tiktok.com/@${profile.tiktok_handle}`} label="TikTok">
+                        <TikTokIcon />
+                      </SocialCircle>
+                    )}
+                    {profile.xiaohongshu_handle && (
+                      <SocialCircle href={`https://xiaohongshu.com/user/profile/${profile.xiaohongshu_handle}`} label="小紅書">
+                        <span style={{ fontSize: 11, fontWeight: 700 }}>紅</span>
+                      </SocialCircle>
+                    )}
+                  </div>
+                )}
+
                 {categories.length > 0 && (
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                     {categories.map((cat) => (
@@ -251,50 +362,71 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
         </header>
 
         {isEnabled(profile.mediakit_total_followers_enabled) && (
-          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-            <p style={{ color: "rgba(0,0,0,0.4)", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>TOTAL FOLLOWERS</p>
-            <p style={{ fontSize: 48, fontWeight: 700, color: textColor, margin: "0 0 16px" }}>{totalFollowers.toLocaleString()}</p>
-            <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-              {profile.instagram_handle && Number(profile.instagram_followers ?? 0) > 0 && (
-                <span style={{ color: textColor, fontSize: 14 }}>@{profile.instagram_handle} · {Number(profile.instagram_followers).toLocaleString()}</span>
-              )}
-              {profile.youtube_handle && Number(profile.youtube_subscribers ?? 0) > 0 && (
-                <span style={{ color: textColor, fontSize: 14 }}>@{profile.youtube_handle} · {Number(profile.youtube_subscribers).toLocaleString()}</span>
-              )}
-              {profile.tiktok_handle && Number(profile.tiktok_followers ?? 0) > 0 && (
-                <span style={{ color: textColor, fontSize: 14 }}>@{profile.tiktok_handle} · {Number(profile.tiktok_followers).toLocaleString()}</span>
-              )}
-              {profile.xiaohongshu_handle && Number(profile.xiaohongshu_followers ?? 0) > 0 && (
-                <span style={{ color: textColor, fontSize: 14 }}>
-                  @{profile.xiaohongshu_handle} · {Number(profile.xiaohongshu_followers).toLocaleString()}
-                </span>
-              )}
-            </div>
+          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: `1px solid ${borderColor}` }}>
+            <p style={{ color: mutedTextColor, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 8 }}>TOTAL FOLLOWERS</p>
+            <p style={{ fontSize: 48, fontWeight: 700, color: bodyTextColor, margin: "0 0 20px", fontFamily: font }}>
+              {totalFollowers > 0 ? totalFollowers.toLocaleString() : "—"}
+            </p>
+
+            {platformBreakdown.length > 0 ? (
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                {platformBreakdown.map((platform) => (
+                  <div key={platform.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "50%",
+                        background: isLightColor(bgColor) ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.12)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        color: bodyTextColor,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {platform.icon}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 18, fontWeight: 700, color: bodyTextColor, margin: 0 }}>
+                        {platform.count && platform.count > 0 ? platform.count.toLocaleString() : "—"}
+                      </p>
+                      <p style={{ fontSize: 11, color: mutedTextColor, margin: 0 }}>{platform.label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: mutedTextColor, fontSize: 13 }}>尚未連結社交平台</p>
+            )}
           </section>
         )}
 
-        {isEnabled(profile.mediakit_about_enabled) && !profile.mediakit_lock_about && (profile.mediakit_bio || profile.bio) && (
-          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-            <p style={{ color: "rgba(0,0,0,0.4)", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 12 }}>
+        {isEnabled(profile.mediakit_about_enabled) && !profile.mediakit_lock_about && (
+          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: `1px solid ${borderColor}` }}>
+            <p style={{ color: mutedTextColor, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>
               {profile.mediakit_about_title ?? "ABOUT ME"}
             </p>
-            <p style={{ color: textColor, fontSize: 16, lineHeight: 1.7, maxWidth: 720 }}>{profile.mediakit_bio ?? profile.bio}</p>
+            <p style={{ color: bodyTextColor, fontSize: 16, lineHeight: 1.8, maxWidth: 720, fontFamily: font, opacity: 1 }}>
+              {profile.mediakit_bio ?? profile.bio ?? "—"}
+            </p>
           </section>
         )}
 
         {isEnabled(profile.mediakit_rates_enabled) && !profile.mediakit_lock_rates && activeRateCards.length > 0 && (
-          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-            <p style={{ color: "rgba(0,0,0,0.4)", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>RATES CARD</p>
+          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: `1px solid ${borderColor}` }}>
+            <p style={{ color: mutedTextColor, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>RATES CARD</p>
             {activeRateCards.map((rate) => (
               <div
                 key={rate.id}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: "1px solid rgba(0,0,0,0.06)" }}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, padding: "16px 0", borderBottom: `1px solid ${borderColor}` }}
               >
                 <div>
-                  <p style={{ color: textColor, fontSize: 16, fontWeight: 600, margin: 0 }}>{rate.service_name_zh ?? rate.service_name}</p>
-                  {rate.platform && <p style={{ color: "rgba(0,0,0,0.45)", fontSize: 13, margin: "2px 0 0" }}>{rate.platform}</p>}
+                  <p style={{ color: bodyTextColor, fontSize: 16, fontWeight: 600, margin: 0 }}>{rate.service_name_zh ?? rate.service_name}</p>
+                  {rate.platform && <p style={{ color: mutedTextColor, fontSize: 13, margin: "2px 0 0" }}>{rate.platform}</p>}
                 </div>
-                <p style={{ color: textColor, fontSize: 18, fontWeight: 700, margin: 0 }}>
+                <p style={{ color: bodyTextColor, fontSize: 18, fontWeight: 700, margin: 0 }}>
                   {money(rate.price)}
                   {rate.is_starting_price ? "+" : ""}
                 </p>
@@ -304,11 +436,21 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
         )}
 
         {isEnabled(profile.mediakit_brand_partners_enabled) && !profile.mediakit_lock_brand_partners && activeBrandPartners.length > 0 && (
-          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-            <p style={{ color: "rgba(0,0,0,0.4)", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>BRAND PARTNERS</p>
+          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: `1px solid ${borderColor}` }}>
+            <p style={{ color: mutedTextColor, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>BRAND PARTNERS</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
               {activeBrandPartners.map((bp) => (
-                <div key={bp.id} style={{ background: "rgba(0,0,0,0.04)", borderRadius: 12, padding: "12px 20px", fontSize: 14, fontWeight: 500, color: textColor }}>
+                <div
+                  key={bp.id}
+                  style={{
+                    background: isLightColor(bgColor) ? "rgba(0,0,0,0.04)" : "rgba(255,255,255,0.08)",
+                    borderRadius: 12,
+                    padding: "12px 20px",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: bodyTextColor,
+                  }}
+                >
                   {bp.brand_logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={bp.brand_logo_url} style={{ height: 32, objectFit: "contain" }} alt={bp.brand_name ?? "Brand partner"} />
@@ -322,19 +464,27 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
         )}
 
         {isEnabled(profile.mediakit_case_studies_enabled) && !profile.mediakit_lock_case_studies && activeCaseStudies.length > 0 && (
-          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-            <p style={{ color: "rgba(0,0,0,0.4)", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>PAST PROJECTS</p>
+          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: `1px solid ${borderColor}` }}>
+            <p style={{ color: mutedTextColor, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>PAST PROJECTS</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
               {activeCaseStudies.map((cs) => (
-                <div key={cs.id} style={{ background: "rgba(0,0,0,0.03)", borderRadius: 16, overflow: "hidden", border: "1px solid rgba(0,0,0,0.06)" }}>
+                <div
+                  key={cs.id}
+                  style={{
+                    background: isLightColor(bgColor) ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.08)",
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    border: `1px solid ${borderColor}`,
+                  }}
+                >
                   {cs.image_url && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cs.image_url} style={{ width: "100%", height: 180, objectFit: "cover" }} alt={cs.title ?? "Case study"} />
                   )}
                   <div style={{ padding: 16 }}>
-                    <p style={{ fontWeight: 700, fontSize: 15, color: textColor, margin: "0 0 4px" }}>{cs.title}</p>
-                    {cs.brand_name && <p style={{ fontSize: 12, color: "rgba(0,0,0,0.45)", margin: "0 0 8px" }}>{cs.brand_name}</p>}
-                    {cs.description && <p style={{ fontSize: 13, color: textColor, lineHeight: 1.5, margin: "0 0 8px" }}>{cs.description}</p>}
+                    <p style={{ fontWeight: 700, fontSize: 15, color: bodyTextColor, margin: "0 0 4px" }}>{cs.title}</p>
+                    {cs.brand_name && <p style={{ fontSize: 12, color: mutedTextColor, margin: "0 0 8px" }}>{cs.brand_name}</p>}
+                    {cs.description && <p style={{ fontSize: 13, color: bodyTextColor, lineHeight: 1.5, margin: "0 0 8px" }}>{cs.description}</p>}
                     {cs.result && <p style={{ fontSize: 13, fontWeight: 600, color: accentColor, margin: 0 }}>結果：{cs.result}</p>}
                   </div>
                 </div>
@@ -343,50 +493,57 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
           </section>
         )}
 
-        {isEnabled(profile.mediakit_links_enabled) && activeBlocks.length > 0 && (
-          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-            {profile.mediakit_links_title && (
-              <p style={{ color: "rgba(0,0,0,0.4)", fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>
-                {profile.mediakit_links_title}
-              </p>
-            )}
-            {profile.mediakit_links_subtitle && <p style={{ color: textColor, fontSize: 14, marginBottom: 16 }}>{profile.mediakit_links_subtitle}</p>}
-            <div
+        <section style={{ background: bgColor, padding: "32px 48px" }}>
+          <div style={{ maxWidth: 600, display: "flex", flexDirection: "column", gap: 12 }}>
+            <a
+              href={`mailto:${contactEmail}?subject=${encodeURIComponent(`品牌合作邀請 - ${displayName}`)}`}
               style={{
-                display: profile.mediakit_links_layout === "carousel" ? "grid" : "flex",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                flexDirection: "column",
-                gap: 10,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "16px 32px",
+                backgroundColor: accentColor,
+                color: accentText,
+                borderRadius: 50,
+                fontSize: 16,
+                fontWeight: 700,
+                textDecoration: "none",
+                textAlign: "center",
               }}
             >
-              {activeBlocks.map((block) => (
-                <a
-                  key={block.id}
-                  href={block.url ?? "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "14px 16px",
-                    background: accentColor,
-                    color: accentText,
-                    borderRadius: 50,
-                    textDecoration: "none",
-                    fontWeight: 500,
-                    fontSize: 14,
-                  }}
-                >
-                  {block.title}
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
+              發送合作邀請
+            </a>
 
-        <footer style={{ background: bgColor, padding: "24px 48px", textAlign: "center", borderTop: "1px solid rgba(0,0,0,0.08)" }}>
-          <p style={{ color: "rgba(0,0,0,0.3)", fontSize: 12 }}>
+            {isEnabled(profile.mediakit_links_enabled) && activeBlocks.length > 0 && (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {activeBlocks.map((block) => (
+                  <a
+                    key={block.id}
+                    href={block.url ?? "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: "10px 20px",
+                      border: `1.5px solid ${accentColor}`,
+                      color: accentColor,
+                      borderRadius: 50,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      textDecoration: "none",
+                      background: "transparent",
+                    }}
+                  >
+                    {block.title}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <footer style={{ background: bgColor, padding: "24px 48px", textAlign: "center", borderTop: `1px solid ${borderColor}` }}>
+          <p style={{ color: mutedTextColor, fontSize: 12 }}>
             Powered by{" "}
             <a href="https://egg.sooncreator.network" style={{ color: accentColor, textDecoration: "none", fontWeight: 500 }}>
               SOON-EGG

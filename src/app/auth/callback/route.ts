@@ -23,6 +23,12 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.redirect(new URL(profile?.onboarding_completed ? "/dashboard" : "/onboarding", request.url));
     }
+
+    return NextResponse.redirect(new URL("/login?auth_error=session", request.url));
+  }
+
+  if (next === "auto") {
+    return NextResponse.redirect(new URL("/login?auth_error=session", request.url));
   }
 
   return NextResponse.redirect(new URL(next, request.url));

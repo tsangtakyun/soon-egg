@@ -46,8 +46,8 @@ export function FollowButton({
         type="button"
         onClick={follow}
         disabled={followed || loading}
-        className="block w-full rounded-full border-2 px-4 py-2 text-sm font-medium transition hover:opacity-80 disabled:opacity-70"
-        style={{ borderColor: color, color }}
+        className="w-full rounded-full py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-70"
+        style={{ backgroundColor: color }}
       >
         {followed ? "✓ 已追蹤" : `＋ 追蹤 ${displayName}`}
       </button>

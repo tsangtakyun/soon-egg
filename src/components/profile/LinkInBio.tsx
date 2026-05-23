@@ -1,9 +1,18 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Copy, Upload } from "lucide-react";
+import { Check, Copy, Upload, X } from "lucide-react";
 import { BlockEditor } from "./BlockEditor";
 import { PhonePreview, type PhonePreviewProfile, type PhonePreviewTheme, type ProfileBlock } from "./PhonePreview";
+
+const COVER_OPTIONS = [
+  { src: "/hero-bg.jpg", name: "藍天白雲" },
+  { src: "/star-bg.jpg", name: "萬天星空" },
+  { src: "/secondbg.jpg", name: "搞笑戲劇" },
+  { src: "/tech.jpg", name: "科技感覺" },
+  { src: "/classic.jpg", name: "經典復古" },
+  { src: "/creative.jpg", name: "創意主題" },
+];
 
 export function LinkInBio({
   profile: initialProfile,
@@ -17,14 +26,14 @@ export function LinkInBio({
   blocksError?: string;
 }) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
   const [profile, setProfile] = useState(initialProfile);
   const [blocks, setBlocks] = useState(initialBlocks);
   const [copied, setCopied] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [uploadingCover, setUploadingCover] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [coverError, setCoverError] = useState("");
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [savingCover, setSavingCover] = useState(false);
   const [coffeeUrl, setCoffeeUrl] = useState(initialProfile.buy_me_a_coffee_url || "");
   const [savingCoffeeUrl, setSavingCoffeeUrl] = useState(false);
   const [coffeeMessage, setCoffeeMessage] = useState("");
@@ -40,48 +49,51 @@ export function LinkInBio({
     avatarInputRef.current?.click();
   };
 
-  const openCoverPicker = () => {
-    coverInputRef.current?.click();
-  };
-
-  const uploadProfileImage = async (file: File, kind: "avatar" | "cover") => {
-    const isAvatar = kind === "avatar";
-    if (isAvatar) {
-      setUploadingAvatar(true);
-      setAvatarError("");
-    } else {
-      setUploadingCover(true);
-      setCoverError("");
-    }
+  const uploadAvatar = async (file: File) => {
+    setUploadingAvatar(true);
+    setAvatarError("");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/profile/${kind}`, {
+      const response = await fetch("/api/profile/avatar", {
         method: "POST",
         body: formData,
       });
 
       const result = await response.json();
-      const nextUrl = isAvatar ? result.avatarUrl : result.coverUrl;
-      if (!response.ok || !nextUrl) {
-        throw new Error(result.error || "Upload failed");
+      if (!response.ok || !result.avatarUrl) {
+        throw new Error(result.error || "Avatar upload failed");
       }
 
-      setProfile((current) => ({
-        ...current,
-        ...(isAvatar ? { avatar_url: nextUrl } : { cover_url: nextUrl }),
-      }));
+      setProfile((current) => ({ ...current, avatar_url: result.avatarUrl }));
     } catch {
-      if (isAvatar) {
-        setAvatarError("頭像未能上載，請稍後再試。");
-      } else {
-        setCoverError("封面圖未能上載，請稍後再試。");
-      }
+      setAvatarError("頭像未能上載，請稍後再試。");
     } finally {
       setUploadingAvatar(false);
-      setUploadingCover(false);
+    }
+  };
+
+  const selectCover = async (selectedSrc: string) => {
+    setSavingCover(true);
+    setCoverError("");
+
+    try {
+      const response = await fetch("/api/profile/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cover_url: selectedSrc }),
+      });
+
+      if (!response.ok) throw new Error("Save failed");
+
+      setProfile((current) => ({ ...current, cover_url: selectedSrc }));
+      setCoverModalOpen(false);
+    } catch {
+      setCoverError("封面圖未能更新，請稍後再試。");
+    } finally {
+      setSavingCover(false);
     }
   };
 
@@ -136,18 +148,7 @@ export function LinkInBio({
             className="hidden"
             onChange={(event) => {
               const file = event.target.files?.[0];
-              if (file) void uploadProfileImage(file, "avatar");
-              event.target.value = "";
-            }}
-          />
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void uploadProfileImage(file, "cover");
+              if (file) void uploadAvatar(file);
               event.target.value = "";
             }}
           />
@@ -162,12 +163,10 @@ export function LinkInBio({
           </button>
           <button
             type="button"
-            onClick={openCoverPicker}
-            disabled={uploadingCover}
-            className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
+            onClick={() => setCoverModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50"
           >
-            <Upload className="h-4 w-4" aria-hidden />
-            {uploadingCover ? "上載中..." : "更換封面圖"}
+            更換封面圖
           </button>
         </div>
         {avatarError && <p className="text-sm text-red-600">{avatarError}</p>}
@@ -216,6 +215,54 @@ export function LinkInBio({
           avatarUploading={uploadingAvatar}
         />
       </div>
+
+      {coverModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-zinc-950">選擇封面背景</h2>
+              <button
+                type="button"
+                onClick={() => setCoverModalOpen(false)}
+                className="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+                aria-label="關閉"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {COVER_OPTIONS.map((option) => {
+                const selected = profile.cover_url === option.src;
+
+                return (
+                  <button
+                    key={option.src}
+                    type="button"
+                    onClick={() => void selectCover(option.src)}
+                    disabled={savingCover}
+                    className="group text-left disabled:opacity-60"
+                  >
+                    <div
+                      className={`relative h-28 overflow-hidden rounded-2xl ring-offset-2 transition ${
+                        selected ? "ring-4 ring-blue-500" : "ring-1 ring-gray-200 group-hover:ring-2 group-hover:ring-blue-300"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={option.src} alt={option.name} className="h-full w-full object-cover" />
+                      {selected && (
+                        <div className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
+                          ✓
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-center text-sm font-medium text-zinc-700">{option.name}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

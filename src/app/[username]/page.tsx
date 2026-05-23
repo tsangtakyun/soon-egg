@@ -167,10 +167,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       <div className="relative h-[320px] w-full overflow-hidden">
         {typedProfile.cover_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={typedProfile.cover_url} alt="" className="h-full w-full object-cover" />
+          <img src={typedProfile.cover_url} alt="" className="h-full w-full object-cover object-top" />
         ) : typedTheme?.background_image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={typedTheme.background_image} alt="" className="h-full w-full object-cover" />
+          <img src={typedTheme.background_image} alt="" className="h-full w-full object-cover object-top" />
         ) : (
           <div className="h-full w-full" style={heroFallbackStyle} />
         )}
@@ -267,8 +267,8 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
         <a
           href={`/media-kit?creator=${typedProfile.username}`}
-          className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium transition hover:bg-white/30"
-          style={{ borderColor: btnColor, color: btnColor }}
+          className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
+          style={{ backgroundColor: btnColor }}
         >
           查看 Media Kit
         </a>

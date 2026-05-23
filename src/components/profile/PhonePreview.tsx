@@ -47,7 +47,14 @@ export function PhonePreview({
   const displayName = profile.display_name || profile.username;
   const bio = profile.bio || profile.ai_profile_summary || "";
   const firstInitial = displayName?.trim()[0]?.toUpperCase() || "?";
-  const previewStyle = theme?.background_image
+  const previewStyle = profile.cover_url
+    ? {
+        backgroundImage: `url(${profile.cover_url})`,
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+        color: theme?.text_color ?? "#1a1a1a",
+      }
+    : theme?.background_image
     ? {
         backgroundImage: `url(${theme.background_image})`,
         backgroundPosition: "center",

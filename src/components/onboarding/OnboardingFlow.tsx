@@ -8,22 +8,22 @@ import { SOONMascot } from "./SOONMascot";
 const totalSteps = 5;
 
 const PLATFORMS = [
-  { id: "instagram", label: "Instagram", placeholder: "用戶名稱", color: "#E1306C" },
-  { id: "facebook", label: "Facebook", placeholder: "用戶名稱或專頁名稱", color: "#1877F2" },
-  { id: "threads", label: "Threads", placeholder: "用戶名稱", color: "#000000" },
-  { id: "youtube", label: "YouTube", placeholder: "頻道名稱", color: "#FF0000" },
-  { id: "tiktok", label: "TikTok", placeholder: "用戶名稱", color: "#000000" },
-  { id: "douyin", label: "抖音", placeholder: "抖音號", color: "#161823" },
-  { id: "xiaohongshu", label: "小紅書", placeholder: "小紅書號", color: "#FF2442" },
+  { id: "instagram", label: "Instagram", placeholder: "用戶名稱", logoUrl: "https://cdn.simpleicons.org/instagram/E1306C" },
+  { id: "facebook", label: "Facebook", placeholder: "用戶名稱或專頁名稱", logoUrl: "https://cdn.simpleicons.org/facebook/1877F2" },
+  { id: "threads", label: "Threads", placeholder: "用戶名稱", logoUrl: "https://cdn.simpleicons.org/threads/000000" },
+  { id: "youtube", label: "YouTube", placeholder: "頻道名稱", logoUrl: "https://cdn.simpleicons.org/youtube/FF0000" },
+  { id: "tiktok", label: "TikTok", placeholder: "用戶名稱", logoUrl: "https://cdn.simpleicons.org/tiktok/000000" },
+  { id: "douyin", label: "抖音", placeholder: "抖音號", logoUrl: "https://cdn.simpleicons.org/tiktok/161823" },
+  { id: "xiaohongshu", label: "小紅書", placeholder: "小紅書號", logoUrl: "https://cdn.simpleicons.org/xiaohongshu/FF2442" },
 ];
 
 const THEME_OPTIONS = [
-  { name: "藍天白雲", bg: "/hero-bg.jpg", textColor: "#1a1a1a", buttonColor: "#3b82f6" },
-  { name: "萬天星空", bg: "/star-bg.jpg", textColor: "#ffffff", buttonColor: "#818cf8" },
-  { name: "搞笑戲劇", bg: "/secondbg.jpg", textColor: "#ffffff", buttonColor: "#f59e0b" },
-  { name: "科技感覺", bg: "/tech.jpg", textColor: "#ffffff", buttonColor: "#00ff9f" },
-  { name: "經典複古", bg: "/classic.jpg", textColor: "#3d2b1f", buttonColor: "#8b6914" },
-  { name: "創意主題", bg: "/creative.jpg", textColor: "#2d1b69", buttonColor: "#7c3aed" },
+  { name: "藍天白雲", bg: "/hero-bg.jpg" },
+  { name: "萬天星空", bg: "/star-bg.jpg" },
+  { name: "搞笑戲劇", bg: "/secondbg.jpg" },
+  { name: "科技感覺", bg: "/tech.jpg" },
+  { name: "經典複古", bg: "/classic.jpg" },
+  { name: "創意主題", bg: "/creative.jpg" },
 ];
 
 type Handles = Record<string, string>;
@@ -241,12 +241,17 @@ function StepContent({
         <div className="space-y-3">
           {PLATFORMS.map((platform) => (
             <label key={platform.id} className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-3 py-2">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{ backgroundColor: platform.color }}
-              >
-                {platform.label[0]}
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={platform.logoUrl}
+                alt={platform.label}
+                className="h-6 w-6 shrink-0 object-contain"
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                  event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                }}
+              />
+              <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
               <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
               <input
                 value={handles[platform.id] ?? ""}
@@ -323,21 +328,12 @@ function StepContent({
           }`}
         >
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${theme.bg})` }} />
-          <div className="absolute inset-0 bg-black/20" />
-          <div className="relative z-10 flex h-full flex-col justify-between p-3">
-            <div className="flex items-center gap-1.5">
-              <div className="h-5 w-5 rounded-full bg-white/80" />
-              <div className="h-2 w-12 rounded bg-white/70" />
-            </div>
-            <div className="h-5 w-full rounded-full" style={{ backgroundColor: theme.buttonColor, opacity: 0.9 }} />
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1">
-            <p className="text-center text-xs font-medium text-white">{theme.name}</p>
-          </div>
+          <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/60 to-transparent" />
+          <p className="absolute bottom-2 left-0 right-0 text-center text-xs font-semibold text-white drop-shadow-sm">{theme.name}</p>
           {selectedTheme === theme.name && (
-            <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
+            <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 shadow">
               <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
-                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
           )}

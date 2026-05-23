@@ -23,7 +23,7 @@ const fallbackProfile: Profile = {
   id: "fallback",
   username: "soon_egg",
   display_name: "SOON-EGG",
-  bio: "完成設定後，您的創作者介紹會顯示在這裡。",
+  bio: "亞洲創作者的品牌合作與變現中樞",
   avatar_url: null,
   ai_profile_summary: null,
 };

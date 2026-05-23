@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { Check, Copy, Upload } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { BlockEditor } from "./BlockEditor";
 import { PhonePreview, type PhonePreviewProfile, type PhonePreviewTheme, type ProfileBlock } from "./PhonePreview";
 
@@ -31,29 +30,29 @@ export function LinkInBio({
     window.setTimeout(() => setCopied(false), 2000);
   };
 
+  const openAvatarPicker = () => {
+    fileInputRef.current?.click();
+  };
+
   const uploadAvatar = async (file: File) => {
     setUploadingAvatar(true);
     setAvatarError("");
 
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const formData = new FormData();
+      formData.append("file", file);
 
-      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const path = `${user.id}/avatar.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-      if (uploadError) throw uploadError;
+      const response = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+      });
 
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-      const avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
-      const { error: updateError } = await supabase
-        .from("egg_creator_profiles")
-        .update({ avatar_url: avatarUrl })
-        .eq("user_id", user.id);
-      if (updateError) throw updateError;
+      const result = await response.json();
+      if (!response.ok || !result.avatarUrl) {
+        throw new Error(result.error || "Avatar upload failed");
+      }
 
-      setProfile((current) => ({ ...current, avatar_url: avatarUrl }));
+      setProfile((current) => ({ ...current, avatar_url: result.avatarUrl }));
     } catch {
       setAvatarError("頭像未能上載，請稍後再試。");
     } finally {
@@ -62,8 +61,8 @@ export function LinkInBio({
   };
 
   return (
-    <div className="flex items-start gap-8">
-      <div className="flex-1 space-y-5">
+    <div className="flex gap-8 items-start">
+      <div className="flex-1 flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-black text-zinc-950">我的主頁</h1>
           <p className="mt-2 text-sm text-gray-500">
@@ -96,7 +95,7 @@ export function LinkInBio({
           />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={openAvatarPicker}
             disabled={uploadingAvatar}
             className="inline-flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50"
           >
@@ -110,7 +109,13 @@ export function LinkInBio({
       </div>
 
       <div className="flex-none">
-        <PhonePreview profile={profile} theme={theme} blocks={blocks} />
+        <PhonePreview
+          profile={profile}
+          theme={theme}
+          blocks={blocks}
+          onAvatarClick={openAvatarPicker}
+          avatarUploading={uploadingAvatar}
+        />
       </div>
     </div>
   );

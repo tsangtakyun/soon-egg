@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Sparkles, UserRound } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, DollarSign, Sparkles, UserRound } from "lucide-react";
 import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { demoBrandMatches, demoCreator } from "@/lib/mock-data";
@@ -53,7 +53,7 @@ export default function DashboardHome() {
             <Metric icon={UserRound} label="Reach" value="103.5K" />
             <Metric icon={ChartNoAxesCombined} label="Engagement" value="5.8%" />
             <Metric icon={BriefcaseBusiness} label="Deals" value="8" />
-            <Metric icon={Sparkles} label="AI Credits" value="300" />
+            <Metric icon={DollarSign} label="Total Earnings" value="US$0" />
           </div>
         </div>
         </section>

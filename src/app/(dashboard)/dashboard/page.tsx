@@ -11,23 +11,34 @@ export default function DashboardHome() {
       <DashboardShareHeader />
       <div className="space-y-6 px-6 py-6">
         <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-        <div className="rounded-lg bg-zinc-950 p-6 text-white">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white/70">
-            <Sparkles className="h-4 w-4" aria-hidden />
-            SOON-EGG Creator Network
+          <div
+            className="relative overflow-hidden rounded-2xl text-white"
+            style={{
+              backgroundImage: "url(/hero-bg.jpg)",
+              backgroundPosition: "center top",
+              backgroundRepeat: "no-repeat",
+              backgroundSize: "cover",
+            }}
+          >
+            <div className="absolute inset-0 bg-black/30" />
+            <div className="relative z-10 p-8">
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white">
+                <Sparkles className="h-4 w-4" aria-hidden />
+                SOON-EGG Creator Network
+              </div>
+              <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight text-white sm:text-5xl">亞洲創作者的品牌合作與變現中樞</h1>
+              <p className="mt-4 max-w-2xl text-white">SOON AI 幫你整理社交數據、生成 Media Kit、配對 HK/TW/SG 品牌，並起草繁體中文 pitch。</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/onboarding" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950">
+                  開始 onboarding
+                  <ArrowUpRight className="h-4 w-4" aria-hidden />
+                </Link>
+                <Link href="/soon_egg" className="inline-flex items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-sm text-white">
+                  查看公開主頁
+                </Link>
+              </div>
+            </div>
           </div>
-          <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight sm:text-5xl">亞洲創作者的品牌合作與變現中樞</h1>
-          <p className="mt-4 max-w-2xl text-white/70">SOON AI 幫你整理社交數據、生成 Media Kit、配對 HK/TW/SG 品牌，並起草繁體中文 pitch。</p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/onboarding" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950">
-              開始 onboarding
-              <ArrowUpRight className="h-4 w-4" aria-hidden />
-            </Link>
-            <Link href="/soon_egg" className="inline-flex items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-sm text-white">
-              查看公開主頁
-            </Link>
-          </div>
-        </div>
 
         <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-4">

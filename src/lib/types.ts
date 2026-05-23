@@ -50,6 +50,7 @@ export type ProfileBlock = {
 export type ProfileTheme = {
   id: string;
   theme_name: string;
+  background_image?: string;
   background_color?: string;
   background_gradient?: string;
   text_color: string;

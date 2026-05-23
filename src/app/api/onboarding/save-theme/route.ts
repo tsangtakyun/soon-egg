@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 const THEMES: Record<string, {
+  background_image: string;
   background_color: string;
   background_gradient: string | null;
   text_color: string;
@@ -9,44 +10,58 @@ const THEMES: Record<string, {
   button_style: string;
   font_family: string;
 }> = {
-  "日系清透": {
-    background_color: "#f8f4f0",
-    background_gradient: "linear-gradient(135deg, #f8f4f0, #e8e0d8)",
-    text_color: "#2d2d2d",
-    button_color: "#c9a96e",
+  "藍天白雲": {
+    background_image: "/hero-bg.jpg",
+    background_color: "#87CEEB",
+    background_gradient: null,
+    text_color: "#1a1a1a",
+    button_color: "#3b82f6",
     button_style: "rounded",
     font_family: "sans-serif",
   },
-  "韓系黃昏": {
-    background_color: "#1a1a2e",
-    background_gradient: "linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)",
+  "萬天星空": {
+    background_image: "/star-bg.jpg",
+    background_color: "#0a0a2e",
+    background_gradient: null,
     text_color: "#ffffff",
-    button_color: "#e94560",
+    button_color: "#818cf8",
     button_style: "pill",
     font_family: "sans-serif",
   },
-  "港風霓虹": {
-    background_color: "#0a0a0a",
-    background_gradient: "linear-gradient(135deg, #0a0a0a, #1a0a2e)",
+  "搞笑戲劇": {
+    background_image: "/secondbg.jpg",
+    background_color: "#1a1a1a",
+    background_gradient: null,
+    text_color: "#ffffff",
+    button_color: "#f59e0b",
+    button_style: "square",
+    font_family: "sans-serif",
+  },
+  "科技感覺": {
+    background_image: "/tech.jpg",
+    background_color: "#0f172a",
+    background_gradient: null,
     text_color: "#ffffff",
     button_color: "#00ff9f",
     button_style: "square",
     font_family: "monospace",
   },
-  "台系文青": {
+  "經典複古": {
+    background_image: "/classic.jpg",
     background_color: "#f5f0e8",
-    background_gradient: "linear-gradient(135deg, #f5f0e8, #e8e0d0)",
-    text_color: "#3d3530",
-    button_color: "#8b7355",
+    background_gradient: null,
+    text_color: "#3d2b1f",
+    button_color: "#8b6914",
     button_style: "rounded",
     font_family: "serif",
   },
-  "現代極簡": {
-    background_color: "#ffffff",
+  "創意主題": {
+    background_image: "/creative.jpg",
+    background_color: "#f0e6ff",
     background_gradient: null,
-    text_color: "#000000",
-    button_color: "#000000",
-    button_style: "square",
+    text_color: "#2d1b69",
+    button_color: "#7c3aed",
+    button_style: "pill",
     font_family: "sans-serif",
   },
 };
@@ -74,7 +89,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
-  const selectedTheme = themeName && THEMES[themeName] ? themeName : "現代極簡";
+  const selectedTheme = themeName && THEMES[themeName] ? themeName : "藍天白雲";
   const themeConfig = THEMES[selectedTheme];
 
   await supabase

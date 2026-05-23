@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeDollarSign, BriefcaseBusiness, Check, ClipboardList } from "lucide-react";
+import { BadgeDollarSign, BriefcaseBusiness, ClipboardList } from "lucide-react";
 import { SOONMascot } from "./SOONMascot";
 
 const totalSteps = 5;
@@ -17,12 +17,13 @@ const PLATFORMS = [
   { id: "xiaohongshu", label: "小紅書", placeholder: "小紅書號", color: "#FF2442" },
 ];
 
-const THEMES = [
-  { name: "日系清透", swatch: "linear-gradient(135deg,#f8fbff,#dceee5)" },
-  { name: "韓系黃昏", swatch: "linear-gradient(135deg,#ffdfb8,#e6a6b8)" },
-  { name: "港風霓虹", swatch: "linear-gradient(135deg,#160b2e,#00b8d4,#ff4f7b)" },
-  { name: "台系文青", swatch: "linear-gradient(135deg,#f4efe6,#7aa095)" },
-  { name: "現代極簡", swatch: "linear-gradient(135deg,#111,#f5f5f4)" },
+const THEME_OPTIONS = [
+  { name: "藍天白雲", bg: "/hero-bg.jpg", textColor: "#1a1a1a", buttonColor: "#3b82f6" },
+  { name: "萬天星空", bg: "/star-bg.jpg", textColor: "#ffffff", buttonColor: "#818cf8" },
+  { name: "搞笑戲劇", bg: "/secondbg.jpg", textColor: "#ffffff", buttonColor: "#f59e0b" },
+  { name: "科技感覺", bg: "/tech.jpg", textColor: "#ffffff", buttonColor: "#00ff9f" },
+  { name: "經典複古", bg: "/classic.jpg", textColor: "#3d2b1f", buttonColor: "#8b6914" },
+  { name: "創意主題", bg: "/creative.jpg", textColor: "#2d1b69", buttonColor: "#7c3aed" },
 ];
 
 type Handles = Record<string, string>;
@@ -51,7 +52,7 @@ export function OnboardingFlow() {
   const [currentStep, setCurrentStep] = useState(1);
   const [handles, setHandles] = useState<Handles>(initialHandles);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [selectedTheme, setSelectedTheme] = useState("現代極簡");
+  const [selectedTheme, setSelectedTheme] = useState("藍天白雲");
   const [analyzing, setAnalyzing] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +76,7 @@ export function OnboardingFlow() {
       }
 
       setAnalysisResult(data.analysis);
-      if (data.analysis?.suggested_theme) {
+      if (data.analysis?.suggested_theme && THEME_OPTIONS.some((theme) => theme.name === data.analysis.suggested_theme)) {
         setSelectedTheme(data.analysis.suggested_theme);
       }
       setTimeout(() => setCurrentStep(4), 1000);
@@ -312,20 +313,34 @@ function StepContent({
 
   return (
     <div className="mt-6 grid grid-cols-2 gap-3">
-      {THEMES.map((theme) => (
+      {THEME_OPTIONS.map((theme) => (
         <button
           key={theme.name}
           type="button"
           onClick={() => onSelectTheme(theme.name)}
-          className={`rounded-2xl border bg-white p-3 text-left shadow-sm transition ${
-            selectedTheme === theme.name ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-100 hover:border-blue-200"
+          className={`relative h-32 overflow-hidden rounded-2xl transition-all ${
+            selectedTheme === theme.name ? "scale-[1.02] ring-4 ring-blue-500" : "ring-1 ring-gray-200 hover:ring-2 hover:ring-blue-300"
           }`}
         >
-          <div className="aspect-[4/3] rounded-xl" style={{ background: theme.swatch }} />
-          <div className="mt-3 flex items-center justify-between text-sm font-semibold text-gray-900">
-            {theme.name}
-            {selectedTheme === theme.name && <Check size={16} className="text-blue-500" />}
+          <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${theme.bg})` }} />
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="relative z-10 flex h-full flex-col justify-between p-3">
+            <div className="flex items-center gap-1.5">
+              <div className="h-5 w-5 rounded-full bg-white/80" />
+              <div className="h-2 w-12 rounded bg-white/70" />
+            </div>
+            <div className="h-5 w-full rounded-full" style={{ backgroundColor: theme.buttonColor, opacity: 0.9 }} />
           </div>
+          <div className="absolute bottom-0 left-0 right-0 bg-black/40 px-2 py-1">
+            <p className="text-center text-xs font-medium text-white">{theme.name}</p>
+          </div>
+          {selectedTheme === theme.name && (
+            <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500">
+              <svg width="10" height="8" viewBox="0 0 10 8" fill="none" aria-hidden>
+                <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+          )}
         </button>
       ))}
     </div>

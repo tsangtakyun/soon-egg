@@ -56,6 +56,7 @@ create table if not exists egg_profile_themes (
   id uuid primary key default gen_random_uuid(),
   creator_id uuid references egg_creator_profiles(id) on delete cascade,
   theme_name text,
+  background_image text,
   background_color text,
   background_gradient text,
   text_color text,
@@ -66,6 +67,8 @@ create table if not exists egg_profile_themes (
   is_active boolean default false,
   created_at timestamptz default now()
 );
+
+alter table egg_profile_themes add column if not exists background_image text;
 
 create table if not exists egg_brands (
   id uuid primary key default gen_random_uuid(),

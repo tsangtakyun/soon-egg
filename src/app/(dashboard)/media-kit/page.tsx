@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -275,7 +275,7 @@ function LockedBlockRow({
           <Toggle value={visible} onChange={(value) => onUpdate({ [toggleField]: !value } as Partial<CreatorProfile>)} />
           <button
             onClick={() => setExpanded((current) => !current)}
-            className="text-base text-gray-300 hover:text-gray-600"
+            className="flex h-6 w-6 items-center justify-center text-base text-gray-400 hover:text-gray-700"
             type="button"
           >
             {expanded ? "∧" : "›"}

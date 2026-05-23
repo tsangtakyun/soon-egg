@@ -29,6 +29,7 @@ export function BlockEditor({
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
 
@@ -63,6 +64,7 @@ export function BlockEditor({
   };
 
   const startEdit = (block: ProfileBlock) => {
+    setConfirmDeleteId(null);
     setEditingId(block.id);
     setEditDraft({ title: block.title ?? "", url: block.url ?? "" });
   };
@@ -83,10 +85,9 @@ export function BlockEditor({
   };
 
   const deleteBlock = async (block: ProfileBlock) => {
-    if (!window.confirm("確定刪除此連結？")) return;
-
     const nextBlocks = blocks.filter((item) => item.id !== block.id);
     onBlocksChange(nextBlocks);
+    setConfirmDeleteId(null);
 
     try {
       const supabase = createClient();
@@ -229,12 +230,27 @@ export function BlockEditor({
                     <IconButton label="編輯" onClick={() => startEdit(block)}>
                       <Pencil className="h-4 w-4" aria-hidden />
                     </IconButton>
-                    <IconButton label="刪除" onClick={() => deleteBlock(block)}>
+                    <IconButton label="刪除" onClick={() => {
+                      setEditingId(null);
+                      setConfirmDeleteId(block.id);
+                    }}>
                       <Trash2 className="h-4 w-4" aria-hidden />
                     </IconButton>
                   </>
                 )}
               </div>
+
+              {confirmDeleteId === block.id && (
+                <div className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs text-red-600">
+                  <span className="whitespace-nowrap">確定刪除？</span>
+                  <IconButton label="確認刪除" onClick={() => deleteBlock(block)}>
+                    <Check className="h-4 w-4" aria-hidden />
+                  </IconButton>
+                  <IconButton label="取消刪除" onClick={() => setConfirmDeleteId(null)}>
+                    <X className="h-4 w-4" aria-hidden />
+                  </IconButton>
+                </div>
+              )}
 
               <div className="font-mono text-xs text-zinc-500">{block.click_count ?? 0} clicks</div>
             </div>
@@ -301,7 +317,7 @@ function IconButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-950 disabled:opacity-40"
+      className="rounded-md p-1 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-40"
       aria-label={label}
       title={label}
     >

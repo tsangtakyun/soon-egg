@@ -44,8 +44,24 @@ type RateCard = {
   is_active: boolean | null;
 };
 
+type CaseStudy = {
+  id: string;
+  title: string | null;
+  brand_name: string | null;
+  description: string | null;
+  result: string | null;
+  sort_order: number | null;
+};
+
+type BrandPartner = {
+  id: string;
+  brand_name: string | null;
+  brand_logo_url: string | null;
+  sort_order: number | null;
+};
+
 type TabKey = "design" | "permissions" | "rates";
-type SectionKey = "contact" | "about" | "cases" | "partners" | "rates" | "analytics";
+type SectionKey = "contact" | "about" | "cases" | "partners" | "analytics";
 
 const emptyRate = {
   service_name: "",
@@ -69,7 +85,7 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   return (
     <button
       onClick={() => onChange(!value)}
-      className={`relative h-6 w-10 rounded-full transition-colors ${value ? "bg-black" : "bg-gray-200"}`}
+      className={`relative h-6 w-10 rounded-full transition-colors ${value ? "bg-green-500" : "bg-red-400"}`}
       type="button"
     >
       <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${value ? "translate-x-5" : "translate-x-1"}`} />
@@ -181,6 +197,215 @@ function TextField({
   );
 }
 
+function CaseStudiesEditor({ profileId }: { profileId: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
+  const [draft, setDraft] = useState({ title: "", brand_name: "", description: "", result: "" });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const { data } = await supabase
+        .from("egg_case_studies")
+        .select("*")
+        .eq("creator_id", profileId)
+        .order("sort_order", { ascending: true });
+
+      if (!cancelled) setCaseStudies((data ?? []) as CaseStudy[]);
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, supabase]);
+
+  async function handleAdd() {
+    if (!draft.title.trim()) return;
+
+    const { data, error } = await supabase
+      .from("egg_case_studies")
+      .insert({
+        creator_id: profileId,
+        title: draft.title.trim(),
+        brand_name: draft.brand_name.trim() || null,
+        description: draft.description.trim() || null,
+        result: draft.result.trim() || null,
+        sort_order: caseStudies.length,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setCaseStudies((current) => [...current, data as CaseStudy]);
+      setDraft({ title: "", brand_name: "", description: "", result: "" });
+    }
+  }
+
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from("egg_case_studies").delete().eq("id", id);
+    if (!error) setCaseStudies((current) => current.filter((item) => item.id !== id));
+  }
+
+  return (
+    <div className="space-y-3 p-4">
+      <div className="rounded-2xl border border-zinc-100 bg-white p-3">
+        <div className="grid gap-2">
+          <input
+            value={draft.title}
+            onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
+            placeholder="項目名稱 *"
+            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          />
+          <input
+            value={draft.brand_name}
+            onChange={(event) => setDraft((current) => ({ ...current, brand_name: event.target.value }))}
+            placeholder="品牌名稱"
+            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          />
+          <textarea
+            value={draft.description}
+            onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+            placeholder="項目描述"
+            rows={3}
+            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          />
+          <input
+            value={draft.result}
+            onChange={(event) => setDraft((current) => ({ ...current, result: event.target.value }))}
+            placeholder="成果，例如：帶來 30K+ 觸及"
+            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!draft.title.trim()}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-40"
+            type="button"
+          >
+            新增過往項目
+          </button>
+        </div>
+      </div>
+
+      {caseStudies.length === 0 ? (
+        <p className="rounded-xl bg-white px-4 py-6 text-center text-sm text-zinc-400">尚未新增過往項目。</p>
+      ) : (
+        <div className="divide-y divide-zinc-100 rounded-2xl border border-zinc-100 bg-white">
+          {caseStudies.map((item) => (
+            <div key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-zinc-900">{item.title}</p>
+                {item.brand_name && <p className="text-xs text-zinc-400">{item.brand_name}</p>}
+                {item.description && <p className="mt-1 text-xs leading-relaxed text-zinc-500">{item.description}</p>}
+                {item.result && <p className="mt-1 text-xs font-medium text-blue-600">{item.result}</p>}
+              </div>
+              <button onClick={() => handleDelete(item.id)} className="text-xs text-zinc-300 hover:text-red-400" type="button">
+                刪除
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BrandPartnersEditor({ profileId }: { profileId: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [partners, setPartners] = useState<BrandPartner[]>([]);
+  const [brandName, setBrandName] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      const { data } = await supabase
+        .from("egg_brand_partners")
+        .select("*")
+        .eq("creator_id", profileId)
+        .order("sort_order", { ascending: true });
+
+      if (!cancelled) setPartners((data ?? []) as BrandPartner[]);
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, supabase]);
+
+  async function handleAdd() {
+    if (!brandName.trim()) return;
+
+    const { data, error } = await supabase
+      .from("egg_brand_partners")
+      .insert({
+        creator_id: profileId,
+        brand_name: brandName.trim(),
+        sort_order: partners.length,
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setPartners((current) => [...current, data as BrandPartner]);
+      setBrandName("");
+    }
+  }
+
+  async function handleDelete(id: string) {
+    const { error } = await supabase.from("egg_brand_partners").delete().eq("id", id);
+    if (!error) setPartners((current) => current.filter((partner) => partner.id !== id));
+  }
+
+  return (
+    <div className="space-y-3 p-4">
+      <div className="flex gap-2 rounded-2xl border border-zinc-100 bg-white p-3">
+        <input
+          value={brandName}
+          onChange={(event) => setBrandName(event.target.value)}
+          placeholder="品牌名稱"
+          className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+        />
+        <button
+          onClick={handleAdd}
+          disabled={!brandName.trim()}
+          className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-40"
+          type="button"
+        >
+          新增
+        </button>
+      </div>
+
+      {partners.length === 0 ? (
+        <p className="rounded-xl bg-white px-4 py-6 text-center text-sm text-zinc-400">尚未新增品牌合作。</p>
+      ) : (
+        <div className="divide-y divide-zinc-100 rounded-2xl border border-zinc-100 bg-white">
+          {partners.map((partner) => (
+            <div key={partner.id} className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-3">
+                {partner.brand_logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={partner.brand_logo_url} alt={partner.brand_name ?? "Brand"} className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-500">
+                    {partner.brand_name?.[0] ?? "B"}
+                  </div>
+                )}
+                <p className="text-sm font-medium text-zinc-900">{partner.brand_name}</p>
+              </div>
+              <button onClick={() => handleDelete(partner.id)} className="text-xs text-zinc-300 hover:text-red-400" type="button">
+                刪除
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SectionEditor({
   sectionKey,
   profile,
@@ -236,19 +461,15 @@ function SectionEditor({
     );
   }
 
-  if (sectionKey === "rates") {
-    return <p className="p-4 text-sm text-zinc-500">服務報價可在「報價」分頁新增、刪除和排序。</p>;
-  }
-
   if (sectionKey === "analytics") {
     return <p className="p-4 text-sm text-zinc-500">數據分析會根據已連結社交帳號自動顯示。</p>;
   }
 
   if (sectionKey === "cases") {
-    return <p className="p-4 text-sm text-zinc-500">過往項目內容會顯示在公開 Media Kit，稍後可加入案例管理。</p>;
+    return <CaseStudiesEditor profileId={profile.id} />;
   }
 
-  return <p className="p-4 text-sm text-zinc-500">品牌合作內容會顯示在公開 Media Kit，稍後可加入品牌管理。</p>;
+  return <BrandPartnersEditor profileId={profile.id} />;
 }
 
 function LockedBlockRow({
@@ -553,7 +774,6 @@ export default function MediaKitPage() {
                         profile={profile}
                         onUpdate={saveProfile}
                       />
-                      <LockedBlockRow label="服務報價" toggleField="mediakit_lock_rates" sectionKey="rates" profile={profile} onUpdate={saveProfile} />
                       <LockedBlockRow
                         label="數據分析"
                         toggleField="mediakit_lock_analytics"

@@ -272,10 +272,10 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
                       color: "rgba(255,255,255,0.82)",
                       fontSize: 14,
                       margin: "6px 0 0",
-                      maxWidth: 520,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      maxWidth: 400,
+                      overflow: "visible",
+                      whiteSpace: "normal",
+                      wordBreak: "break-word",
                     }}
                   >
                     {tagline}

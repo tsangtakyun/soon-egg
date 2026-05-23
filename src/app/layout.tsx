@@ -20,6 +20,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://sooncreator.network"),
   title: "SOON-EGG Creator Network",
   description: "AI-powered creator economy platform for pan-Asian KOLs.",
+  icons: {
+    icon: "/soon-egg.png",
+    shortcut: "/soon-egg.png",
+    apple: "/soon-egg.png",
+  },
 };
 
 export default function RootLayout({

@@ -72,7 +72,7 @@ export default function LoginPage() {
           <img src="/soon-egg.png" alt="SOON-EGG" className="h-12 w-auto object-contain" />
         </div>
         <h1 className="text-center text-2xl font-black text-zinc-950">登入 SOON-EGG</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500">登入後會按您的設定進入 onboarding 或 dashboard。</p>
+        <p className="mt-2 text-center text-sm text-zinc-500">登入後會帶您回到設定流程或主頁。</p>
 
         <button
           type="button"

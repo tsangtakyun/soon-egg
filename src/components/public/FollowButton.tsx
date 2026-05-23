@@ -8,12 +8,14 @@ export function FollowButton({
   initialCount = 0,
   buttonColor,
   btnColor,
+  btnRadius = "50px",
 }: {
   creatorId: string;
   displayName: string;
   initialCount?: number;
   buttonColor?: string;
   btnColor?: string;
+  btnRadius?: string;
 }) {
   const [count, setCount] = useState(initialCount);
   const [followed, setFollowed] = useState(false);
@@ -41,17 +43,32 @@ export function FollowButton({
   };
 
   return (
-    <div className="w-full max-w-sm mx-auto">
+    <div style={{ width: "100%", maxWidth: 384, margin: "0 auto" }}>
       <button
         type="button"
         onClick={follow}
         disabled={followed || loading}
-        className="w-full rounded-full py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-70"
-        style={{ backgroundColor: color }}
+        style={{
+          width: "100%",
+          padding: "10px 16px",
+          borderRadius: btnRadius,
+          border: "none",
+          backgroundColor: color,
+          color: "white",
+          fontSize: 14,
+          fontWeight: 500,
+          cursor: followed || loading ? "default" : "pointer",
+          opacity: followed || loading ? 0.7 : 1,
+          transition: "opacity 0.2s ease",
+        }}
       >
         {followed ? "✓ 已追蹤" : `＋ 追蹤 ${displayName}`}
       </button>
-      {count > 0 && <p className="mt-2 text-center text-xs text-gray-500">已有 {count.toLocaleString()} 人追蹤</p>}
+      {count > 0 && (
+        <p style={{ marginTop: 8, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+          已有 {count.toLocaleString()} 人追蹤
+        </p>
+      )}
     </div>
   );
 }

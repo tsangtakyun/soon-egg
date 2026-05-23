@@ -51,7 +51,15 @@ type PublicTheme = {
   text_color: string | null;
 };
 
-function getBackgroundStyle(theme: PublicTheme | null): CSSProperties {
+function getBackgroundStyle(profile: PublicProfile, theme: PublicTheme | null): CSSProperties {
+  if (profile.cover_url) {
+    return {
+      backgroundImage: `url(${profile.cover_url})`,
+      backgroundPosition: "center",
+      backgroundSize: "cover",
+    };
+  }
+
   if (theme?.background_image) {
     return {
       backgroundImage: `url(${theme.background_image})`,
@@ -74,7 +82,7 @@ function SocialLink({ href, label, children }: { href: string; label: string; ch
       aria-label={label}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex h-9 w-9 items-center justify-center rounded-full bg-white/70 text-gray-700 shadow-sm backdrop-blur transition hover:bg-white hover:text-gray-900"
+      className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-gray-700 shadow-sm backdrop-blur transition hover:bg-white hover:text-gray-900"
     >
       {children}
     </a>
@@ -152,131 +160,117 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const typedProfile = profile as PublicProfile;
   const typedTheme = theme as PublicTheme | null;
-  const bgStyle = getBackgroundStyle(typedTheme);
+  const bgStyle = getBackgroundStyle(typedProfile, typedTheme);
   const btnColor = typedTheme?.button_color ?? "#3b82f6";
-  const textColor = typedTheme?.text_color ?? "#1a1a1a";
   const displayName = typedProfile.display_name || typedProfile.username;
   const bio = typedProfile.bio ?? typedProfile.ai_profile_summary;
-  const heroFallbackStyle: CSSProperties = typedTheme?.background_gradient
-    ? { background: typedTheme.background_gradient }
-    : { backgroundColor: typedTheme?.background_color ?? "#87CEEB" };
   const followerCount = followsResult.count ?? 0;
 
   return (
-    <main className="min-h-screen" style={bgStyle}>
-      <div className="relative h-[320px] w-full overflow-hidden">
-        {typedProfile.cover_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={typedProfile.cover_url} alt="" className="h-full w-full object-cover object-top" />
-        ) : typedTheme?.background_image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={typedTheme.background_image} alt="" className="h-full w-full object-cover object-top" />
-        ) : (
-          <div className="h-full w-full" style={heroFallbackStyle} />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-        <div className="absolute bottom-4 left-4 flex items-end gap-3">
+    <main className="min-h-screen w-full" style={bgStyle}>
+      <div className="flex min-h-screen w-full flex-col items-center bg-black/20 px-4 pb-12 pt-16">
+        <div className="mb-6 flex flex-col items-center">
           {typedProfile.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={typedProfile.avatar_url} alt={displayName} className="h-14 w-14 rounded-full border-2 border-white object-cover" />
+            <img
+              src={typedProfile.avatar_url}
+              alt={displayName}
+              className="h-40 w-40 rounded-full border-4 border-white/80 object-cover shadow-lg"
+            />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white/30 text-xl font-bold text-white">
+            <div className="flex h-40 w-40 items-center justify-center rounded-full border-4 border-white/50 bg-white/30 text-5xl font-bold text-white">
               {displayName?.[0] ?? "?"}
             </div>
           )}
-          <div>
-            <h1 className="text-xl font-bold text-white">{displayName}</h1>
-            {bio && <p className="text-xs text-white drop-shadow">{bio}</p>}
+          <h1 className="mt-4 text-center text-2xl font-bold text-white drop-shadow">{displayName}</h1>
+          {bio && <p className="mt-1 max-w-xs text-center text-sm text-white/80 drop-shadow">{bio}</p>}
+        </div>
+
+        <div className="flex w-full max-w-sm flex-col gap-3">
+          <div className="flex justify-center gap-4 py-3">
+            {typedProfile.contact_email && (
+              <SocialLink href={`mailto:${typedProfile.contact_email}`} label="Email">
+                <Mail className="h-6 w-6" aria-hidden />
+              </SocialLink>
+            )}
+            {typedProfile.tiktok_handle && (
+              <SocialLink href={`https://tiktok.com/@${typedProfile.tiktok_handle}`} label="TikTok">
+                <TikTokIcon />
+              </SocialLink>
+            )}
+            {typedProfile.instagram_handle && (
+              <SocialLink href={`https://instagram.com/${typedProfile.instagram_handle}`} label="Instagram">
+                <InstagramIcon />
+              </SocialLink>
+            )}
+            {typedProfile.xiaohongshu_handle && (
+              <SocialLink href={`https://xiaohongshu.com/user/profile/${typedProfile.xiaohongshu_handle}`} label="小紅書">
+                <XiaohongshuIcon />
+              </SocialLink>
+            )}
+            {typedProfile.youtube_handle && (
+              <SocialLink href={`https://youtube.com/@${typedProfile.youtube_handle}`} label="YouTube">
+                <YouTubeIcon />
+              </SocialLink>
+            )}
           </div>
-        </div>
-      </div>
 
-      <div className="mx-auto flex w-full max-w-sm flex-col gap-3 px-4 py-4">
-        <div className="flex justify-center gap-4 py-3">
-          {typedProfile.contact_email && (
-            <SocialLink href={`mailto:${typedProfile.contact_email}`} label="Email">
-              <Mail className="h-6 w-6" aria-hidden />
-            </SocialLink>
-          )}
-          {typedProfile.tiktok_handle && (
-            <SocialLink href={`https://tiktok.com/@${typedProfile.tiktok_handle}`} label="TikTok">
-              <TikTokIcon />
-            </SocialLink>
-          )}
-          {typedProfile.instagram_handle && (
-            <SocialLink href={`https://instagram.com/${typedProfile.instagram_handle}`} label="Instagram">
-              <InstagramIcon />
-            </SocialLink>
-          )}
-          {typedProfile.xiaohongshu_handle && (
-            <SocialLink href={`https://xiaohongshu.com/user/profile/${typedProfile.xiaohongshu_handle}`} label="小紅書">
-              <XiaohongshuIcon />
-            </SocialLink>
-          )}
-          {typedProfile.youtube_handle && (
-            <SocialLink href={`https://youtube.com/@${typedProfile.youtube_handle}`} label="YouTube">
-              <YouTubeIcon />
-            </SocialLink>
-          )}
-        </div>
+          <div className="mx-auto w-full max-w-sm px-4">
+            <FollowButton creatorId={typedProfile.id} displayName={displayName} initialCount={followerCount} btnColor={btnColor} />
+          </div>
 
-        <div className="mx-auto w-full max-w-sm px-4">
-          <FollowButton creatorId={typedProfile.id} displayName={displayName} initialCount={followerCount} btnColor={btnColor} />
-        </div>
-
-        {typedProfile.youtube_handle && typedProfile.youtube_latest_video_id && (
-          <div className="mx-auto w-full max-w-sm">
-            <p className="mb-2 text-center text-xs font-medium" style={{ color: textColor }}>
-              最新 YouTube 影片
-            </p>
-            <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-              <iframe
-                title={`${displayName} 最新 YouTube 影片`}
-                className="absolute inset-0 h-full w-full rounded-xl"
-                src={`https://www.youtube.com/embed/${typedProfile.youtube_latest_video_id}`}
-                allowFullScreen
-              />
+          {typedProfile.youtube_handle && typedProfile.youtube_latest_video_id && (
+            <div className="mx-auto w-full max-w-sm">
+              <p className="mb-2 text-center text-xs font-medium text-white drop-shadow">最新 YouTube 影片</p>
+              <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+                <iframe
+                  title={`${displayName} 最新 YouTube 影片`}
+                  className="absolute inset-0 h-full w-full rounded-xl"
+                  src={`https://www.youtube.com/embed/${typedProfile.youtube_latest_video_id}`}
+                  allowFullScreen
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {(blocks as PublicBlock[] | null)?.map((block) => (
+          {(blocks as PublicBlock[] | null)?.map((block) => (
+            <a
+              key={block.id}
+              href={block.url || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mx-auto flex w-full max-w-sm items-center justify-center rounded-xl px-4 py-3 text-center font-medium text-white transition hover:opacity-90"
+              style={{ backgroundColor: btnColor }}
+            >
+              {block.title}
+            </a>
+          ))}
+
+          {typedProfile.buy_me_a_coffee_url && (
+            <a
+              href={typedProfile.buy_me_a_coffee_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium text-white transition hover:opacity-90"
+              style={{ backgroundColor: btnColor }}
+            >
+              Buy Me A Coffee
+            </a>
+          )}
+
           <a
-            key={block.id}
-            href={block.url || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mx-auto flex w-full max-w-sm items-center justify-center rounded-xl px-4 py-3 text-center font-medium text-white transition hover:opacity-90"
+            href={`/media-kit?creator=${typedProfile.username}`}
+            className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
             style={{ backgroundColor: btnColor }}
           >
-            {block.title}
+            查看 Media Kit
           </a>
-        ))}
 
-        {typedProfile.buy_me_a_coffee_url && (
-          <a
-            href={typedProfile.buy_me_a_coffee_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium transition hover:opacity-90"
-            style={{ backgroundColor: btnColor, color: "#fff" }}
-          >
-            Buy Me A Coffee
-          </a>
-        )}
-
-        <a
-          href={`/media-kit?creator=${typedProfile.username}`}
-          className="mx-auto flex w-full max-w-sm items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-white transition hover:opacity-90"
-          style={{ backgroundColor: btnColor }}
-        >
-          查看 Media Kit
-        </a>
-
-        <div className="py-6 text-center">
-          <a href="https://egg.sooncreator.network/signup" className="text-xs text-gray-500 underline transition hover:text-gray-700">
-            Create your own SOON-EGG page
-          </a>
+          <div className="py-6 text-center">
+            <a href="https://egg.sooncreator.network/signup" className="text-xs text-white/80 underline transition hover:text-white">
+              Create your own SOON-EGG page
+            </a>
+          </div>
         </div>
       </div>
     </main>

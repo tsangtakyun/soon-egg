@@ -15,6 +15,15 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(canonicalUrl, 308);
   }
 
+  if (pathname === "/" && request.nextUrl.searchParams.has("code")) {
+    const callbackUrl = request.nextUrl.clone();
+    callbackUrl.pathname = "/auth/callback";
+    if (!callbackUrl.searchParams.has("next")) {
+      callbackUrl.searchParams.set("next", "auto");
+    }
+    return NextResponse.redirect(callbackUrl);
+  }
+
   if (!url || !key) {
     return response;
   }

@@ -46,6 +46,8 @@ type PublicPageClientProps = {
   textColor: string;
 };
 
+const CONTENT_WIDTH = 480;
+
 function getSectionStyle(overrides: React.CSSProperties = {}): React.CSSProperties {
   return {
     height: "100vh",
@@ -54,7 +56,7 @@ function getSectionStyle(overrides: React.CSSProperties = {}): React.CSSProperti
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    padding: "32px 20px",
+    padding: "24px 20px",
     position: "relative",
     ...overrides,
   };
@@ -71,8 +73,8 @@ function SocialIcon({ href, icon }: { href: string; icon: "instagram" | "youtube
       target="_blank"
       rel="noopener noreferrer"
       style={{
-        width: 34,
-        height: 34,
+        width: 32,
+        height: 32,
         borderRadius: 999,
         background: "rgba(255,255,255,0.16)",
         border: "0.5px solid rgba(255,255,255,0.24)",
@@ -85,7 +87,7 @@ function SocialIcon({ href, icon }: { href: string; icon: "instagram" | "youtube
       aria-label={icon}
     >
       {icon === "instagram" && (
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
           <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
         </svg>
       )}
@@ -95,7 +97,7 @@ function SocialIcon({ href, icon }: { href: string; icon: "instagram" | "youtube
         </svg>
       )}
       {icon === "tiktok" && (
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>
           <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.69a8.18 8.18 0 004.78 1.52V6.77a4.85 4.85 0 01-1.01-.08z" />
         </svg>
       )}
@@ -126,6 +128,7 @@ export function PublicPageClient({
   );
 
   useEffect(() => {
+    const root = document.getElementById("scroll-container");
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -137,7 +140,7 @@ export function PublicPageClient({
           if (!Number.isNaN(nextIndex)) setActiveSection(nextIndex);
         }
       },
-      { root: document.getElementById("scroll-container"), threshold: [0.55, 0.75] },
+      { root, threshold: [0.55, 0.75] },
     );
 
     sections.forEach((_, index) => {
@@ -161,147 +164,176 @@ export function PublicPageClient({
           }}
         >
           <section id={`section-${sectionIndex.hub}`} style={getSectionStyle()}>
-            {profile.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profile.avatar_url}
-                alt={displayName}
-                style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  border: "3px solid rgba(255,255,255,0.8)",
-                  boxShadow: "0 12px 28px rgba(0,0,0,0.25)",
-                  marginBottom: 16,
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: "50%",
-                  border: "3px solid rgba(255,255,255,0.8)",
-                  background: "rgba(255,255,255,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 32,
-                  color: "white",
-                  marginBottom: 16,
-                }}
-              >
-                {displayName?.[0] ?? "?"}
-              </div>
-            )}
-
-            <h1 style={{ color: textColor, fontSize: 22, fontWeight: 500, textAlign: "center", marginBottom: 4 }}>
-              {displayName}
-            </h1>
-            {bio && (
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.7)",
-                  fontSize: 13,
-                  textAlign: "center",
-                  marginBottom: 14,
-                  maxWidth: 260,
-                  lineHeight: 1.6,
-                }}
-              >
-                {bio}
-              </p>
-            )}
-
-            <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-              {profile.contact_email && <SocialIcon href={`mailto:${profile.contact_email}`} icon="email" />}
-              {profile.instagram_handle && <SocialIcon href={`https://instagram.com/${profile.instagram_handle}`} icon="instagram" />}
-              {profile.youtube_handle && <SocialIcon href={`https://youtube.com/@${profile.youtube_handle}`} icon="youtube" />}
-              {profile.tiktok_handle && <SocialIcon href={`https://tiktok.com/@${profile.tiktok_handle}`} icon="tiktok" />}
-              {profile.xiaohongshu_handle && (
-                <SocialIcon href={`https://xiaohongshu.com/user/profile/${profile.xiaohongshu_handle}`} icon="xhs" />
+            <div
+              style={{
+                width: "100%",
+                maxWidth: CONTENT_WIDTH,
+                margin: "0 auto",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              {profile.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.avatar_url}
+                  alt={displayName}
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "3px solid rgba(255,255,255,0.8)",
+                    boxShadow: "0 12px 28px rgba(0,0,0,0.25)",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: "50%",
+                    border: "3px solid rgba(255,255,255,0.8)",
+                    background: "rgba(255,255,255,0.2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 32,
+                    color: "white",
+                  }}
+                >
+                  {displayName?.[0] ?? "?"}
+                </div>
               )}
-            </div>
 
-            <FollowButton creatorId={profile.id} displayName={displayName} initialCount={followerCount} btnColor={btnColor} btnRadius={btnRadius} />
+              <h1
+                style={{
+                  color: "white",
+                  fontSize: 22,
+                  fontWeight: 600,
+                  textAlign: "center",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+                }}
+              >
+                {displayName}
+              </h1>
+              {bio && (
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.78)",
+                    fontSize: 13,
+                    textAlign: "center",
+                    maxWidth: 280,
+                    lineHeight: 1.5,
+                    overflowWrap: "break-word",
+                    wordBreak: "normal",
+                    textShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                  }}
+                >
+                  {bio}
+                </p>
+              )}
 
-            <div style={{ width: "100%", maxWidth: 384, display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
-              {sections
-                .filter((section) => section.id !== "hub")
-                .map((section) => (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => scrollToSection(sectionIndex[section.id])}
-                    style={{
-                      width: "100%",
-                      background: "rgba(255,255,255,0.12)",
-                      border: "0.5px solid rgba(255,255,255,0.25)",
-                      borderRadius: 14,
-                      padding: "13px 16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      cursor: "pointer",
-                      color: textColor,
-                      textAlign: "left",
-                    }}
-                  >
-                    <div
+              <div style={{ display: "flex", gap: 10 }}>
+                {profile.contact_email && <SocialIcon href={`mailto:${profile.contact_email}`} icon="email" />}
+                {profile.instagram_handle && <SocialIcon href={`https://instagram.com/${profile.instagram_handle}`} icon="instagram" />}
+                {profile.youtube_handle && <SocialIcon href={`https://youtube.com/@${profile.youtube_handle}`} icon="youtube" />}
+                {profile.tiktok_handle && <SocialIcon href={`https://tiktok.com/@${profile.tiktok_handle}`} icon="tiktok" />}
+                {profile.xiaohongshu_handle && (
+                  <SocialIcon href={`https://xiaohongshu.com/user/profile/${profile.xiaohongshu_handle}`} icon="xhs" />
+                )}
+              </div>
+
+              <FollowButton
+                creatorId={profile.id}
+                displayName={displayName}
+                initialCount={followerCount}
+                btnColor={btnColor}
+                btnRadius={btnRadius}
+              />
+
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 2 }}>
+                {sections
+                  .filter((section) => section.id !== "hub")
+                  .map((section) => (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => scrollToSection(sectionIndex[section.id])}
                       style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 9,
-                        background: "rgba(255,255,255,0.15)",
+                        width: "100%",
+                        background: "rgba(255,255,255,0.12)",
+                        border: "0.5px solid rgba(255,255,255,0.25)",
+                        borderRadius: 14,
+                        padding: "12px 15px",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                        fontSize: 16,
+                        gap: 12,
+                        cursor: "pointer",
+                        color: textColor,
+                        textAlign: "left",
                       }}
                     >
-                      {section.icon}
-                    </div>
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{section.label}</span>
-                    <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 15 }}>›</span>
-                  </button>
-                ))}
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 9,
+                          background: "rgba(255,255,255,0.15)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          fontSize: 16,
+                        }}
+                      >
+                        {section.icon}
+                      </div>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{section.label}</span>
+                      <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 15 }}>›</span>
+                    </button>
+                  ))}
+              </div>
             </div>
           </section>
 
           {sectionIndex.video !== undefined && profile.youtube_latest_video_id && (
             <section id={`section-${sectionIndex.video}`} style={getSectionStyle()}>
-              <p
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: 11,
-                  letterSpacing: "1.5px",
-                  textTransform: "uppercase",
-                  marginBottom: 16,
-                }}
-              >
-                最新影片
-              </p>
-              <div style={{ width: "100%", maxWidth: 420, borderRadius: 14, overflow: "hidden", aspectRatio: "16/9" }}>
-                <iframe
-                  title={`${displayName} 最新 YouTube 影片`}
-                  src={`https://www.youtube.com/embed/${profile.youtube_latest_video_id}`}
-                  style={{ width: "100%", height: "100%", border: "none" }}
-                  allowFullScreen
-                />
+              <div style={{ width: "100%", maxWidth: CONTENT_WIDTH, margin: "0 auto" }}>
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.6)",
+                    fontSize: 13,
+                    letterSpacing: "1px",
+                    textTransform: "uppercase",
+                    marginBottom: 16,
+                    textAlign: "center",
+                  }}
+                >
+                  最新影片
+                </p>
+                <div style={{ width: "100%", borderRadius: 14, overflow: "hidden", aspectRatio: "16/9" }}>
+                  <iframe
+                    title={`${displayName} 最新 YouTube 影片`}
+                    src={`https://www.youtube.com/embed/${profile.youtube_latest_video_id}`}
+                    style={{ width: "100%", height: "100%", border: "none" }}
+                    allowFullScreen
+                  />
+                </div>
               </div>
             </section>
           )}
 
           {sectionIndex.links !== undefined && (
-            <section id={`section-${sectionIndex.links}`} style={getSectionStyle({ justifyContent: "flex-start", paddingTop: 48 })}>
-              <div style={{ width: "100%", maxWidth: 420 }}>
+            <section id={`section-${sectionIndex.links}`} style={getSectionStyle({ justifyContent: "center" })}>
+              <div style={{ width: "100%", maxWidth: CONTENT_WIDTH, margin: "0 auto" }}>
                 <p
                   style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: 11,
-                    letterSpacing: "1.5px",
+                    color: "rgba(255,255,255,0.6)",
+                    fontSize: 13,
+                    letterSpacing: "1px",
                     textTransform: "uppercase",
                     marginBottom: 16,
                   }}
@@ -324,7 +356,7 @@ export function PublicPageClient({
                       alignItems: "center",
                       gap: 11,
                       marginBottom: 9,
-                      color: textColor,
+                      color: "white",
                       textDecoration: "none",
                     }}
                   >
@@ -344,7 +376,7 @@ export function PublicPageClient({
                       🔗
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <strong style={{ fontSize: 13, fontWeight: 500, display: "block" }}>{block.title}</strong>
+                      <strong style={{ color: "white", fontSize: 13, fontWeight: 500, display: "block" }}>{block.title}</strong>
                       <span
                         style={{
                           color: "rgba(255,255,255,0.35)",
@@ -370,7 +402,8 @@ export function PublicPageClient({
               <div
                 style={{
                   width: "100%",
-                  maxWidth: 420,
+                  maxWidth: CONTENT_WIDTH,
+                  margin: "0 auto",
                   background: "rgba(255,255,255,0.07)",
                   border: "0.5px solid rgba(255,255,255,0.12)",
                   borderRadius: 18,
@@ -411,7 +444,8 @@ export function PublicPageClient({
               <div
                 style={{
                   width: "100%",
-                  maxWidth: 420,
+                  maxWidth: CONTENT_WIDTH,
+                  margin: "0 auto",
                   background: "rgba(255,200,80,0.1)",
                   border: "0.5px solid rgba(255,200,80,0.25)",
                   borderRadius: 20,
@@ -448,7 +482,7 @@ export function PublicPageClient({
           )}
 
           <section id={`section-${sectionIndex.cta}`} style={getSectionStyle()}>
-            <div style={{ width: "100%", maxWidth: 420 }}>
+            <div style={{ width: "100%", maxWidth: CONTENT_WIDTH, margin: "0 auto" }}>
               <a
                 href={`/media-kit?creator=${profile.username}`}
                 style={{

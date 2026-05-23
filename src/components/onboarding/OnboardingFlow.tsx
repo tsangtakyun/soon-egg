@@ -35,6 +35,10 @@ type AnalysisResult = {
   content_language?: string;
   ai_profile_summary?: string;
   suggested_theme?: string;
+  instagram_followers?: number;
+  youtube_subscribers?: number;
+  avatar_url?: string | null;
+  real_data_fetched?: boolean;
 };
 
 const initialHandles = {
@@ -283,10 +287,20 @@ function StepContent({
 
   if (currentStep === 4) {
     const connectedHandles = Object.entries(handles).filter(([, value]) => value.trim());
+    const instagramFollowers = analysisResult?.instagram_followers ?? 0;
+    const youtubeSubscribers = analysisResult?.youtube_subscribers ?? 0;
 
     return (
       <div className="mt-6 space-y-4">
         <div className="rounded-2xl bg-gray-50 p-4">
+          {analysisResult?.avatar_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={analysisResult.avatar_url}
+              alt="Profile"
+              className="mx-auto mb-3 h-16 w-16 rounded-full object-cover"
+            />
+          )}
           <h3 className="text-lg font-bold text-gray-900">{analysisResult?.display_name || "您的創作者檔案"}</h3>
           <p className="mt-1 text-sm text-gray-600">{analysisResult?.bio || "正在建立您的創作者定位。"}</p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -296,6 +310,22 @@ function StepContent({
               </span>
             ))}
           </div>
+          {(instagramFollowers > 0 || youtubeSubscribers > 0) && (
+            <div className="mt-4 flex gap-4">
+              {instagramFollowers > 0 && (
+                <div className="text-center">
+                  <p className="font-bold text-gray-900">{instagramFollowers.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">Instagram 粉絲</p>
+                </div>
+              )}
+              {youtubeSubscribers > 0 && (
+                <div className="text-center">
+                  <p className="font-bold text-gray-900">{youtubeSubscribers.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">YouTube 訂閱</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">

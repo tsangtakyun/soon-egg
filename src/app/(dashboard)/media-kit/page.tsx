@@ -10,6 +10,7 @@ type CreatorProfile = {
   username: string;
   instagram_handle: string | null;
   instagram_followers?: number | null;
+  instagram_access_token?: string | null;
   contact_email?: string | null;
   mediakit_bg_color: string | null;
   mediakit_text_color: string | null;
@@ -417,6 +418,7 @@ function SectionEditor({
   onUpdate: (updates: Partial<CreatorProfile>) => void;
 }) {
   const [syncing, setSyncing] = useState(false);
+  const hasInstagramToken = Boolean(profile.instagram_access_token);
 
   if (sectionKey === "contact") {
     return (
@@ -481,6 +483,8 @@ function SectionEditor({
               if (data.success) {
                 onUpdate({ instagram_followers: data.followers });
                 alert(`已同步！追蹤人數：${Number(data.followers ?? 0).toLocaleString()}`);
+              } else if (data.needs_reconnect) {
+                alert("需要重新連接 Instagram，完成授權後就可以同步追蹤人數。");
               } else {
                 alert(`同步失敗：${data.error}`);
               }
@@ -493,6 +497,14 @@ function SectionEditor({
           >
             {syncing ? "同步中..." : "↻ 同步追蹤人數"}
           </button>
+          {!hasInstagramToken && (
+            <Link
+              href="/api/auth/instagram"
+              className="mt-2 block w-full rounded-lg bg-black py-2 text-center text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              重新連接 Instagram
+            </Link>
+          )}
         </div>
       </div>
     );

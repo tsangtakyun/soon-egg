@@ -52,7 +52,13 @@ export async function POST() {
     .single();
 
   if (!profile?.instagram_access_token) {
-    return NextResponse.json({ error: "No IG token" }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "Instagram 尚未完成授權，請重新連接 Instagram。",
+        needs_reconnect: true,
+      },
+      { status: 400 },
+    );
   }
 
   const data = await fetchInstagramProfile(profile.instagram_user_id ?? null, profile.instagram_access_token);

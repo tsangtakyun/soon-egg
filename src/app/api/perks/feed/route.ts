@@ -3,7 +3,7 @@ export async function GET() {
     headers: {
       "x-soon-api-key": process.env.SOON_INTERNAL_API_KEY ?? "",
     },
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
 
   if (!res.ok) {

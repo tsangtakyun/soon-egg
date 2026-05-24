@@ -1,6 +1,9 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 type InvitationBody = {
   egg_creator_id?: string;
   creator_username?: string;
@@ -26,20 +29,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error("Invitation receive error: Supabase service role env is missing");
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
   }
 
-  const supabase = createServiceClient(url, serviceKey, {
+  const supabase = createServiceClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
 
-  const { error } = await supabase.from("egg_campaign_applications").upsert(
+  const { error } = await supabase.from("egg_brand_invitations").upsert(
     {
       creator_id: body.egg_creator_id,
+      creator_username: body.creator_username,
       cw_campaign_id: body.cw_campaign_id,
       cw_workspace_id: body.cw_workspace_id,
       campaign_name: body.campaign_name,
@@ -48,13 +50,14 @@ export async function POST(req: Request) {
       theme: body.theme,
       call_to_action: body.call_to_action,
       starts_on: body.starts_on,
-      pitch_message: body.message,
-      status: "invited",
+      message: body.message,
+      status: "pending",
     },
     { onConflict: "creator_id,cw_campaign_id" }
   );
 
   if (error) {
+    console.error("Invitation receive DB error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

@@ -141,7 +141,15 @@ function ApplyModal({ campaign, onClose, onSuccess }: { campaign: Campaign; prof
   );
 }
 
-function InvitationCard({ invitation, onRespond }: { invitation: BrandInvitation; onRespond: (id: string, status: string) => void }) {
+function InvitationCard({
+  invitation,
+  profileId,
+  onRespond,
+}: {
+  invitation: BrandInvitation;
+  profileId: string;
+  onRespond: (id: string, status: string) => void;
+}) {
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(false);
   const isPending = invitation.status === "pending";
@@ -150,6 +158,22 @@ function InvitationCard({ invitation, onRespond }: { invitation: BrandInvitation
     setLoading(true);
     const { error } = await supabase.from("egg_brand_invitations").update({ status, responded_at: new Date().toISOString() }).eq("id", invitation.id);
     if (!error) {
+      if (status === "accepted" && invitation.brand_name) {
+        const { data: existingPartner } = await supabase
+          .from("egg_brand_partners")
+          .select("id")
+          .eq("creator_id", profileId)
+          .eq("brand_name", invitation.brand_name)
+          .maybeSingle();
+
+        if (!existingPartner?.id) {
+          await supabase.from("egg_brand_partners").insert({
+            creator_id: profileId,
+            brand_name: invitation.brand_name,
+          });
+        }
+      }
+
       await fetch("/api/invitations/respond", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -238,6 +262,7 @@ function CompletedBrandCard({ invitation }: { invitation: BrandInvitation }) {
           </div>
         )}
         {invitation.responded_at && <p className="mt-2 text-xs text-zinc-300">已合作 {new Date(invitation.responded_at).toLocaleDateString("zh-HK")}</p>}
+        <p className="mt-1 text-xs text-green-500">✓ 已加入 Media Kit</p>
       </div>
       <span className="flex-shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">已合作</span>
     </article>
@@ -351,6 +376,43 @@ export default function BrandDealsPage() {
     { id: "brands", label: "推薦品牌" },
   ];
 
+  useEffect(() => {
+    if (!profile?.id || completedInvitations.length === 0) return;
+
+    let cancelled = false;
+
+    async function backfillBrandPartners() {
+      const brandNames = Array.from(new Set(completedInvitations.map((invitation) => invitation.brand_name?.trim()).filter(Boolean))) as string[];
+      if (brandNames.length === 0 || !profile?.id) return;
+
+      const { data: existingPartners } = await supabase
+        .from("egg_brand_partners")
+        .select("brand_name")
+        .eq("creator_id", profile.id)
+        .in("brand_name", brandNames);
+
+      if (cancelled) return;
+
+      const existingNames = new Set((existingPartners ?? []).map((partner) => partner.brand_name));
+      const missingPartners = brandNames
+        .filter((brandName) => !existingNames.has(brandName))
+        .map((brandName) => ({
+          creator_id: profile.id,
+          brand_name: brandName,
+        }));
+
+      if (missingPartners.length > 0) {
+        await supabase.from("egg_brand_partners").insert(missingPartners);
+      }
+    }
+
+    void backfillBrandPartners();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [completedInvitations, profile?.id, supabase]);
+
   return (
     <div className="space-y-5">
       <div>
@@ -366,7 +428,27 @@ export default function BrandDealsPage() {
         ))}
       </div>
       {activeTab === "campaigns" && (loadingProfile ? <Loading /> : profile ? <CampaignFeed profile={profile} /> : <Empty text="請先完成創作者個人檔案。" />)}
-      {activeTab === "invitations" && (loadingProfile ? <Loading /> : invitations.length === 0 ? <Empty text="暫時未有品牌邀請。" /> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{invitations.map((invitation) => <InvitationCard key={invitation.id} invitation={invitation} onRespond={(id, status) => setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status, responded_at: new Date().toISOString() } : item)))} />)}</div>)}
+      {activeTab === "invitations" &&
+        (loadingProfile ? (
+          <Loading />
+        ) : !profile ? (
+          <Empty text="請先完成創作者個人檔案。" />
+        ) : invitations.length === 0 ? (
+          <Empty text="暫時未有品牌邀請。" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {invitations.map((invitation) => (
+              <InvitationCard
+                key={invitation.id}
+                invitation={invitation}
+                profileId={profile.id}
+                onRespond={(id, status) =>
+                  setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status, responded_at: new Date().toISOString() } : item)))
+                }
+              />
+            ))}
+          </div>
+        ))}
       {activeTab === "completed" &&
         (loadingProfile ? (
           <Loading />

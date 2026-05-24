@@ -1,6 +1,6 @@
-import { createClient } from "@/lib/supabase/server";
-import { logDealActivity } from "@/lib/deals-activity";
 import { NextResponse } from "next/server";
+import { logDealActivity } from "@/lib/deals-activity";
+import { createClient } from "@/lib/supabase/server";
 
 type ApplyBody = {
   campaign_id: string;
@@ -11,6 +11,9 @@ type ApplyBody = {
   theme?: string | null;
   call_to_action?: string | null;
   starts_on?: string | null;
+  budget_range?: string | null;
+  collab_formats?: string[] | null;
+  brand_website?: string | null;
   pitch_message?: string | null;
 };
 
@@ -18,14 +21,12 @@ export async function POST(req: Request) {
   const supabase = await createClient();
   if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: profile, error: profileError } = await supabase
-    .from("egg_creator_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const { data: profile, error: profileError } = await supabase.from("egg_creator_profiles").select("*").eq("user_id", user.id).single();
 
   if (profileError || !profile) {
     return NextResponse.json({ error: "Creator profile not found" }, { status: 404 });
@@ -33,19 +34,22 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as ApplyBody;
 
-  const { error: localError } = await supabase.from("egg_campaign_applications").upsert({
-    creator_id: profile.id,
-    cw_campaign_id: body.campaign_id,
-    cw_workspace_id: body.workspace_id,
-    campaign_name: body.campaign_name,
-    brand_name: body.brand_name,
-    cover_image_url: body.cover_image_url,
-    theme: body.theme,
-    call_to_action: body.call_to_action,
-    starts_on: body.starts_on,
-    pitch_message: body.pitch_message,
-    status: "applied",
-  }, { onConflict: "creator_id,cw_campaign_id" });
+  const { error: localError } = await supabase.from("egg_campaign_applications").upsert(
+    {
+      creator_id: profile.id,
+      cw_campaign_id: body.campaign_id,
+      cw_workspace_id: body.workspace_id,
+      campaign_name: body.campaign_name,
+      brand_name: body.brand_name,
+      cover_image_url: body.cover_image_url,
+      theme: body.theme,
+      call_to_action: body.call_to_action,
+      starts_on: body.starts_on,
+      pitch_message: body.pitch_message,
+      status: "applied",
+    },
+    { onConflict: "creator_id,cw_campaign_id" }
+  );
 
   if (localError) {
     return NextResponse.json({ error: localError.message }, { status: 500 });
@@ -87,12 +91,22 @@ export async function POST(req: Request) {
   await logDealActivity({
     type: "kol_accepted",
     title: `🤝 ${profile.display_name || profile.username} 接受咗品牌邀請`,
-    body: `Campaign：${body.campaign_name || body.campaign_id} · 品牌：${body.brand_name || "未填"}`,
+    body: `Campaign：${body.campaign_name ?? body.campaign_id} · 品牌：${body.brand_name ?? "未命名"}`,
     meta: {
       creator_username: profile.username,
+      creator_display_name: profile.display_name,
+      creator_avatar_url: profile.avatar_url,
+      creator_ig_handle: profile.instagram_handle,
+      creator_ig_followers: profile.instagram_followers ?? 0,
+      creator_mediakit_url: profile.username ? `https://egg.sooncreator.network/${profile.username}/mediakit` : null,
       campaign_name: body.campaign_name,
       brand_name: body.brand_name,
       cw_workspace_id: body.workspace_id,
+      cw_campaign_id: body.campaign_id,
+      budget_range: body.budget_range ?? null,
+      collab_formats: body.collab_formats ?? null,
+      brand_website: body.brand_website ?? null,
+      starts_on: body.starts_on ?? null,
     },
   });
 

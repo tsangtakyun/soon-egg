@@ -1,5 +1,6 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { logDealActivity } from "@/lib/deals-activity";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -57,6 +58,25 @@ export async function POST(req: Request) {
     console.error("Brief receive error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await logDealActivity({
+    type: "brief_received",
+    title: `📋 ${creator_username} 收到 Project Brief`,
+    body: `${body.title ?? rest.title ?? ""} · 品牌：${body.brand_name ?? rest.brand_name ?? ""}`,
+    meta: {
+      creator_username,
+      creator_mediakit_url: `https://egg.sooncreator.network/${creator_username}/mediakit`,
+      brief_title: body.title ?? rest.title ?? null,
+      brand_name: body.brand_name ?? rest.brand_name ?? null,
+      brand_website: body.brand_website ?? rest.brand_website ?? null,
+      cw_workspace_id: body.cw_workspace_id ?? rest.cw_workspace_id ?? null,
+      deliverables: body.deliverables ?? rest.deliverables ?? null,
+      budget: body.budget ?? rest.budget ?? null,
+      timeline: body.timeline ?? rest.timeline ?? null,
+      dos: body.dos ?? rest.dos ?? null,
+      donts: body.donts ?? rest.donts ?? null,
+    },
+  });
 
   return NextResponse.json({ success: true });
 }

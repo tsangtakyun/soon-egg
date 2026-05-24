@@ -1,3 +1,4 @@
+import { logDealActivity } from "@/lib/deals-activity";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -106,6 +107,7 @@ export async function GET(req: NextRequest) {
     const { profile, page, pageAccessToken } = match;
     const supabase = await createClient();
     const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+    let onboardedNewKol = false;
 
     if (supabase && user) {
       const { data: existingProfile } = await supabase
@@ -167,7 +169,21 @@ export async function GET(req: NextRequest) {
           }, { onConflict: "user_id" });
 
         if (upsertError) console.error("Instagram profile upsert save error:", upsertError);
+        else onboardedNewKol = true;
       }
+    }
+
+    if (onboardedNewKol) {
+      await logDealActivity({
+        type: "kol_onboarded",
+        title: "🥚 新 KOL 加入 SOON-EGG",
+        body: `@${profile.username} 完成連結 Instagram · ${profile.followers_count ?? 0} followers`,
+        meta: {
+          username: profile.username,
+          instagram_handle: profile.username,
+          instagram_followers: profile.followers_count ?? 0,
+        },
+      });
     }
 
     const params = new URLSearchParams({

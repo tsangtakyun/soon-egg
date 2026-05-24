@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logDealActivity } from "@/lib/deals-activity";
 import { NextResponse } from "next/server";
 
 type ApplyBody = {
@@ -82,6 +83,18 @@ export async function POST(req: Request) {
   if (!cwRes.ok || !cwData.success) {
     return NextResponse.json({ error: "CW sync failed", detail: cwData.error }, { status: 500 });
   }
+
+  await logDealActivity({
+    type: "kol_accepted",
+    title: `🤝 ${profile.display_name || profile.username} 接受咗品牌邀請`,
+    body: `Campaign：${body.campaign_name || body.campaign_id} · 品牌：${body.brand_name || "未填"}`,
+    meta: {
+      creator_username: profile.username,
+      campaign_name: body.campaign_name,
+      brand_name: body.brand_name,
+      cw_workspace_id: body.workspace_id,
+    },
+  });
 
   return NextResponse.json({ success: true });
 }

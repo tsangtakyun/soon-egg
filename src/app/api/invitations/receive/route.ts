@@ -1,4 +1,5 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { logDealActivity } from "@/lib/deals-activity";
 import { NextResponse } from "next/server";
 
 type InvitationBody = {
@@ -57,6 +58,18 @@ export async function POST(req: Request) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await logDealActivity({
+    type: "brief_received",
+    title: `📋 ${body.creator_username || body.egg_creator_id} 收到 Project Brief`,
+    body: `${body.campaign_name || "未命名 Campaign"} · 品牌：${body.brand_name || "未填"}`,
+    meta: {
+      creator_username: body.creator_username,
+      brief_title: body.campaign_name,
+      brand_name: body.brand_name,
+      cw_workspace_id: body.cw_workspace_id,
+    },
+  });
 
   return NextResponse.json({ success: true });
 }

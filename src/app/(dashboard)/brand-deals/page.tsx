@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BrandCard } from "@/components/brand-deals/BrandCard";
-import { PitchDrafter } from "@/components/brand-deals/PitchDrafter";
 import { createClient } from "@/lib/supabase/client";
-import { demoBrandMatches } from "@/lib/mock-data";
 
-type ActiveTab = "campaigns" | "invitations" | "completed" | "brands";
+type ActiveTab = "campaigns" | "invitations" | "completed";
 
 type Profile = {
   id: string;
@@ -318,17 +315,6 @@ function CampaignFeed({ profile }: { profile: Profile }) {
   );
 }
 
-function RecommendedBrands() {
-  return (
-    <div className="space-y-5">
-      <div className="grid gap-4 lg:grid-cols-2">
-        {demoBrandMatches.slice(0, 6).map((match) => <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />)}
-      </div>
-      <PitchDrafter />
-    </div>
-  );
-}
-
 export default function BrandDealsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [activeTab, setActiveTab] = useState<ActiveTab>("campaigns");
@@ -373,7 +359,6 @@ export default function BrandDealsPage() {
     { id: "campaigns", label: "合作機會" },
     { id: "invitations", label: "品牌邀請" },
     { id: "completed", label: "已合作品牌" },
-    { id: "brands", label: "推薦品牌" },
   ];
 
   useEffect(() => {
@@ -464,7 +449,6 @@ export default function BrandDealsPage() {
             ))}
           </div>
         ))}
-      {activeTab === "brands" && <RecommendedBrands />}
     </div>
   );
 }

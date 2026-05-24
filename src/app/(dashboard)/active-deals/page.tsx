@@ -55,6 +55,10 @@ export default function ActiveDealsPage() {
     };
   }, [supabase]);
 
+  function handleConfirm(briefId: string, confirmation: Partial<ProjectBrief>) {
+    setBriefs((current) => current.map((brief) => (brief.id === briefId ? { ...brief, ...confirmation } : brief)));
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -72,7 +76,7 @@ export default function ActiveDealsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {briefs.map((brief) => (
-            <BriefCard key={brief.id} brief={brief} />
+            <BriefCard key={brief.id} brief={brief} onConfirm={handleConfirm} />
           ))}
         </div>
       )}

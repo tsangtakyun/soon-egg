@@ -6,7 +6,7 @@ import { PitchDrafter } from "@/components/brand-deals/PitchDrafter";
 import { createClient } from "@/lib/supabase/client";
 import { demoBrandMatches } from "@/lib/mock-data";
 
-type ActiveTab = "campaigns" | "invitations" | "brands";
+type ActiveTab = "campaigns" | "invitations" | "briefs" | "brands";
 
 type Profile = {
   id: string;
@@ -29,9 +29,7 @@ type Campaign = {
   cover_image_url: string | null;
   workspace_id: string;
   created_at: string;
-  workspaces?: {
-    name?: string | null;
-  } | null;
+  workspaces?: { name?: string | null } | null;
 };
 
 type BrandInvitation = {
@@ -56,19 +54,26 @@ type BrandInvitation = {
   responded_at: string | null;
 };
 
-function statusLabel(status: string | null) {
-  return status === "active" ? "招募中" : "即將開始";
-}
+type ProjectBrief = {
+  id: string;
+  creator_id: string;
+  cw_brief_id: string;
+  brand_name: string | null;
+  title: string | null;
+  background: string | null;
+  objectives: string | null;
+  deliverables: string[] | null;
+  timeline: string | null;
+  budget: string | null;
+  dos: string | null;
+  donts: string | null;
+  reference_links: string[] | null;
+  additional_notes: string | null;
+  status: string | null;
+  received_at: string | null;
+};
 
-function CampaignCard({
-  campaign,
-  applied,
-  onApply,
-}: {
-  campaign: Campaign;
-  applied: boolean;
-  onApply: () => void;
-}) {
+function CampaignCard({ campaign, applied, onApply }: { campaign: Campaign; applied: boolean; onApply: () => void }) {
   return (
     <article className="overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:shadow-md">
       {campaign.cover_image_url && !campaign.cover_image_url.startsWith("/api/") && (
@@ -81,30 +86,20 @@ function CampaignCard({
             <h3 className="text-sm font-medium text-zinc-950">{campaign.name}</h3>
             <p className="mt-0.5 text-xs text-zinc-400">{campaign.workspaces?.name ?? "SOON Creator Network"}</p>
           </div>
-          <span
-            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${
-              campaign.status === "active" ? "bg-green-50 text-green-600" : "bg-yellow-50 text-yellow-600"
-            }`}
-          >
-            {statusLabel(campaign.status)}
+          <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${campaign.status === "active" ? "bg-green-50 text-green-600" : "bg-yellow-50 text-yellow-600"}`}>
+            {campaign.status === "active" ? "招募中" : "即將開始"}
           </span>
         </div>
-
         {campaign.theme && <p className="mb-3 text-xs leading-5 text-zinc-500">{campaign.theme}</p>}
-
         <div className="mb-3 flex items-center gap-3 text-xs text-zinc-400">
-          {campaign.starts_on && <span>日期：{campaign.starts_on}</span>}
+          {campaign.starts_on && <span>開始日期：{campaign.starts_on}</span>}
           {campaign.duration_weeks && <span>週期：{campaign.duration_weeks} 週</span>}
         </div>
-
         {campaign.call_to_action && <p className="mb-3 text-xs text-blue-600">目標：{campaign.call_to_action}</p>}
-
         <button
           onClick={onApply}
           disabled={applied}
-          className={`w-full rounded-lg py-2 text-sm font-medium transition ${
-            applied ? "cursor-not-allowed bg-zinc-100 text-zinc-400" : "bg-black text-white hover:bg-zinc-800"
-          }`}
+          className={`w-full rounded-lg py-2 text-sm font-medium transition ${applied ? "cursor-not-allowed bg-zinc-100 text-zinc-400" : "bg-black text-white hover:bg-zinc-800"}`}
           type="button"
         >
           {applied ? "已申請" : "申請合作"}
@@ -114,16 +109,7 @@ function CampaignCard({
   );
 }
 
-function ApplyModal({
-  campaign,
-  onClose,
-  onSuccess,
-}: {
-  campaign: Campaign;
-  profile: Profile;
-  onClose: () => void;
-  onSuccess: (id: string) => void;
-}) {
+function ApplyModal({ campaign, onClose, onSuccess }: { campaign: Campaign; profile: Profile; onClose: () => void; onSuccess: (id: string) => void }) {
   const [pitch, setPitch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -131,7 +117,6 @@ function ApplyModal({
   async function handleApply() {
     setLoading(true);
     setError("");
-
     const res = await fetch("/api/campaigns/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,13 +133,9 @@ function ApplyModal({
       }),
     });
     const data = await res.json();
-
     setLoading(false);
-    if (data.success) {
-      onSuccess(campaign.id);
-    } else {
-      setError(data.error || data.detail || "提交失敗，請稍後再試。");
-    }
+    if (data.success) onSuccess(campaign.id);
+    else setError(data.error || data.detail || "提交失敗，請稍後再試。");
   }
 
   return (
@@ -162,28 +143,12 @@ function ApplyModal({
       <div className="w-full max-w-lg rounded-2xl bg-white p-6">
         <h3 className="mb-1 text-lg font-semibold text-zinc-950">{campaign.name}</h3>
         <p className="mb-4 text-sm text-zinc-400">{campaign.workspaces?.name ?? "SOON Creator Network"}</p>
-
         <label className="mb-2 block text-sm font-medium text-zinc-900">你的 Pitch（可選）</label>
-        <textarea
-          value={pitch}
-          onChange={(event) => setPitch(event.target.value)}
-          placeholder="介紹自己同點樣配合呢個 campaign..."
-          rows={4}
-          className="mb-4 w-full resize-none rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
-        />
-
-        <p className="mb-4 text-xs leading-relaxed text-zinc-400">
-          申請後，品牌主會喺 sooncreator.network 收到你的 Media Kit 連結。
-        </p>
+        <textarea value={pitch} onChange={(event) => setPitch(event.target.value)} rows={4} className="mb-4 w-full resize-none rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200" />
+        <p className="mb-4 text-xs leading-relaxed text-zinc-400">申請後，品牌主會在 sooncreator.network 收到你的 Media Kit 連結。</p>
         {error && <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
-
         <div className="flex gap-3">
-          <button
-            onClick={handleApply}
-            disabled={loading}
-            className="flex-1 rounded-xl bg-black py-2.5 text-sm font-medium text-white disabled:opacity-50"
-            type="button"
-          >
+          <button onClick={handleApply} disabled={loading} className="flex-1 rounded-xl bg-black py-2.5 text-sm font-medium text-white disabled:opacity-50" type="button">
             {loading ? "提交中..." : "確認申請"}
           </button>
           <button onClick={onClose} className="flex-1 rounded-xl border border-zinc-200 py-2.5 text-sm text-zinc-500" type="button">
@@ -195,24 +160,14 @@ function ApplyModal({
   );
 }
 
-function InvitationCard({
-  invitation,
-  onRespond,
-}: {
-  invitation: BrandInvitation;
-  onRespond: (id: string, status: string) => void;
-}) {
+function InvitationCard({ invitation, onRespond }: { invitation: BrandInvitation; onRespond: (id: string, status: string) => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(false);
   const isPending = invitation.status === "pending";
 
   async function respond(status: "accepted" | "declined") {
     setLoading(true);
-    const { error } = await supabase
-      .from("egg_brand_invitations")
-      .update({ status, responded_at: new Date().toISOString() })
-      .eq("id", invitation.id);
-
+    const { error } = await supabase.from("egg_brand_invitations").update({ status, responded_at: new Date().toISOString() }).eq("id", invitation.id);
     if (!error) {
       await fetch("/api/invitations/respond", {
         method: "POST",
@@ -224,7 +179,6 @@ function InvitationCard({
           status,
         }),
       }).catch(() => null);
-
       onRespond(invitation.id, status);
     }
     setLoading(false);
@@ -242,91 +196,89 @@ function InvitationCard({
             <h3 className="text-sm font-semibold text-zinc-950">{invitation.campaign_name}</h3>
             <p className="mt-0.5 text-xs text-zinc-400">{invitation.brand_name}</p>
           </div>
-          <span
-            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${
-              invitation.status === "pending"
-                ? "bg-yellow-50 text-yellow-600"
-                : invitation.status === "accepted"
-                  ? "bg-green-50 text-green-600"
-                  : "bg-zinc-100 text-zinc-400"
-            }`}
-          >
+          <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${invitation.status === "pending" ? "bg-yellow-50 text-yellow-600" : invitation.status === "accepted" ? "bg-green-50 text-green-600" : "bg-zinc-100 text-zinc-400"}`}>
             {invitation.status === "pending" ? "待回覆" : invitation.status === "accepted" ? "已接受" : "已婉拒"}
           </span>
         </div>
-
         {invitation.brand_overview && (
           <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2">
             <p className="mb-0.5 text-xs font-medium text-blue-600">關於品牌</p>
             <p className="line-clamp-3 text-xs text-blue-800">{invitation.brand_overview}</p>
           </div>
         )}
-
-        {invitation.brand_website && (
-          <a
-            href={invitation.brand_website}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mb-2 block text-xs text-blue-500 hover:underline"
-          >
-            {invitation.brand_website}
-          </a>
-        )}
-
+        {invitation.brand_website && <a href={invitation.brand_website} target="_blank" rel="noopener noreferrer" className="mb-2 block text-xs text-blue-500 hover:underline">{invitation.brand_website}</a>}
         {invitation.collab_formats && invitation.collab_formats.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-1">
-            {invitation.collab_formats.map((format) => (
-              <span key={format} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
-                {format}
-              </span>
-            ))}
+            {invitation.collab_formats.map((format) => <span key={format} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">{format}</span>)}
           </div>
         )}
-
         {invitation.theme && <p className="mb-3 line-clamp-2 text-xs text-zinc-500">{invitation.theme}</p>}
-
         <div className="mb-3 flex items-center gap-4 text-xs text-zinc-400">
           {invitation.starts_on && <span>開始日期：{invitation.starts_on}</span>}
           {invitation.duration_weeks && <span>{invitation.duration_weeks} 週</span>}
         </div>
-
         {invitation.budget_range && <p className="mb-3 text-xs text-zinc-500">預算：{invitation.budget_range}</p>}
-
         {invitation.call_to_action && <p className="mb-3 text-xs text-blue-600">{invitation.call_to_action}</p>}
-
         {invitation.message && (
           <div className="mb-3 rounded-lg bg-zinc-50 px-3 py-2">
             <p className="text-xs text-zinc-400">品牌訊息：</p>
             <p className="mt-0.5 text-xs text-zinc-700">{invitation.message}</p>
           </div>
         )}
-
         {isPending ? (
           <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => respond("accepted")}
-              disabled={loading}
-              className="flex-1 rounded-lg bg-black py-2 text-sm font-medium text-white disabled:opacity-50"
-              type="button"
-            >
-              接受邀請
-            </button>
-            <button
-              onClick={() => respond("declined")}
-              disabled={loading}
-              className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500 disabled:opacity-50"
-              type="button"
-            >
-              婉拒
-            </button>
+            <button onClick={() => respond("accepted")} disabled={loading} className="flex-1 rounded-lg bg-black py-2 text-sm font-medium text-white disabled:opacity-50" type="button">接受邀請</button>
+            <button onClick={() => respond("declined")} disabled={loading} className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500 disabled:opacity-50" type="button">婉拒</button>
           </div>
         ) : (
-          <p className="mt-2 text-center text-xs text-zinc-400">
-            {invitation.status === "accepted" ? "已接受此邀請" : "已婉拒此邀請"}
-          </p>
+          <p className="mt-2 text-center text-xs text-zinc-400">{invitation.status === "accepted" ? "已接受此邀請" : "已婉拒此邀請"}</p>
         )}
       </div>
     </article>
+  );
+}
+
+function BriefCard({ brief }: { brief: ProjectBrief }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <article className="rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium text-zinc-950">{brief.title || "未命名簡報"}</h3>
+          <p className="text-xs text-zinc-400">{brief.brand_name || "Brand"}</p>
+        </div>
+        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">已收到</span>
+      </div>
+      {brief.deliverables && brief.deliverables.length > 0 && <div className="mb-2 flex flex-wrap gap-1">{brief.deliverables.map((item) => <span key={item} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">{item}</span>)}</div>}
+      {brief.budget && <p className="mb-2 text-xs text-zinc-500">預算：{brief.budget}</p>}
+      {brief.timeline && <p className="mb-3 text-xs text-zinc-500">時間表：{brief.timeline}</p>}
+      {brief.received_at && <p className="mb-3 text-xs text-zinc-400">{new Date(brief.received_at).toLocaleString("zh-HK")}</p>}
+      <button onClick={() => setExpanded((value) => !value)} className="text-xs text-blue-600 hover:underline" type="button">{expanded ? "收起詳情" : "查看詳情 ›"}</button>
+      {expanded && (
+        <div className="mt-3 space-y-3 border-t border-zinc-100 pt-3">
+          {brief.background && <Detail label="背景介紹" value={brief.background} />}
+          {brief.objectives && <Detail label="合作目標" value={brief.objectives} />}
+          {brief.dos && <Detail label="注意事項" value={brief.dos} />}
+          {brief.donts && <Detail label="禁止事項" value={brief.donts} />}
+          {brief.reference_links && brief.reference_links.length > 0 && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-zinc-500">參考連結</p>
+              {brief.reference_links.map((link) => <a key={link} href={link} target="_blank" rel="noopener noreferrer" className="block text-xs text-blue-500 hover:underline">{link}</a>)}
+            </div>
+          )}
+          {brief.additional_notes && <Detail label="補充備注" value={brief.additional_notes} />}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium text-zinc-500">{label}</p>
+      <p className="text-xs text-zinc-700">{value}</p>
+    </div>
   );
 }
 
@@ -340,18 +292,15 @@ function CampaignFeed({ profile }: { profile: Profile }) {
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadCampaigns() {
       setLoading(true);
       setError("");
-
       try {
         const [campaignRes, applicationRes] = await Promise.all([
           fetch("/api/campaigns/feed"),
           supabase.from("egg_campaign_applications").select("cw_campaign_id").eq("creator_id", profile.id),
         ]);
         const campaignData = await campaignRes.json();
-
         if (!cancelled) {
           if (!campaignRes.ok) setError(campaignData.error || "未能載入合作機會");
           setCampaigns(campaignData.campaigns ?? []);
@@ -363,7 +312,6 @@ function CampaignFeed({ profile }: { profile: Profile }) {
         if (!cancelled) setLoading(false);
       }
     }
-
     loadCampaigns();
     return () => {
       cancelled = true;
@@ -373,30 +321,12 @@ function CampaignFeed({ profile }: { profile: Profile }) {
   if (loading) return <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>;
   if (error) return <div className="py-12 text-center text-sm text-red-500">{error}</div>;
   if (campaigns.length === 0) return <div className="py-12 text-center text-sm text-zinc-400">暫無合作機會</div>;
-
   return (
     <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {campaigns.map((campaign) => (
-          <CampaignCard
-            key={campaign.id}
-            campaign={campaign}
-            applied={applications.includes(campaign.id)}
-            onApply={() => setShowPitchModal(campaign)}
-          />
-        ))}
+        {campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} applied={applications.includes(campaign.id)} onApply={() => setShowPitchModal(campaign)} />)}
       </div>
-      {showPitchModal && (
-        <ApplyModal
-          campaign={showPitchModal}
-          profile={profile}
-          onClose={() => setShowPitchModal(null)}
-          onSuccess={(id) => {
-            setApplications((current) => [...current, id]);
-            setShowPitchModal(null);
-          }}
-        />
-      )}
+      {showPitchModal && <ApplyModal campaign={showPitchModal} profile={profile} onClose={() => setShowPitchModal(null)} onSuccess={(id) => { setApplications((current) => [...current, id]); setShowPitchModal(null); }} />}
     </>
   );
 }
@@ -405,9 +335,7 @@ function RecommendedBrands() {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 lg:grid-cols-2">
-        {demoBrandMatches.slice(0, 6).map((match) => (
-          <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />
-        ))}
+        {demoBrandMatches.slice(0, 6).map((match) => <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />)}
       </div>
       <PitchDrafter />
     </div>
@@ -419,29 +347,23 @@ export default function BrandDealsPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("campaigns");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [invitations, setInvitations] = useState<BrandInvitation[]>([]);
+  const [briefs, setBriefs] = useState<ProjectBrief[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         if (!cancelled) setLoadingProfile(false);
         return;
       }
-
       const { data } = await supabase.from("egg_creator_profiles").select("*").eq("user_id", user.id).single();
-
       if (!cancelled) {
         setProfile(data as Profile | null);
         setLoadingProfile(false);
       }
     }
-
     loadProfile();
     return () => {
       cancelled = true;
@@ -450,18 +372,13 @@ export default function BrandDealsPage() {
 
   useEffect(() => {
     if (!profile?.id) return;
-
     let cancelled = false;
-
-    supabase
-      .from("egg_brand_invitations")
-      .select("*")
-      .eq("creator_id", profile.id)
-      .order("sent_at", { ascending: false })
-      .then(({ data }) => {
-        if (!cancelled) setInvitations((data ?? []) as BrandInvitation[]);
-      });
-
+    supabase.from("egg_brand_invitations").select("*").eq("creator_id", profile.id).order("sent_at", { ascending: false }).then(({ data }) => {
+      if (!cancelled) setInvitations((data ?? []) as BrandInvitation[]);
+    });
+    supabase.from("egg_project_briefs").select("*").eq("creator_id", profile.id).order("received_at", { ascending: false }).then(({ data }) => {
+      if (!cancelled) setBriefs((data ?? []) as ProjectBrief[]);
+    });
     return () => {
       cancelled = true;
     };
@@ -471,6 +388,7 @@ export default function BrandDealsPage() {
   const tabs: { id: ActiveTab; label: string }[] = [
     { id: "campaigns", label: "合作機會" },
     { id: "invitations", label: "品牌邀請" },
+    { id: "briefs", label: "項目簡報" },
     { id: "brands", label: "推薦品牌" },
   ];
 
@@ -478,66 +396,28 @@ export default function BrandDealsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">品牌合作</h1>
-        <p className="mt-2 text-zinc-500">瀏覽最新合作機會，或查看 SOON AI 為你推薦的亞洲品牌。</p>
+        <p className="mt-2 text-zinc-500">管理品牌邀請、合作機會和項目簡報。</p>
       </div>
-
       <div className="mb-6 flex border-b border-zinc-200">
         {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-medium transition ${
-              activeTab === tab.id ? "border-black text-black" : "border-transparent text-zinc-400"
-            }`}
-            type="button"
-          >
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-medium transition ${activeTab === tab.id ? "border-black text-black" : "border-transparent text-zinc-400"}`} type="button">
             {tab.label}
-            {tab.id === "invitations" && pendingInvitationCount > 0 && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                {pendingInvitationCount}
-              </span>
-            )}
+            {tab.id === "invitations" && pendingInvitationCount > 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">{pendingInvitationCount}</span>}
           </button>
         ))}
       </div>
-
-      {activeTab === "campaigns" &&
-        (loadingProfile ? (
-          <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
-        ) : profile ? (
-          <CampaignFeed profile={profile} />
-        ) : (
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
-            請先完成創作者檔案設定。
-          </div>
-        ))}
-
-      {activeTab === "invitations" && (
-        <div>
-          {loadingProfile ? (
-            <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
-          ) : invitations.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-sm text-zinc-400">暫時未有品牌邀請</p>
-              <p className="mt-1 text-xs text-zinc-300">完善你的 Media Kit，提高被品牌發現的機會</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {invitations.map((invitation) => (
-                <InvitationCard
-                  key={invitation.id}
-                  invitation={invitation}
-                  onRespond={(id, status) => {
-                    setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status } : item)));
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
+      {activeTab === "campaigns" && (loadingProfile ? <Loading /> : profile ? <CampaignFeed profile={profile} /> : <Empty text="請先完成創作者個人檔案。" />)}
+      {activeTab === "invitations" && (loadingProfile ? <Loading /> : invitations.length === 0 ? <Empty text="暫時未有品牌邀請。" /> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{invitations.map((invitation) => <InvitationCard key={invitation.id} invitation={invitation} onRespond={(id, status) => setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status } : item)))} />)}</div>)}
+      {activeTab === "briefs" && (loadingProfile ? <Loading /> : briefs.length === 0 ? <Empty text="暫時未有項目簡報。" /> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{briefs.map((brief) => <BriefCard key={brief.id} brief={brief} />)}</div>)}
       {activeTab === "brands" && <RecommendedBrands />}
     </div>
   );
+}
+
+function Loading() {
+  return <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>;
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="py-16 text-center text-sm text-zinc-400">{text}</div>;
 }

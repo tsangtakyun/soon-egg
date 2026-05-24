@@ -45,6 +45,9 @@ type BrandInvitation = {
   theme: string | null;
   call_to_action: string | null;
   starts_on: string | null;
+  brand_overview: string | null;
+  budget_range: string | null;
+  duration_weeks: number | null;
   message: string | null;
   status: string;
   sent_at: string;
@@ -219,9 +222,9 @@ function InvitationCard({
         <img src={invitation.cover_image_url} className="h-36 w-full object-cover" alt={invitation.campaign_name ?? ""} />
       )}
       <div className="p-4">
-        <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <h3 className="text-sm font-medium text-zinc-950">{invitation.campaign_name}</h3>
+            <h3 className="text-sm font-semibold text-zinc-950">{invitation.campaign_name}</h3>
             <p className="mt-0.5 text-xs text-zinc-400">{invitation.brand_name}</p>
           </div>
           <span
@@ -237,7 +240,22 @@ function InvitationCard({
           </span>
         </div>
 
+        {invitation.brand_overview && (
+          <div className="mb-3 rounded-lg bg-blue-50 px-3 py-2">
+            <p className="mb-0.5 text-xs font-medium text-blue-600">關於品牌</p>
+            <p className="line-clamp-3 text-xs text-blue-800">{invitation.brand_overview}</p>
+          </div>
+        )}
+
         {invitation.theme && <p className="mb-3 line-clamp-2 text-xs text-zinc-500">{invitation.theme}</p>}
+
+        <div className="mb-3 flex items-center gap-4 text-xs text-zinc-400">
+          {invitation.starts_on && <span>開始日期：{invitation.starts_on}</span>}
+          {invitation.duration_weeks && <span>{invitation.duration_weeks} 週</span>}
+          {invitation.budget_range && <span>{invitation.budget_range}</span>}
+        </div>
+
+        {invitation.call_to_action && <p className="mb-3 text-xs text-blue-600">{invitation.call_to_action}</p>}
 
         {invitation.message && (
           <div className="mb-3 rounded-lg bg-zinc-50 px-3 py-2">
@@ -246,10 +264,8 @@ function InvitationCard({
           </div>
         )}
 
-        {invitation.starts_on && <p className="mb-3 text-xs text-zinc-400">開始日期：{invitation.starts_on}</p>}
-
         {isPending ? (
-          <div className="flex gap-2">
+          <div className="mt-2 flex gap-2">
             <button
               onClick={() => respond("accepted")}
               disabled={loading}
@@ -268,7 +284,7 @@ function InvitationCard({
             </button>
           </div>
         ) : (
-          <p className="text-center text-xs text-zinc-400">
+          <p className="mt-2 text-center text-xs text-zinc-400">
             {invitation.status === "accepted" ? "已接受此邀請" : "已婉拒此邀請"}
           </p>
         )}

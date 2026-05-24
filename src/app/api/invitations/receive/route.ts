@@ -15,6 +15,9 @@ type InvitationBody = {
   theme?: string | null;
   call_to_action?: string | null;
   starts_on?: string | null;
+  brand_overview?: string | null;
+  duration_weeks?: number | null;
+  budget_range?: string | null;
   message?: string | null;
 };
 
@@ -60,6 +63,9 @@ export async function POST(req: Request) {
       theme: body.theme,
       call_to_action: body.call_to_action,
       starts_on: body.starts_on,
+      brand_overview: body.brand_overview ?? null,
+      duration_weeks: body.duration_weeks ?? null,
+      budget_range: body.budget_range ?? null,
       message: body.message,
       status: "pending",
     },

@@ -35,17 +35,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Creator not found" }, { status: 404 });
   }
 
-  const { error } = await supabase.from("egg_project_briefs").upsert(
-    {
-      creator_id: profile.id,
-      cw_brief_id,
-      creator_username,
-      ...rest,
-      status: "received",
-      received_at: new Date().toISOString(),
-    },
-    { onConflict: "cw_brief_id" }
-  );
+  const payload = {
+    creator_id: profile.id,
+    cw_brief_id,
+    ...rest,
+    status: "received",
+    received_at: new Date().toISOString(),
+  };
+
+  const { data: existingBrief } = await supabase
+    .from("egg_project_briefs")
+    .select("id")
+    .eq("cw_brief_id", cw_brief_id)
+    .maybeSingle();
+
+  const { error } = existingBrief?.id
+    ? await supabase.from("egg_project_briefs").update(payload).eq("id", existingBrief.id)
+    : await supabase.from("egg_project_briefs").insert(payload);
 
   if (error) {
     console.error("Brief receive error:", error);

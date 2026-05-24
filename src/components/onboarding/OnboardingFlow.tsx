@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BadgeDollarSign, BriefcaseBusiness, CheckCircle, ClipboardList } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { SOONMascot } from "./SOONMascot";
 
-const totalSteps = 5;
+const totalSteps = 6;
 
 const PLATFORMS = [
   { id: "instagram", label: "Instagram", placeholder: "用戶名稱", logoUrl: "https://cdn.simpleicons.org/instagram/E1306C" },
@@ -28,6 +29,8 @@ const THEME_OPTIONS = [
   { name: "經典複古", bg: "/classic.jpg" },
   { name: "創意主題", bg: "/creative.jpg" },
 ];
+
+const PROFILE_CATEGORIES = ["生活美學", "美容護膚", "時尚穿搭", "美食", "旅遊", "健康運動", "親子", "科技", "財經", "教育", "娛樂", "其他"];
 
 type Handles = Record<string, string>;
 type FollowerCounts = Record<string, string>;
@@ -78,6 +81,9 @@ const initialFollowerCounts = {
 export function OnboardingFlow() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
   const [handles, setHandles] = useState<Handles>(initialHandles);
   const [followerCounts, setFollowerCounts] = useState<FollowerCounts>(initialFollowerCounts);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -88,6 +94,38 @@ export function OnboardingFlow() {
   const [error, setError] = useState("");
   const analyzedRef = useRef(false);
   const progress = (currentStep / totalSteps) * 100;
+
+  const toggleCategory = (category: string) => {
+    setCategories((current) => (current.includes(category) ? current.filter((item) => item !== category) : [...current, category]));
+  };
+
+  const saveProfileStep = async () => {
+    const trimmedDisplayName = displayName.trim();
+    if (!trimmedDisplayName) {
+      setError("請先填寫創作者名稱。");
+      return false;
+    }
+
+    try {
+      const response = await fetch("/api/profile/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: trimmedDisplayName,
+          bio: bio.trim() || null,
+          content_categories: categories,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Save failed");
+
+      setError("");
+      return true;
+    } catch {
+      setError("未能儲存創作者資料，請稍後再試。");
+      return false;
+    }
+  };
 
   const analyzeProfiles = useCallback(async () => {
     setAnalyzing(true);
@@ -109,7 +147,7 @@ export function OnboardingFlow() {
       if (data.analysis?.suggested_theme && THEME_OPTIONS.some((theme) => theme.name === data.analysis.suggested_theme)) {
         setSelectedTheme(data.analysis.suggested_theme);
       }
-      setTimeout(() => setCurrentStep(4), 1000);
+      setTimeout(() => setCurrentStep(5), 1000);
     } catch {
       setError("暫時無法完成分析，請稍後再試。");
       setAnalysisResult({
@@ -118,18 +156,60 @@ export function OnboardingFlow() {
         content_categories: ["品牌合作", "內容創作", "創作者工具"],
         ai_profile_summary: "系統暫時未能連線至 AI 分析服務，您仍可繼續選擇頁面風格。",
       });
-      setTimeout(() => setCurrentStep(4), 1000);
+      setTimeout(() => setCurrentStep(5), 1000);
     } finally {
       setAnalyzing(false);
     }
   }, [followerCounts, handles]);
 
   useEffect(() => {
-    if (currentStep === 3 && !analyzedRef.current) {
+    if (currentStep === 4 && !analyzedRef.current) {
       analyzedRef.current = true;
       void analyzeProfiles();
     }
   }, [analyzeProfiles, currentStep]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from("egg_creator_profiles")
+          .select("username, display_name, bio, content_categories")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (!profile || cancelled) return;
+
+        const initialDisplayName =
+          profile.display_name &&
+          profile.display_name !== profile.username &&
+          profile.display_name !== "Miscellaneous"
+            ? profile.display_name
+            : "";
+
+        setDisplayName((current) => current || initialDisplayName);
+        setBio((current) => current || profile.bio || "");
+        setCategories((current) => current.length > 0 ? current : Array.isArray(profile.content_categories) ? profile.content_categories : []);
+      } catch (err) {
+        console.error("Load onboarding profile failed:", err);
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -155,7 +235,11 @@ export function OnboardingFlow() {
           threads: nextIgData.threadsUsername,
           facebook: current.facebook || nextIgData.facebookPageName,
         }));
-        setCurrentStep(2);
+        const igName = params.get("ig_name") || "";
+        if (igName && igName !== username && igName !== "Miscellaneous") {
+          setDisplayName((current) => current || igName);
+        }
+        setCurrentStep(3);
         analyzedRef.current = false;
         router.replace("/onboarding");
       });
@@ -172,18 +256,25 @@ export function OnboardingFlow() {
       case 1:
         return { title: "你好！我係 SOON AI", mood: "excited" as const };
       case 2:
-        return { title: "請告訴我您活躍的社交平台", mood: "thinking" as const };
+        return { title: "你想用咩名出現？", mood: "happy" as const };
       case 3:
-        return { title: "SOON AI 正在分析您的社交平台數據...", mood: "thinking" as const };
+        return { title: "請告訴我您活躍的社交平台", mood: "thinking" as const };
       case 4:
+        return { title: "SOON AI 正在分析您的社交平台數據...", mood: "thinking" as const };
+      case 5:
         return { title: "以下是您的創作者檔案，請確認是否正確", mood: "excited" as const };
       default:
         return { title: "請選擇您偏好的頁面風格", mood: "happy" as const };
     }
   }, [currentStep]);
 
-  const nextStep = () => {
-    if (currentStep === 5) {
+  const nextStep = async () => {
+    if (currentStep === 2) {
+      const saved = await saveProfileStep();
+      if (!saved) return;
+    }
+
+    if (currentStep === 6) {
       void handleThemeConfirm();
       return;
     }
@@ -194,14 +285,14 @@ export function OnboardingFlow() {
 
   const updateHandle = (platform: string, value: string) => {
     setHandles((current) => ({ ...current, [platform]: value }));
-    if (currentStep < 3) {
+    if (currentStep < 4) {
       analyzedRef.current = false;
     }
   };
 
   const updateFollowerCount = (platform: string, value: string) => {
     setFollowerCounts((current) => ({ ...current, [platform]: value.replace(/[^\d]/g, "") }));
-    if (currentStep < 3) {
+    if (currentStep < 4) {
       analyzedRef.current = false;
     }
   };
@@ -246,11 +337,17 @@ export function OnboardingFlow() {
           <h2 className="mb-2 text-center text-xl font-bold text-gray-900">{stepMeta.title}</h2>
           <StepContent
             currentStep={currentStep}
+            displayName={displayName}
+            bio={bio}
+            categories={categories}
             handles={handles}
             followerCounts={followerCounts}
             igData={igData}
             updateHandle={updateHandle}
             updateFollowerCount={updateFollowerCount}
+            setDisplayName={setDisplayName}
+            setBio={setBio}
+            toggleCategory={toggleCategory}
             analyzing={analyzing}
             analysisResult={analysisResult}
             selectedTheme={selectedTheme}
@@ -260,7 +357,7 @@ export function OnboardingFlow() {
         </div>
 
         <div className="mt-6 flex w-full max-w-md gap-3">
-          {currentStep > 1 && currentStep !== 3 && (
+          {currentStep > 1 && currentStep !== 4 && (
             <button
               type="button"
               onClick={prevStep}
@@ -271,11 +368,11 @@ export function OnboardingFlow() {
           )}
           <button
             type="button"
-            onClick={nextStep}
+            onClick={() => void nextStep()}
             disabled={analyzing || savingTheme}
             className="flex-1 rounded-2xl bg-blue-500 py-3 font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
           >
-            {currentStep === 5 ? (savingTheme ? "儲存中..." : "完成設定") : "下一步 →"}
+            {currentStep === 6 ? (savingTheme ? "儲存中..." : "完成設定") : "下一步 →"}
           </button>
         </div>
       </div>
@@ -285,22 +382,34 @@ export function OnboardingFlow() {
 
 function StepContent({
   currentStep,
+  displayName,
+  bio,
+  categories,
   handles,
   followerCounts,
   igData,
   updateHandle,
   updateFollowerCount,
+  setDisplayName,
+  setBio,
+  toggleCategory,
   analyzing,
   analysisResult,
   selectedTheme,
   onSelectTheme,
 }: {
   currentStep: number;
+  displayName: string;
+  bio: string;
+  categories: string[];
   handles: Handles;
   followerCounts: FollowerCounts;
   igData: InstagramConnection | null;
   updateHandle: (platform: string, value: string) => void;
   updateFollowerCount: (platform: string, value: string) => void;
+  setDisplayName: (value: string) => void;
+  setBio: (value: string) => void;
+  toggleCategory: (category: string) => void;
   analyzing: boolean;
   analysisResult: AnalysisResult | null;
   selectedTheme: string;
@@ -317,6 +426,58 @@ function StepContent({
   }
 
   if (currentStep === 2) {
+    return (
+      <div className="mt-6 space-y-4">
+        <p className="text-center text-sm leading-6 text-gray-500">品牌主會喺 Creator Match 睇到呢個名</p>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">創作者名稱 *</label>
+          <input
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder="例如：Rosary Lifestyle"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+            maxLength={50}
+          />
+          <p className="mt-1 text-xs text-gray-400">可以係你的品牌名、頻道名或真實姓名</p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">一句介紹自己</label>
+          <textarea
+            value={bio}
+            onChange={(event) => setBio(event.target.value)}
+            placeholder="例如：專注香港生活美學，分享護膚、美食與日常"
+            rows={3}
+            className="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+            maxLength={150}
+          />
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-gray-700">內容類型（可多選）</label>
+          <div className="grid grid-cols-3 gap-2">
+            {PROFILE_CATEGORIES.map((category) => (
+              <button
+                key={category}
+                onClick={() => toggleCategory(category)}
+                className={`rounded-xl border px-3 py-2 text-xs transition ${
+                  categories.includes(category)
+                    ? "border-black bg-black text-white"
+                    : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                }`}
+                type="button"
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentStep === 3) {
     return (
       <div className="mt-5 space-y-4">
         <p className="text-center text-sm leading-6 text-gray-500">我會幫您分析受眾，配對最合適的品牌。</p>
@@ -492,7 +653,7 @@ function StepContent({
     );
   }
 
-  if (currentStep === 3) {
+  if (currentStep === 4) {
     return (
       <div className="mt-8 rounded-3xl bg-blue-50 p-6 text-center">
         <div className="mx-auto flex w-fit gap-2">
@@ -507,7 +668,7 @@ function StepContent({
     );
   }
 
-  if (currentStep === 4) {
+  if (currentStep === 5) {
     const connectedHandles = Object.entries(handles).filter(([, value]) => value.trim());
     const instagramFollowers = analysisResult?.instagram_followers ?? 0;
     const youtubeSubscribers = analysisResult?.youtube_subscribers ?? 0;

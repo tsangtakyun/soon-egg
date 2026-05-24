@@ -255,7 +255,7 @@ async function saveCreatorProfile(
   const savePayload = async (payload: Record<string, unknown>) => {
     const { data: existing } = await supabase
       .from("egg_creator_profiles")
-      .select("id")
+      .select("id, display_name, username, bio, content_categories")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -276,6 +276,30 @@ async function saveCreatorProfile(
 
   if (error) console.error("Supabase profile save error:", error);
   return !error;
+}
+
+async function fetchStoredCreatorProfile() {
+  const supabase = await createClient();
+  const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+
+  if (!supabase || !user) return null;
+
+  const { data } = await supabase
+    .from("egg_creator_profiles")
+    .select("username, display_name, bio, content_categories")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return data;
+}
+
+function hasCreatorDisplayName(profile: { username?: string | null; display_name?: string | null } | null) {
+  return Boolean(
+    profile?.display_name &&
+      profile.display_name !== profile.username &&
+      profile.display_name !== "Miscellaneous" &&
+      profile.display_name !== "SOON-EGG",
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -386,8 +410,16 @@ ${hasRealData ? realDataContext.join("\n") : platformInfo}
       };
     }
 
+    const storedProfile = await fetchStoredCreatorProfile();
+    const storedCategories = Array.isArray(storedProfile?.content_categories)
+      ? storedProfile.content_categories.filter((category): category is string => typeof category === "string")
+      : [];
+
     const enrichedAnalysis: Analysis = {
       ...analysis,
+      display_name: hasCreatorDisplayName(storedProfile) ? storedProfile!.display_name! : analysis.display_name,
+      bio: storedProfile?.bio || analysis.bio,
+      content_categories: storedCategories.length > 0 ? storedCategories : analysis.content_categories,
       instagram_followers: instagramData?.followerCount || analysis.instagram_followers || 0,
       youtube_subscribers: youtubeData?.subscriberCount || analysis.youtube_subscribers || 0,
       tiktok_followers: normalizedFollowerCounts.tiktok || analysis.tiktok_followers || 0,

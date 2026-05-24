@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { buy_me_a_coffee_url, cover_url } = body;
+  const { buy_me_a_coffee_url, cover_url, display_name, bio, content_categories } = body;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -23,7 +23,13 @@ export async function PATCH(req: NextRequest) {
     auth: { persistSession: false },
   });
 
-  const updates: { buy_me_a_coffee_url?: string | null; cover_url?: string | null } = {};
+  const updates: {
+    buy_me_a_coffee_url?: string | null;
+    cover_url?: string | null;
+    display_name?: string;
+    bio?: string | null;
+    content_categories?: string[];
+  } = {};
 
   if ("buy_me_a_coffee_url" in body) {
     updates.buy_me_a_coffee_url = buy_me_a_coffee_url || null;
@@ -31,6 +37,18 @@ export async function PATCH(req: NextRequest) {
 
   if (typeof cover_url === "string") {
     updates.cover_url = cover_url;
+  }
+
+  if (typeof display_name === "string") {
+    updates.display_name = display_name.trim();
+  }
+
+  if ("bio" in body) {
+    updates.bio = typeof bio === "string" && bio.trim() ? bio.trim() : null;
+  }
+
+  if (Array.isArray(content_categories)) {
+    updates.content_categories = content_categories.filter((category): category is string => typeof category === "string");
   }
 
   const { error } = await serviceSupabase.from("egg_creator_profiles").update(updates).eq("user_id", user.id);

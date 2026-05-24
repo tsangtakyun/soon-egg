@@ -34,6 +34,10 @@ export function LinkInBio({
   const [coverError, setCoverError] = useState("");
   const [coverModalOpen, setCoverModalOpen] = useState(false);
   const [savingCover, setSavingCover] = useState(false);
+  const [profileDisplayName, setProfileDisplayName] = useState(initialProfile.display_name || "");
+  const [profileBio, setProfileBio] = useState(initialProfile.bio || "");
+  const [savingProfileInfo, setSavingProfileInfo] = useState(false);
+  const [profileInfoMessage, setProfileInfoMessage] = useState("");
   const [coffeeUrl, setCoffeeUrl] = useState(initialProfile.buy_me_a_coffee_url || "");
   const [savingCoffeeUrl, setSavingCoffeeUrl] = useState(false);
   const [coffeeMessage, setCoffeeMessage] = useState("");
@@ -94,6 +98,41 @@ export function LinkInBio({
       setCoverError("封面圖未能更新，請稍後再試。");
     } finally {
       setSavingCover(false);
+    }
+  };
+
+  const saveProfileInfo = async () => {
+    const trimmedDisplayName = profileDisplayName.trim();
+    if (!trimmedDisplayName) {
+      setProfileInfoMessage("請填寫創作者名稱。");
+      return;
+    }
+
+    setSavingProfileInfo(true);
+    setProfileInfoMessage("");
+
+    try {
+      const response = await fetch("/api/profile/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: trimmedDisplayName,
+          bio: profileBio.trim() || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Save failed");
+
+      setProfile((current) => ({
+        ...current,
+        display_name: trimmedDisplayName,
+        bio: profileBio.trim() || null,
+      }));
+      setProfileInfoMessage("已儲存");
+    } catch {
+      setProfileInfoMessage("未能儲存，請稍後再試。");
+    } finally {
+      setSavingProfileInfo(false);
     }
   };
 
@@ -171,6 +210,63 @@ export function LinkInBio({
         </div>
         {avatarError && <p className="text-sm text-red-600">{avatarError}</p>}
         {coverError && <p className="text-sm text-red-600">{coverError}</p>}
+
+        <div className="rounded-2xl border border-zinc-100 bg-white p-4">
+          <h2 className="text-sm font-semibold text-zinc-900">創作者資料</h2>
+          <div className="mt-3 space-y-3">
+            <div>
+              <label htmlFor="profile-display-name" className="mb-1 block text-xs font-medium text-zinc-500">
+                創作者名稱 *
+              </label>
+              <input
+                id="profile-display-name"
+                type="text"
+                value={profileDisplayName}
+                onChange={(event) => {
+                  setProfileDisplayName(event.target.value);
+                  setProfileInfoMessage("");
+                }}
+                onBlur={() => {
+                  if (profileDisplayName.trim() !== (profile.display_name || "")) void saveProfileInfo();
+                }}
+                placeholder="例如：Rosary Lifestyle"
+                maxLength={50}
+                className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div>
+              <label htmlFor="profile-bio" className="mb-1 block text-xs font-medium text-zinc-500">
+                一句介紹自己
+              </label>
+              <textarea
+                id="profile-bio"
+                value={profileBio}
+                onChange={(event) => {
+                  setProfileBio(event.target.value);
+                  setProfileInfoMessage("");
+                }}
+                onBlur={() => {
+                  if (profileBio.trim() !== (profile.bio || "")) void saveProfileInfo();
+                }}
+                placeholder="例如：分享精緻生活美學與日常靈感"
+                maxLength={150}
+                rows={3}
+                className="w-full resize-none rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={saveProfileInfo}
+                disabled={savingProfileInfo}
+                className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+              >
+                {savingProfileInfo ? "儲存中" : "儲存資料"}
+              </button>
+              {profileInfoMessage && <p className="text-xs text-gray-500">{profileInfoMessage}</p>}
+            </div>
+          </div>
+        </div>
 
         <BlockEditor creatorId={profile.id} blocks={blocks} onBlocksChange={setBlocks} blocksError={blocksError} />
 

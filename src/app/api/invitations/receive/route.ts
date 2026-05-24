@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json()) as InvitationBody;
-  if (!body.egg_creator_id || !body.cw_campaign_id) {
+  if (!body.creator_username || !body.cw_campaign_id) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -38,10 +38,20 @@ export async function POST(req: Request) {
     auth: { persistSession: false },
   });
 
+  const { data: profile, error: profileError } = await supabase
+    .from("egg_creator_profiles")
+    .select("id")
+    .eq("username", body.creator_username)
+    .single();
+
+  if (profileError || !profile) {
+    console.error("Creator not found:", body.creator_username, profileError);
+    return NextResponse.json({ error: "Creator not found" }, { status: 404 });
+  }
+
   const { error } = await supabase.from("egg_brand_invitations").upsert(
     {
-      creator_id: body.egg_creator_id,
-      creator_username: body.creator_username,
+      creator_id: profile.id,
       cw_campaign_id: body.cw_campaign_id,
       cw_workspace_id: body.cw_workspace_id,
       campaign_name: body.campaign_name,

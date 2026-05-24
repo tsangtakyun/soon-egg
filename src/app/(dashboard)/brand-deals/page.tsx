@@ -6,7 +6,7 @@ import { PitchDrafter } from "@/components/brand-deals/PitchDrafter";
 import { createClient } from "@/lib/supabase/client";
 import { demoBrandMatches } from "@/lib/mock-data";
 
-type ActiveTab = "campaigns" | "invitations" | "briefs" | "brands";
+type ActiveTab = "campaigns" | "invitations" | "completed" | "brands";
 
 type Profile = {
   id: string;
@@ -52,25 +52,6 @@ type BrandInvitation = {
   status: string;
   sent_at: string;
   responded_at: string | null;
-};
-
-type ProjectBrief = {
-  id: string;
-  creator_id: string;
-  cw_brief_id: string;
-  brand_name: string | null;
-  title: string | null;
-  background: string | null;
-  objectives: string | null;
-  deliverables: string[] | null;
-  timeline: string | null;
-  budget: string | null;
-  dos: string | null;
-  donts: string | null;
-  reference_links: string[] | null;
-  additional_notes: string | null;
-  status: string | null;
-  received_at: string | null;
 };
 
 function CampaignCard({ campaign, applied, onApply }: { campaign: Campaign; applied: boolean; onApply: () => void }) {
@@ -238,47 +219,28 @@ function InvitationCard({ invitation, onRespond }: { invitation: BrandInvitation
   );
 }
 
-function BriefCard({ brief }: { brief: ProjectBrief }) {
-  const [expanded, setExpanded] = useState(false);
+function CompletedBrandCard({ invitation }: { invitation: BrandInvitation }) {
   return (
-    <article className="rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-medium text-zinc-950">{brief.title || "未命名簡報"}</h3>
-          <p className="text-xs text-zinc-400">{brief.brand_name || "Brand"}</p>
-        </div>
-        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">已收到</span>
+    <article className="flex items-start gap-4 rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-zinc-100 text-lg font-bold text-zinc-400">
+        {invitation.brand_name?.[0] ?? "?"}
       </div>
-      {brief.deliverables && brief.deliverables.length > 0 && <div className="mb-2 flex flex-wrap gap-1">{brief.deliverables.map((item) => <span key={item} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">{item}</span>)}</div>}
-      {brief.budget && <p className="mb-2 text-xs text-zinc-500">預算：{brief.budget}</p>}
-      {brief.timeline && <p className="mb-3 text-xs text-zinc-500">時間表：{brief.timeline}</p>}
-      {brief.received_at && <p className="mb-3 text-xs text-zinc-400">{new Date(brief.received_at).toLocaleString("zh-HK")}</p>}
-      <button onClick={() => setExpanded((value) => !value)} className="text-xs text-blue-600 hover:underline" type="button">{expanded ? "收起詳情" : "查看詳情 ›"}</button>
-      {expanded && (
-        <div className="mt-3 space-y-3 border-t border-zinc-100 pt-3">
-          {brief.background && <Detail label="背景介紹" value={brief.background} />}
-          {brief.objectives && <Detail label="合作目標" value={brief.objectives} />}
-          {brief.dos && <Detail label="注意事項" value={brief.dos} />}
-          {brief.donts && <Detail label="禁止事項" value={brief.donts} />}
-          {brief.reference_links && brief.reference_links.length > 0 && (
-            <div>
-              <p className="mb-1 text-xs font-medium text-zinc-500">參考連結</p>
-              {brief.reference_links.map((link) => <a key={link} href={link} target="_blank" rel="noopener noreferrer" className="block text-xs text-blue-500 hover:underline">{link}</a>)}
-            </div>
-          )}
-          {brief.additional_notes && <Detail label="補充備注" value={brief.additional_notes} />}
-        </div>
-      )}
+      <div className="flex-1">
+        <h3 className="text-sm font-medium text-zinc-950">{invitation.brand_name || "未命名品牌"}</h3>
+        <p className="mt-0.5 text-xs text-zinc-400">{invitation.campaign_name || "未命名 Campaign"}</p>
+        {invitation.collab_formats && invitation.collab_formats.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {invitation.collab_formats.map((format) => (
+              <span key={format} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                {format}
+              </span>
+            ))}
+          </div>
+        )}
+        {invitation.responded_at && <p className="mt-2 text-xs text-zinc-300">已合作 {new Date(invitation.responded_at).toLocaleDateString("zh-HK")}</p>}
+      </div>
+      <span className="flex-shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">已合作</span>
     </article>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="mb-1 text-xs font-medium text-zinc-500">{label}</p>
-      <p className="text-xs text-zinc-700">{value}</p>
-    </div>
   );
 }
 
@@ -347,7 +309,6 @@ export default function BrandDealsPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("campaigns");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [invitations, setInvitations] = useState<BrandInvitation[]>([]);
-  const [briefs, setBriefs] = useState<ProjectBrief[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
@@ -376,19 +337,17 @@ export default function BrandDealsPage() {
     supabase.from("egg_brand_invitations").select("*").eq("creator_id", profile.id).order("sent_at", { ascending: false }).then(({ data }) => {
       if (!cancelled) setInvitations((data ?? []) as BrandInvitation[]);
     });
-    supabase.from("egg_project_briefs").select("*").eq("creator_id", profile.id).order("received_at", { ascending: false }).then(({ data }) => {
-      if (!cancelled) setBriefs((data ?? []) as ProjectBrief[]);
-    });
     return () => {
       cancelled = true;
     };
   }, [profile?.id, supabase]);
 
   const pendingInvitationCount = invitations.filter((invitation) => invitation.status === "pending").length;
+  const completedInvitations = invitations.filter((invitation) => invitation.status === "accepted");
   const tabs: { id: ActiveTab; label: string }[] = [
     { id: "campaigns", label: "合作機會" },
     { id: "invitations", label: "品牌邀請" },
-    { id: "briefs", label: "項目簡報" },
+    { id: "completed", label: "已合作品牌" },
     { id: "brands", label: "推薦品牌" },
   ];
 
@@ -396,7 +355,7 @@ export default function BrandDealsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">品牌合作</h1>
-        <p className="mt-2 text-zinc-500">管理品牌邀請、合作機會和項目簡報。</p>
+        <p className="mt-2 text-zinc-500">管理合作機會、品牌邀請和合作記錄。</p>
       </div>
       <div className="mb-6 flex border-b border-zinc-200">
         {tabs.map((tab) => (
@@ -407,8 +366,22 @@ export default function BrandDealsPage() {
         ))}
       </div>
       {activeTab === "campaigns" && (loadingProfile ? <Loading /> : profile ? <CampaignFeed profile={profile} /> : <Empty text="請先完成創作者個人檔案。" />)}
-      {activeTab === "invitations" && (loadingProfile ? <Loading /> : invitations.length === 0 ? <Empty text="暫時未有品牌邀請。" /> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{invitations.map((invitation) => <InvitationCard key={invitation.id} invitation={invitation} onRespond={(id, status) => setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status } : item)))} />)}</div>)}
-      {activeTab === "briefs" && (loadingProfile ? <Loading /> : briefs.length === 0 ? <Empty text="暫時未有項目簡報。" /> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{briefs.map((brief) => <BriefCard key={brief.id} brief={brief} />)}</div>)}
+      {activeTab === "invitations" && (loadingProfile ? <Loading /> : invitations.length === 0 ? <Empty text="暫時未有品牌邀請。" /> : <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{invitations.map((invitation) => <InvitationCard key={invitation.id} invitation={invitation} onRespond={(id, status) => setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status, responded_at: new Date().toISOString() } : item)))} />)}</div>)}
+      {activeTab === "completed" &&
+        (loadingProfile ? (
+          <Loading />
+        ) : completedInvitations.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-zinc-400">未有已合作品牌記錄</p>
+            <p className="mt-1 text-xs text-zinc-300">接受品牌邀請後，合作記錄會自動出現於此</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {completedInvitations.map((invitation) => (
+              <CompletedBrandCard key={invitation.id} invitation={invitation} />
+            ))}
+          </div>
+        ))}
       {activeTab === "brands" && <RecommendedBrands />}
     </div>
   );

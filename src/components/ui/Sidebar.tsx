@@ -11,7 +11,7 @@ const items = [
   { href: "/media-kit", label: "Media Kit", icon: WandSparkles },
   { href: "/brand-deals", label: "品牌合作", icon: BriefcaseBusiness },
   { href: "/brand-deals/discover", label: "探索品牌", icon: BriefcaseBusiness },
-  { href: "/brand-deals/active", label: "進行中合作", icon: BriefcaseBusiness },
+  { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
   { href: "/products", label: "數位產品", icon: Package },
   { href: "/analytics", label: "數據分析", icon: BarChart3 },
   { href: "/onboarding", label: "推廣工具", icon: Mail },

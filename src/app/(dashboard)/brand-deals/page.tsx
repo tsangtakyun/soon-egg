@@ -46,6 +46,8 @@ type BrandInvitation = {
   call_to_action: string | null;
   starts_on: string | null;
   brand_overview: string | null;
+  brand_website: string | null;
+  collab_formats: string[] | null;
   budget_range: string | null;
   duration_weeks: number | null;
   message: string | null;
@@ -247,13 +249,35 @@ function InvitationCard({
           </div>
         )}
 
+        {invitation.brand_website && (
+          <a
+            href={invitation.brand_website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-2 block text-xs text-blue-500 hover:underline"
+          >
+            {invitation.brand_website}
+          </a>
+        )}
+
+        {invitation.collab_formats && invitation.collab_formats.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1">
+            {invitation.collab_formats.map((format) => (
+              <span key={format} className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                {format}
+              </span>
+            ))}
+          </div>
+        )}
+
         {invitation.theme && <p className="mb-3 line-clamp-2 text-xs text-zinc-500">{invitation.theme}</p>}
 
         <div className="mb-3 flex items-center gap-4 text-xs text-zinc-400">
           {invitation.starts_on && <span>開始日期：{invitation.starts_on}</span>}
           {invitation.duration_weeks && <span>{invitation.duration_weeks} 週</span>}
-          {invitation.budget_range && <span>{invitation.budget_range}</span>}
         </div>
+
+        {invitation.budget_range && <p className="mb-3 text-xs text-zinc-500">預算：{invitation.budget_range}</p>}
 
         {invitation.call_to_action && <p className="mb-3 text-xs text-blue-600">{invitation.call_to_action}</p>}
 

@@ -399,7 +399,7 @@ export default function BrandDealsPage() {
   }, [completedInvitations, profile?.id, supabase]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-[20vh]">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">品牌合作</h1>
         <p className="mt-2 text-zinc-500">管理合作機會、品牌邀請和合作記錄。</p>

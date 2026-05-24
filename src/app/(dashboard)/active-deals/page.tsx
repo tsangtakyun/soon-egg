@@ -60,7 +60,7 @@ export default function ActiveDealsPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-[20vh]">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">進行中合作</h1>
         <p className="mt-2 text-zinc-500">查看品牌發來的項目簡報，了解合作詳情與交付要求。</p>

@@ -60,7 +60,7 @@ export default function DiscoverBrandsPage() {
   const filteredPerks = useMemo(() => (filter === "all" ? perks : perks.filter((perk) => perk.type === filter)), [filter, perks]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pt-[20vh]">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">探索品牌</h1>
         <p className="mt-2 text-zinc-500">申請品牌提供的免費服務或產品，主動建立合作關係。</p>

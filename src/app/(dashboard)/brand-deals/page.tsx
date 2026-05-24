@@ -213,7 +213,20 @@ function InvitationCard({
       .update({ status, responded_at: new Date().toISOString() })
       .eq("id", invitation.id);
 
-    if (!error) onRespond(invitation.id, status);
+    if (!error) {
+      await fetch("/api/invitations/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cw_workspace_id: invitation.cw_workspace_id,
+          cw_campaign_id: invitation.cw_campaign_id,
+          campaign_name: invitation.campaign_name,
+          status,
+        }),
+      }).catch(() => null);
+
+      onRespond(invitation.id, status);
+    }
     setLoading(false);
   }
 

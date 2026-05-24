@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type PerkType = "service" | "product";
 type FilterType = "all" | PerkType;
@@ -24,12 +25,13 @@ const timeSlots = ["上午 10:00-12:00", "下午 12:00-14:00", "下午 14:00-17:
 const districts = ["香港島", "九龍", "新界", "離島"];
 
 export default function DiscoverBrandsPage() {
+  const supabase = useMemo(() => createClient(), []);
   const [perks, setPerks] = useState<Perk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [claimPerk, setClaimPerk] = useState<Perk | null>(null);
-  const [claimedIds, setClaimedIds] = useState<string[]>([]);
+  const [claimStatuses, setClaimStatuses] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +44,24 @@ export default function DiscoverBrandsPage() {
         const res = await fetch("/api/perks/feed");
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load perks");
-        if (!cancelled) setPerks((data.perks ?? []) as Perk[]);
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        let myClaimMap: Record<string, string> = {};
+        if (user?.id) {
+          const { data: profile } = await supabase.from("egg_creator_profiles").select("id").eq("user_id", user.id).single();
+          if (profile?.id) {
+            const { data: myClaims } = await supabase.from("perk_claims").select("perk_id, status").eq("creator_id", profile.id);
+            myClaimMap = Object.fromEntries((myClaims ?? []).map((claim) => [claim.perk_id as string, (claim.status as string | null) || "pending"]));
+          }
+        }
+
+        if (!cancelled) {
+          setPerks((data.perks ?? []) as Perk[]);
+          setClaimStatuses(myClaimMap);
+        }
       } catch {
         if (!cancelled) setError("未能載入品牌 Perks，請稍後再試。");
       } finally {
@@ -55,7 +74,7 @@ export default function DiscoverBrandsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [supabase]);
 
   const filteredPerks = useMemo(() => (filter === "all" ? perks : perks.filter((perk) => perk.type === filter)), [filter, perks]);
 
@@ -98,7 +117,7 @@ export default function DiscoverBrandsPage() {
         <div className="grid gap-4 lg:grid-cols-3">
           {filteredPerks.map((perk) => (
             <PerkCard
-              claimed={claimedIds.includes(perk.id)}
+              claimStatus={claimStatuses[perk.id]}
               key={perk.id}
               onClaim={() => setClaimPerk(perk)}
               perk={perk}
@@ -111,7 +130,7 @@ export default function DiscoverBrandsPage() {
         <ClaimModal
           onClose={() => setClaimPerk(null)}
           onSuccess={(perkId) => {
-            setClaimedIds((current) => [...current, perkId]);
+            setClaimStatuses((current) => ({ ...current, [perkId]: "pending" }));
             setPerks((current) =>
               current.map((perk) => (perk.id === perkId ? { ...perk, claimed_count: (perk.claimed_count ?? 0) + 1 } : perk))
             );
@@ -124,10 +143,19 @@ export default function DiscoverBrandsPage() {
   );
 }
 
-function PerkCard({ perk, claimed, onClaim }: { perk: Perk; claimed: boolean; onClaim: () => void }) {
+const statusDisplay: Record<string, { label: string; color: string }> = {
+  pending: { label: "等待確認", color: "bg-yellow-50 text-yellow-700" },
+  confirmed: { label: "✓ 已確認", color: "bg-blue-50 text-blue-700" },
+  in_progress: { label: "進行中", color: "bg-purple-50 text-purple-700" },
+  completed: { label: "✓ 已完成", color: "bg-green-50 text-green-700" },
+  rejected: { label: "未能安排", color: "bg-gray-100 text-gray-500" },
+};
+
+function PerkCard({ perk, claimStatus, onClaim }: { perk: Perk; claimStatus?: string; onClaim: () => void }) {
   const quota = perk.quota ?? 0;
   const full = quota > 0 && perk.claimed_count >= quota;
   const remaining = quota > 0 ? Math.max(0, quota - perk.claimed_count) : 0;
+  const status = claimStatus ? statusDisplay[claimStatus] ?? statusDisplay.pending : null;
 
   return (
     <article className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
@@ -163,16 +191,22 @@ function PerkCard({ perk, claimed, onClaim }: { perk: Perk; claimed: boolean; on
           {perk.valid_until && <span className="text-xs text-zinc-400">有效至：{perk.valid_until}</span>}
         </div>
 
-        <button
-          className={`w-full rounded-xl py-2.5 text-sm font-medium transition ${
-            full || claimed ? "cursor-not-allowed bg-zinc-100 text-zinc-400" : "bg-black text-white hover:bg-zinc-800"
-          }`}
-          disabled={full || claimed}
-          onClick={onClaim}
-          type="button"
-        >
-          {claimed ? "已申請" : full ? "名額已滿" : "我想要"}
-        </button>
+        {status ? (
+          <div className={`w-full rounded-xl py-2.5 text-center text-sm font-medium ${status.color}`}>
+            {status.label}
+          </div>
+        ) : (
+          <button
+            className={`w-full rounded-xl py-2.5 text-sm font-medium transition ${
+              full ? "cursor-not-allowed bg-zinc-100 text-zinc-400" : "bg-black text-white hover:bg-zinc-800"
+            }`}
+            disabled={full}
+            onClick={onClaim}
+            type="button"
+          >
+            {full ? "名額已滿" : "我想要"}
+          </button>
+        )}
       </div>
     </article>
   );

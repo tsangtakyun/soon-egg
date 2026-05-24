@@ -6,7 +6,7 @@ import { PitchDrafter } from "@/components/brand-deals/PitchDrafter";
 import { createClient } from "@/lib/supabase/client";
 import { demoBrandMatches } from "@/lib/mock-data";
 
-type ActiveTab = "campaigns" | "brands";
+type ActiveTab = "campaigns" | "invitations" | "brands";
 
 type Profile = {
   id: string;
@@ -32,6 +32,23 @@ type Campaign = {
   workspaces?: {
     name?: string | null;
   } | null;
+};
+
+type BrandInvitation = {
+  id: string;
+  creator_id: string;
+  cw_campaign_id: string;
+  cw_workspace_id: string | null;
+  campaign_name: string | null;
+  brand_name: string | null;
+  cover_image_url: string | null;
+  theme: string | null;
+  call_to_action: string | null;
+  starts_on: string | null;
+  message: string | null;
+  status: string;
+  sent_at: string;
+  responded_at: string | null;
 };
 
 function statusLabel(status: string | null) {
@@ -150,7 +167,9 @@ function ApplyModal({
           className="mb-4 w-full resize-none rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
         />
 
-        <p className="mb-4 text-xs leading-relaxed text-zinc-400">申請後，品牌主會喺 sooncreator.network 收到你的 Media Kit 連結。</p>
+        <p className="mb-4 text-xs leading-relaxed text-zinc-400">
+          申請後，品牌主會喺 sooncreator.network 收到你的 Media Kit 連結。
+        </p>
         {error && <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
 
         <div className="flex gap-3">
@@ -168,6 +187,93 @@ function ApplyModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function InvitationCard({
+  invitation,
+  onRespond,
+}: {
+  invitation: BrandInvitation;
+  onRespond: (id: string, status: string) => void;
+}) {
+  const supabase = useMemo(() => createClient(), []);
+  const [loading, setLoading] = useState(false);
+  const isPending = invitation.status === "pending";
+
+  async function respond(status: "accepted" | "declined") {
+    setLoading(true);
+    const { error } = await supabase
+      .from("egg_brand_invitations")
+      .update({ status, responded_at: new Date().toISOString() })
+      .eq("id", invitation.id);
+
+    if (!error) onRespond(invitation.id, status);
+    setLoading(false);
+  }
+
+  return (
+    <article className={`overflow-hidden rounded-xl border border-zinc-200 bg-white ${!isPending ? "opacity-60" : ""}`}>
+      {invitation.cover_image_url && !invitation.cover_image_url.startsWith("/api/") && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={invitation.cover_image_url} className="h-36 w-full object-cover" alt={invitation.campaign_name ?? ""} />
+      )}
+      <div className="p-4">
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-medium text-zinc-950">{invitation.campaign_name}</h3>
+            <p className="mt-0.5 text-xs text-zinc-400">{invitation.brand_name}</p>
+          </div>
+          <span
+            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${
+              invitation.status === "pending"
+                ? "bg-yellow-50 text-yellow-600"
+                : invitation.status === "accepted"
+                  ? "bg-green-50 text-green-600"
+                  : "bg-zinc-100 text-zinc-400"
+            }`}
+          >
+            {invitation.status === "pending" ? "待回覆" : invitation.status === "accepted" ? "已接受" : "已婉拒"}
+          </span>
+        </div>
+
+        {invitation.theme && <p className="mb-3 line-clamp-2 text-xs text-zinc-500">{invitation.theme}</p>}
+
+        {invitation.message && (
+          <div className="mb-3 rounded-lg bg-zinc-50 px-3 py-2">
+            <p className="text-xs text-zinc-400">品牌訊息：</p>
+            <p className="mt-0.5 text-xs text-zinc-700">{invitation.message}</p>
+          </div>
+        )}
+
+        {invitation.starts_on && <p className="mb-3 text-xs text-zinc-400">開始日期：{invitation.starts_on}</p>}
+
+        {isPending ? (
+          <div className="flex gap-2">
+            <button
+              onClick={() => respond("accepted")}
+              disabled={loading}
+              className="flex-1 rounded-lg bg-black py-2 text-sm font-medium text-white disabled:opacity-50"
+              type="button"
+            >
+              接受邀請
+            </button>
+            <button
+              onClick={() => respond("declined")}
+              disabled={loading}
+              className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500 disabled:opacity-50"
+              type="button"
+            >
+              婉拒
+            </button>
+          </div>
+        ) : (
+          <p className="text-center text-xs text-zinc-400">
+            {invitation.status === "accepted" ? "已接受此邀請" : "已婉拒此邀請"}
+          </p>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -259,6 +365,7 @@ export default function BrandDealsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [activeTab, setActiveTab] = useState<ActiveTab>("campaigns");
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [invitations, setInvitations] = useState<BrandInvitation[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
@@ -288,6 +395,32 @@ export default function BrandDealsPage() {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    let cancelled = false;
+
+    supabase
+      .from("egg_brand_invitations")
+      .select("*")
+      .eq("creator_id", profile.id)
+      .order("sent_at", { ascending: false })
+      .then(({ data }) => {
+        if (!cancelled) setInvitations((data ?? []) as BrandInvitation[]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, supabase]);
+
+  const pendingInvitationCount = invitations.filter((invitation) => invitation.status === "pending").length;
+  const tabs: { id: ActiveTab; label: string }[] = [
+    { id: "campaigns", label: "合作機會" },
+    { id: "invitations", label: "品牌邀請" },
+    { id: "brands", label: "推薦品牌" },
+  ];
+
   return (
     <div className="space-y-5">
       <div>
@@ -296,34 +429,59 @@ export default function BrandDealsPage() {
       </div>
 
       <div className="mb-6 flex border-b border-zinc-200">
-        <button
-          onClick={() => setActiveTab("campaigns")}
-          className={`border-b-2 px-6 py-3 text-sm font-medium transition ${
-            activeTab === "campaigns" ? "border-black text-black" : "border-transparent text-zinc-400"
-          }`}
-          type="button"
-        >
-          合作機會
-        </button>
-        <button
-          onClick={() => setActiveTab("brands")}
-          className={`border-b-2 px-6 py-3 text-sm font-medium transition ${
-            activeTab === "brands" ? "border-black text-black" : "border-transparent text-zinc-400"
-          }`}
-          type="button"
-        >
-          推薦品牌
-        </button>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-medium transition ${
+              activeTab === tab.id ? "border-black text-black" : "border-transparent text-zinc-400"
+            }`}
+            type="button"
+          >
+            {tab.label}
+            {tab.id === "invitations" && pendingInvitationCount > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                {pendingInvitationCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {activeTab === "campaigns" && (
-        loadingProfile ? (
+      {activeTab === "campaigns" &&
+        (loadingProfile ? (
           <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
         ) : profile ? (
           <CampaignFeed profile={profile} />
         ) : (
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">請先完成創作者檔案設定。</div>
-        )
+          <div className="rounded-xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
+            請先完成創作者檔案設定。
+          </div>
+        ))}
+
+      {activeTab === "invitations" && (
+        <div>
+          {loadingProfile ? (
+            <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+          ) : invitations.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-sm text-zinc-400">暫時未有品牌邀請</p>
+              <p className="mt-1 text-xs text-zinc-300">完善你的 Media Kit，提高被品牌發現的機會</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              {invitations.map((invitation) => (
+                <InvitationCard
+                  key={invitation.id}
+                  invitation={invitation}
+                  onRespond={(id, status) => {
+                    setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status } : item)));
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {activeTab === "brands" && <RecommendedBrands />}

@@ -21,6 +21,30 @@ type PerkClaimBody = {
   delivery_notes?: string | null;
 };
 
+function missingColumnName(message?: string) {
+  const match = message?.match(/'([^']+)' column/);
+  return match?.[1] ?? null;
+}
+
+async function insertLocalPerkClaim(payload: Record<string, unknown>) {
+  let nextPayload = { ...payload };
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { error } = await supabaseAdmin.from("perk_claims").insert(nextPayload);
+
+    if (!error) return;
+
+    const column = missingColumnName(error.message);
+    if (!column || !(column in nextPayload)) {
+      throw error;
+    }
+
+    console.warn(`[perks/claim] local perk_claims missing column "${column}", retrying without it`);
+    const { [column]: _removed, ...rest } = nextPayload;
+    nextPayload = rest;
+  }
+}
+
 export async function POST(req: Request) {
   const serverSupabase = await createServerClient();
   const {
@@ -62,11 +86,10 @@ export async function POST(req: Request) {
     status: "pending",
   };
 
-  const { error: localError } = await supabaseAdmin.from("perk_claims").insert(claimPayload);
-
-  if (localError) {
-    console.error("SOON-EGG perk claim insert error:", localError);
-    return NextResponse.json({ error: localError.message }, { status: 500 });
+  try {
+    await insertLocalPerkClaim(claimPayload);
+  } catch (localError) {
+    console.error("SOON-EGG perk claim insert skipped:", localError);
   }
 
   const cwRes = await fetch(`${process.env.CW_BASE_URL}/api/public/perks/claim`, {

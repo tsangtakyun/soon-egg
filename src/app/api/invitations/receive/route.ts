@@ -68,8 +68,9 @@ export async function POST(req: Request) {
       budget_range: body.budget_range ?? null,
       message: body.message,
       status: "pending",
+      sent_at: new Date().toISOString(),
     },
-    { onConflict: "creator_id,cw_campaign_id" }
+    { onConflict: "creator_id,cw_campaign_id", ignoreDuplicates: false }
   );
 
   if (error) {

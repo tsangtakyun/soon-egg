@@ -26,21 +26,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("egg_creator_profiles")
-    .select("id")
-    .eq("username", creator_username)
-    .single();
-
-  if (profileError || !profile) {
-    return NextResponse.json({ error: "Creator not found" }, { status: 404 });
-  }
-
   const { error } = await supabase
     .from("perk_claims")
     .update({ status, brand_notes: brand_notes ?? null, updated_at: new Date().toISOString() })
     .eq("perk_id", perk_id)
-    .eq("creator_id", profile.id);
+    .eq("creator_username", creator_username);
 
   if (error) {
     console.error("[perks/status-update] DB error:", error);

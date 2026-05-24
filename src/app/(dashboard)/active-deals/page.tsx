@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Profile = {
   id: string;
+  username: string;
 };
 
 type BrandPerk = {
@@ -19,7 +20,7 @@ type BrandPerk = {
 type PerkClaim = {
   id: string;
   perk_id: string;
-  creator_id: string;
+  creator_username: string;
   status: string | null;
   preferred_date: string | null;
   preferred_time: string | null;
@@ -52,8 +53,8 @@ export default function ActiveDealsPage() {
         return;
       }
 
-      const { data: profileData } = await supabase.from("egg_creator_profiles").select("id").eq("user_id", user.id).single();
-      if (!profileData?.id) {
+      const { data: profileData } = await supabase.from("egg_creator_profiles").select("id,username").eq("user_id", user.id).single();
+      if (!profileData?.id || !profileData.username) {
         if (!cancelled) setLoading(false);
         return;
       }
@@ -75,7 +76,7 @@ export default function ActiveDealsPage() {
             )
           `
           )
-          .eq("creator_id", profileData.id)
+          .eq("creator_username", profileData.username)
           .in("status", ["confirmed", "in_progress", "completed"])
           .order("updated_at", { ascending: false }),
       ]);
@@ -86,7 +87,7 @@ export default function ActiveDealsPage() {
         const { data: claimData } = await supabase
           .from("perk_claims")
           .select("*")
-          .eq("creator_id", profileData.id)
+          .eq("creator_username", profileData.username)
           .in("status", ["confirmed", "in_progress", "completed"])
           .order("updated_at", { ascending: false });
 

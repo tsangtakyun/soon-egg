@@ -8,7 +8,7 @@ function loginUrl(req: Request) {
 export async function POST(req: Request) {
   const supabase = await createClient();
   await supabase?.auth.signOut();
-  return NextResponse.redirect(loginUrl(req));
+  return NextResponse.redirect(loginUrl(req), 303);
 }
 
 export async function GET(req: Request) {

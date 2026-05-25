@@ -13,19 +13,23 @@ export async function Sidebar() {
   const balance = user?.email ? await getCreditBalance(user.email) : 0;
 
   return (
-    <aside className="hidden min-h-screen w-72 shrink-0 border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:block">
-      <Link href="/dashboard" className="flex items-center gap-3 px-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/soon-egg.png" alt="SOON-EGG" className="h-7 w-auto object-contain" />
-      </Link>
+    <aside className="hidden h-screen w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:flex">
+      <div className="shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-3 px-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/soon-egg.png" alt="SOON-EGG" className="h-7 w-auto object-contain" />
+        </Link>
 
-      <div className="mt-6 px-2">
-        <CreditBadge credits={balance} />
+        <div className="mt-6 px-2">
+          <CreditBadge credits={balance} />
+        </div>
       </div>
 
-      <SidebarNav />
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <SidebarNav />
+      </div>
 
-      <div className="mt-8 border-t border-zinc-200 pt-4">
+      <div className="shrink-0 border-t border-zinc-200 pt-4">
         <Link href="/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
           <Settings className="h-4 w-4" aria-hidden />
           設定

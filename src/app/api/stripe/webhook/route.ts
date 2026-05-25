@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const shipping = (session as any).shipping_details;
     const address = shipping?.address;
 
-    await supabaseAdmin.from("egg_product_orders").insert({
+    const { error: insertError } = await supabaseAdmin.from("egg_product_orders").insert({
       creator_id: profile.id,
       product_id: meta.product_id,
       product_title: product?.title ?? null,
@@ -59,10 +59,19 @@ export async function POST(req: Request) {
       delivery_district: address?.city ?? null,
     });
 
-    await supabaseAdmin.rpc("increment_product_sales", {
-      p_product_id: meta.product_id,
-      p_amount: product?.price ?? 0,
-    });
+    if (insertError) {
+      console.error("[webhook] Order insert error:", insertError);
+      return NextResponse.json({ received: true });
+    }
+
+    try {
+      await supabaseAdmin.rpc("increment_product_sales", {
+        p_product_id: meta.product_id,
+        p_amount: product?.price ?? 0,
+      });
+    } catch (err) {
+      console.error("[webhook] increment_product_sales error:", err);
+    }
   }
 
   return NextResponse.json({ received: true });

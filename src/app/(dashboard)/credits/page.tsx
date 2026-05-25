@@ -37,8 +37,11 @@ export default async function CreditsPage({ searchParams }: { searchParams: Prom
   } = await serverSupabase.auth.getUser();
   if (!user?.email) redirect("/login");
 
-  const [balance, { data: packageData }, { data: transactionData }] = await Promise.all([
-    getCreditBalance(user.email),
+  console.log("[credits page] user email:", user.email);
+  const balance = await getCreditBalance(user.email ?? "");
+  console.log("[credits page] balance:", balance);
+
+  const [{ data: packageData }, { data: transactionData }] = await Promise.all([
     (masterSupabase as any).from("credit_packages").select("id, name, emoji, credits, price_hkd").order("price_hkd", { ascending: true }),
     (masterSupabase as any)
       .from("credit_transactions")

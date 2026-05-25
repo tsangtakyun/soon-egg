@@ -14,12 +14,16 @@ type CreditRow = {
 };
 
 export async function getCreditBalance(email: string): Promise<number> {
-  if (!email) return 0;
+  if (!email) {
+    console.error("[credits] getCreditBalance called with empty email");
+    return 0;
+  }
   try {
-    const { data } = await (masterSupabase as any).from("user_credits").select("balance").eq("email", email).maybeSingle();
+    const { data, error } = await (masterSupabase as any).from("user_credits").select("balance").eq("email", email).maybeSingle();
+    console.log("[credits] getCreditBalance:", email, "→", data?.balance, error?.message);
     return data?.balance ?? 0;
-  } catch (error) {
-    console.error("[credits] get balance failed:", error);
+  } catch (err) {
+    console.error("[credits] getCreditBalance exception:", err);
     return 0;
   }
 }

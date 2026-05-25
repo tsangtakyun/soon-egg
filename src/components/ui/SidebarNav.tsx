@@ -16,6 +16,7 @@ import {
   Package,
   UserRound,
   WandSparkles,
+  Wallet,
   Zap,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ const toolItems = [
   { href: "/tools/subtitle", label: "字幕工作台", icon: Captions },
   { href: "/tools/docs", label: "文件中心", icon: FolderOpen },
   { href: "/tools/schedule", label: "行程中心", icon: Calendar },
+  { href: "/tools/finance", label: "財務中心", icon: Wallet },
 ];
 
 export function SidebarNav() {

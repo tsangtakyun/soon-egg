@@ -76,19 +76,32 @@ export function CreditsClient({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   async function handleSubscribe(priceId: string) {
-    setLoadingPriceId(priceId);
-    const res = await fetch("/api/credits/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ price_id: priceId }),
-    });
-    const data = await res.json();
-    if (data.url) {
-      window.location.href = data.url;
+    console.log("[subscribe] clicked, priceId:", priceId);
+    if (!priceId) {
+      console.error("[subscribe] no priceId!");
       return;
     }
-    alert(data.error ?? "未能建立訂閱，請稍後再試。");
-    setLoadingPriceId(null);
+
+    try {
+      setLoadingPriceId(priceId);
+      const res = await fetch("/api/credits/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ price_id: priceId }),
+      });
+      const data = await res.json();
+      console.log("[subscribe] response:", data);
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      console.error("[subscribe] no url in response:", data);
+      alert(data.error ?? "未能建立訂閱，請稍後再試。");
+    } catch (err) {
+      console.error("[subscribe] error:", err);
+    } finally {
+      setLoadingPriceId(null);
+    }
   }
 
   async function handleCancel(subscriptionId: string) {
@@ -106,7 +119,7 @@ export function CreditsClient({
     <main className="space-y-8 pt-[10vh]">
       {subscribed && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-          <p className="text-sm font-medium text-green-700">🎉 訂閱成功！Credits 已加入帳戶。</p>
+          <p className="text-sm font-medium text-green-700">訂閱成功！Credits 已加入帳戶。</p>
         </div>
       )}
       {success && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">Credits 購買成功，餘額已更新。</div>}
@@ -226,6 +239,7 @@ function PlanCard({
         <div className="space-y-2">
           <div className="w-full rounded-xl bg-green-50 py-2.5 text-center text-sm font-medium text-green-700">✓ 當前方案</div>
           <button
+            type="button"
             onClick={() => onCancel(currentPlan.stripe_subscription_id)}
             disabled={cancelling}
             className="w-full rounded-xl border border-gray-200 py-2 text-xs text-gray-400 hover:text-gray-600 disabled:opacity-50"
@@ -235,6 +249,7 @@ function PlanCard({
         </div>
       ) : (
         <button
+          type="button"
           onClick={() => onSubscribe(plan.priceId)}
           disabled={loading}
           className={`w-full rounded-xl py-2.5 text-sm font-medium disabled:opacity-50 ${

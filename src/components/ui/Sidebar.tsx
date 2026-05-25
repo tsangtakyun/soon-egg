@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CreditCard, Settings } from "lucide-react";
+import { CreditCard, LogOut, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCreditBalance } from "@/lib/credits";
 import { CreditBadge } from "./CreditBadge";
@@ -34,6 +34,12 @@ export async function Sidebar() {
           <CreditCard className="h-4 w-4" aria-hidden />
           升級計劃
         </Link>
+        <form action="/api/auth/signout" method="POST">
+          <button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
+            <LogOut className="h-4 w-4" aria-hidden />
+            登出
+          </button>
+        </form>
       </div>
     </aside>
   );

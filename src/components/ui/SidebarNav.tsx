@@ -13,6 +13,7 @@ import {
   Home,
   Layout,
   Lightbulb,
+  MessageSquare,
   Package,
   UserRound,
   WandSparkles,
@@ -41,6 +42,7 @@ const toolItems = [
   { href: "/tools/docs", label: "文件中心", icon: FolderOpen },
   { href: "/tools/schedule", label: "行程中心", icon: Calendar },
   { href: "/tools/finance", label: "財務中心", icon: Wallet },
+  { href: "/tools/reply", label: "回覆中心", icon: MessageSquare },
 ];
 
 export function SidebarNav() {

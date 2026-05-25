@@ -1,5 +1,6 @@
 "use client";
 
+import { type ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -7,18 +8,16 @@ import {
   BriefcaseBusiness,
   Calendar,
   Captions,
-  Clapperboard,
+  ChevronDown,
   FileText,
   FolderOpen,
   Home,
-  Layout,
   Lightbulb,
   MessageSquare,
   Package,
   UserRound,
   WandSparkles,
   Wallet,
-  Zap,
 } from "lucide-react";
 
 const items = [
@@ -30,15 +29,15 @@ const items = [
   { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
   { href: "/products", label: "數位產品", icon: Package },
   { href: "/analytics", label: "數據分析", icon: BarChart3 },
-  { href: "/credits", label: "Credits", icon: Zap },
 ];
 
-const toolItems = [
+const creatorToolItems = [
   { href: "/tools/idea", label: "靈感工作台", icon: Lightbulb },
   { href: "/tools/script", label: "劇本工作台", icon: FileText },
-  { href: "/tools/storyboard", label: "分鏡工作台", icon: Layout },
-  { href: "/tools/production", label: "拍攝跟進", icon: Clapperboard },
   { href: "/tools/subtitle", label: "字幕工作台", icon: Captions },
+];
+
+const productionToolItems = [
   { href: "/tools/docs", label: "文件中心", icon: FolderOpen },
   { href: "/tools/schedule", label: "行程中心", icon: Calendar },
   { href: "/tools/finance", label: "財務中心", icon: Wallet },
@@ -53,45 +52,82 @@ export function SidebarNav() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
+  function SidebarItem({
+    href,
+    icon: Icon,
+    label,
+    prefetch = true,
+  }: {
+    href: string;
+    icon: typeof Home;
+    label: string;
+    prefetch?: boolean;
+  }) {
+    const active = isActive(href);
+
+    return (
+      <Link
+        href={href}
+        prefetch={prefetch}
+        className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
+          active ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
+        }`}
+      >
+        <Icon className="h-4 w-4" aria-hidden />
+        {label}
+      </Link>
+    );
+  }
+
   return (
     <nav className="mt-6 space-y-1">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const active = isActive(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            prefetch={false}
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-              active ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
-            }`}
-          >
-            <Icon className="h-4 w-4" aria-hidden />
-            {item.label}
-          </Link>
-        );
-      })}
-      <div className="px-3 pb-1 pt-5">
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">創作工具</p>
+      {items.map((item) => (
+        <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+      ))}
+
+      <div className="pt-5">
+        <SidebarSection label="創作工具" defaultOpen={true}>
+          {creatorToolItems.map((item) => (
+            <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+          ))}
+        </SidebarSection>
+
+        <SidebarSection label="制片工具" defaultOpen={true} small={true}>
+          {productionToolItems.map((item) => (
+            <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+          ))}
+        </SidebarSection>
       </div>
-      {toolItems.map((item) => {
-        const Icon = item.icon;
-        const active = isActive(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            prefetch={false}
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-              active ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
-            }`}
-          >
-            <Icon className="h-4 w-4" aria-hidden />
-            {item.label}
-          </Link>
-        );
-      })}
     </nav>
+  );
+}
+
+function SidebarSection({
+  label,
+  children,
+  defaultOpen = true,
+  small = false,
+}: {
+  label: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  small?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 hover:bg-white"
+      >
+        <span className={`font-medium uppercase tracking-wider text-gray-400 ${small ? "text-[10px]" : "text-xs"}`}>
+          {label}
+        </span>
+        <ChevronDown size={12} className={`text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="mt-0.5">{children}</div>}
+    </div>
   );
 }

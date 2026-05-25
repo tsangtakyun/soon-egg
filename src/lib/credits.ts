@@ -129,32 +129,44 @@ export async function addCredits({
 export async function initKolCredits(email: string, eggUserId: string): Promise<void> {
   if (!email) return;
 
-  const { data: existing } = await (masterSupabase as any).from("user_credits").select("email").eq("email", email).maybeSingle();
-  if (existing) return;
+  try {
+    const { data: existing, error: checkError } = await (masterSupabase as any).from("user_credits").select("email").eq("email", email).maybeSingle();
 
-  const { error } = await (masterSupabase as any).from("user_credits").insert({
-    user_id: eggUserId,
-    email,
-    balance: 300,
-    total_purchased: 0,
-    total_used: 0,
-    source: "soon_egg",
-  });
+    if (checkError) {
+      console.error("[credits] initKolCredits check error:", JSON.stringify(checkError));
+    }
 
-  if (error) {
-    console.error("[credits] initKolCredits error:", error);
-    return;
+    if (existing) {
+      console.log("[credits] already initialized:", email);
+      return;
+    }
+
+    const { error: insertError } = await (masterSupabase as any).from("user_credits").insert({
+      user_id: eggUserId,
+      email,
+      balance: 300,
+      total_purchased: 0,
+      total_used: 0,
+      source: "soon_egg",
+    });
+
+    if (insertError) {
+      console.error("[credits] insert error:", JSON.stringify(insertError));
+      return;
+    }
+
+    await (masterSupabase as any).from("credit_transactions").insert({
+      user_id: eggUserId,
+      email,
+      amount: 300,
+      balance_after: 300,
+      type: "signup_bonus",
+      description: "新 KOL 歡迎禮遇 — 300 Credits",
+      platform: "soon_egg",
+    });
+
+    console.log("[credits] initKolCredits success:", email);
+  } catch (err) {
+    console.error("[credits] initKolCredits exception:", err);
   }
-
-  await (masterSupabase as any).from("credit_transactions").insert({
-    user_id: eggUserId,
-    email,
-    amount: 300,
-    balance_after: 300,
-    type: "signup_bonus",
-    description: "新 KOL 歡迎禮遇 — 300 Credits",
-    platform: "soon_egg",
-  });
-
-  console.log("[credits] initKolCredits success:", email);
 }

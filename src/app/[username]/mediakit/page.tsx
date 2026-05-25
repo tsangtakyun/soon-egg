@@ -77,6 +77,17 @@ type ProfileBlock = {
   url: string | null;
 };
 
+function blockHref(block: ProfileBlock, username: string) {
+  const title = block.title?.trim() ?? "";
+  const url = block.url ?? "#";
+
+  if (title.includes("我的貨品") || title.includes("貨品") || url.includes("sooncreator.network/shop")) {
+    return `https://egg.sooncreator.network/${username}/shop`;
+  }
+
+  return url;
+}
+
 function isEnabled(value: boolean | null | undefined, fallback = true) {
   return typeof value === "boolean" ? value : fallback;
 }
@@ -520,7 +531,7 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
                 {activeBlocks.map((block) => (
                   <a
                     key={block.id}
-                    href={block.url ?? "#"}
+                    href={blockHref(block, profile.username)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{

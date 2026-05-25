@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, CreditCard, Home, Mail, Package, Settings, UserRound, WandSparkles } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, CreditCard, Home, Package, Settings, UserRound, WandSparkles } from "lucide-react";
 import { CreditBadge } from "./CreditBadge";
 
 const items = [
@@ -14,7 +14,6 @@ const items = [
   { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
   { href: "/products", label: "數位產品", icon: Package },
   { href: "/analytics", label: "數據分析", icon: BarChart3 },
-  { href: "/onboarding", label: "推廣工具", icon: Mail },
 ];
 
 export function Sidebar() {

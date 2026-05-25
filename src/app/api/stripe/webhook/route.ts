@@ -19,6 +19,11 @@ function getSupabaseAdmin() {
   return supabaseAdminClient;
 }
 
+function planFromPrice(priceId?: string | null) {
+  if (priceId === "price_1Tb6uZQ7196tVqUaEFWWDZJ9") return { plan: "basic", credits: 800, label: "Basic" };
+  return { plan: "pro", credits: 2500, label: "Pro" };
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
@@ -35,6 +40,47 @@ export async function POST(req: Request) {
     const session = event.data.object as Stripe.Checkout.Session;
     const meta = session.metadata ?? {};
     const supabaseAdmin = getSupabaseAdmin() as any;
+
+    if (session.mode === "subscription" || meta.type === "subscription") {
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+      if (!subscriptionId) return NextResponse.json({ received: true });
+
+      const subscription = (await getStripe().subscriptions.retrieve(subscriptionId)) as any;
+      const priceId = subscription.items.data[0]?.price.id as string | undefined;
+      const planInfo = planFromPrice(priceId);
+      const email = meta.user_email ?? session.customer_details?.email ?? session.customer_email ?? "";
+
+      await supabaseAdmin.from("egg_subscriptions").upsert(
+        {
+          user_id: meta.user_id,
+          email,
+          plan: planInfo.plan,
+          status: "active",
+          stripe_subscription_id: subscriptionId,
+          stripe_customer_id: typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id,
+          current_period_start: subscription.current_period_start
+            ? new Date(subscription.current_period_start * 1000).toISOString()
+            : null,
+          current_period_end: subscription.current_period_end
+            ? new Date(subscription.current_period_end * 1000).toISOString()
+            : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "stripe_subscription_id" },
+      );
+
+      if (email) {
+        const { addCredits } = await import("@/lib/credits");
+        await addCredits({
+          email,
+          amount: planInfo.credits,
+          type: "subscription_renewal",
+          description: `${planInfo.label} 訂閱 — 每月 ${planInfo.credits.toLocaleString()} Credits`,
+        });
+      }
+
+      return NextResponse.json({ received: true });
+    }
 
     if (meta.type === "credit_purchase") {
       const { addCredits } = await import("@/lib/credits");
@@ -84,6 +130,39 @@ export async function POST(req: Request) {
     } catch (err) {
       console.error("[webhook] increment_product_sales error:", err);
     }
+  }
+
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as any;
+    if (invoice.billing_reason === "subscription_cycle") {
+      const supabaseAdmin = getSupabaseAdmin() as any;
+      const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      const { data: sub } = await supabaseAdmin
+        .from("egg_subscriptions")
+        .select("email, plan")
+        .eq("stripe_subscription_id", subscriptionId)
+        .maybeSingle();
+
+      if (sub?.email) {
+        const creditsToAdd = sub.plan === "basic" ? 800 : 2500;
+        const { addCredits } = await import("@/lib/credits");
+        await addCredits({
+          email: sub.email,
+          amount: creditsToAdd,
+          type: "subscription_renewal",
+          description: `${sub.plan === "basic" ? "Basic" : "Pro"} 月費更新`,
+        });
+      }
+    }
+  }
+
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const supabaseAdmin = getSupabaseAdmin() as any;
+    await supabaseAdmin
+      .from("egg_subscriptions")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("stripe_subscription_id", subscription.id);
   }
 
   return NextResponse.json({ received: true });

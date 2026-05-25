@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import { ProductTypeIcon, productTypeLabels } from "@/components/products/ProductTypeIcon";
+import { ShopBuyButton } from "@/components/public/ShopBuyButton";
 import { notFound } from "next/navigation";
 
 type CreatorProfile = {
@@ -8,6 +10,7 @@ type CreatorProfile = {
   bio: string | null;
   avatar_url: string | null;
   cover_url: string | null;
+  stripe_onboarding_complete?: boolean | null;
 };
 
 type Product = {
@@ -21,22 +24,6 @@ type Product = {
   external_url: string | null;
 };
 
-const typeLabel: Record<string, string> = {
-  physical: "實體貨品",
-  digital: "數碼產品",
-  service: "服務",
-  workshop: "工作坊",
-  other: "其他",
-};
-
-const typeIcon: Record<string, string> = {
-  physical: "📦",
-  digital: "💾",
-  service: "🛎️",
-  workshop: "🎓",
-  other: "🛍️",
-};
-
 export default async function PublicShopPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
   const supabase = await createClient();
@@ -44,7 +31,7 @@ export default async function PublicShopPage({ params }: { params: Promise<{ use
 
   const { data: profileData } = await supabase
     .from("egg_creator_profiles")
-    .select("id, username, display_name, bio, avatar_url, cover_url")
+    .select("id, username, display_name, bio, avatar_url, cover_url, stripe_onboarding_complete")
     .eq("username", username)
     .eq("is_public", true)
     .single();
@@ -96,7 +83,7 @@ export default async function PublicShopPage({ params }: { params: Promise<{ use
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
-              <PublicProductCard key={product.id} product={product} />
+              <PublicProductCard key={product.id} product={product} stripeReady={Boolean(profile.stripe_onboarding_complete)} />
             ))}
           </div>
         )}
@@ -105,9 +92,8 @@ export default async function PublicShopPage({ params }: { params: Promise<{ use
   );
 }
 
-function PublicProductCard({ product }: { product: Product }) {
+function PublicProductCard({ product, stripeReady }: { product: Product; stripeReady: boolean }) {
   const kind = product.product_type ?? "other";
-  const icon = typeIcon[kind] ?? typeIcon.other;
 
   return (
     <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
@@ -115,24 +101,17 @@ function PublicProductCard({ product }: { product: Product }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={product.thumbnail_url} className="h-48 w-full object-cover" alt={product.title} />
       ) : (
-        <div className="flex h-48 w-full items-center justify-center bg-gray-50 text-5xl">{icon}</div>
+        <div className="flex h-48 w-full items-center justify-center bg-gray-50">
+          <ProductTypeIcon type={kind} size={52} />
+        </div>
       )}
       <div className="p-4">
-        <span className="text-xs uppercase tracking-wide text-gray-400">{typeLabel[kind] ?? typeLabel.other}</span>
+        <span className="text-xs uppercase tracking-wide text-gray-400">{productTypeLabels[kind] ?? productTypeLabels.other}</span>
         <h3 className="mt-1 text-base font-semibold">{product.title}</h3>
         {product.description && <p className="mt-1 line-clamp-2 text-sm text-gray-500">{product.description}</p>}
         <div className="mt-3 flex items-center justify-between gap-3">
           <span className="text-base font-bold">{Number(product.price ?? 0) > 0 ? `${product.currency ?? "HKD"} ${product.price}` : "免費"}</span>
-          {product.external_url && (
-            <a
-              href={product.external_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-xl bg-black px-4 py-2 text-sm text-white hover:bg-gray-800"
-            >
-              立即購買
-            </a>
-          )}
+          {(product.external_url || stripeReady) && <ShopBuyButton productId={product.id} externalUrl={product.external_url} stripeReady={stripeReady} />}
         </div>
       </div>
     </div>

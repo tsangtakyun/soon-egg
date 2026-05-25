@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-
-type ProductType = "physical" | "digital" | "service" | "workshop" | "other";
+import { ProductTypeIcon, productTypeBadgeClasses, productTypeLabels, type ProductType } from "@/components/products/ProductTypeIcon";
 
 type Product = {
   id: string;
@@ -19,6 +19,23 @@ type Product = {
   stock_quantity?: number | null;
   stock_unlimited?: boolean | null;
   is_active: boolean | null;
+};
+
+type Order = {
+  id: string;
+  creator_id: string | null;
+  product_id: string | null;
+  product_title: string | null;
+  buyer_name: string | null;
+  buyer_email: string | null;
+  amount: number | null;
+  currency: string | null;
+  status: string | null;
+  delivery_name: string | null;
+  delivery_address: string | null;
+  delivery_district: string | null;
+  tracking_number: string | null;
+  created_at: string;
 };
 
 type ProductForm = {
@@ -47,26 +64,35 @@ const emptyForm: ProductForm = {
   is_active: true,
 };
 
-const typeMeta: Record<string, { label: string; icon: string; className: string }> = {
-  physical: { label: "實體", icon: "📦", className: "bg-orange-50 text-orange-600" },
-  digital: { label: "數碼", icon: "💾", className: "bg-blue-50 text-blue-600" },
-  service: { label: "服務", icon: "🛎️", className: "bg-green-50 text-green-600" },
-  workshop: { label: "工作坊", icon: "🎓", className: "bg-purple-50 text-purple-600" },
-  other: { label: "其他", icon: "🛍️", className: "bg-gray-50 text-gray-600" },
+const productTypes: ProductType[] = ["physical", "digital", "service", "workshop", "other"];
+
+const statusLabels: Record<string, { label: string; color: string }> = {
+  pending: { label: "待付款", color: "bg-gray-100 text-gray-500" },
+  paid: { label: "已付款", color: "bg-yellow-50 text-yellow-700" },
+  processing: { label: "處理中", color: "bg-blue-50 text-blue-700" },
+  shipped: { label: "已寄出", color: "bg-purple-50 text-purple-700" },
+  delivered: { label: "已完成", color: "bg-green-50 text-green-700" },
+  cancelled: { label: "已取消", color: "bg-red-50 text-red-500" },
 };
 
 export default function ProductsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripeComplete, setStripeComplete] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"products" | "orders">("products");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadProducts() {
+    async function load() {
       setLoading(true);
       const {
         data: { user },
@@ -83,20 +109,31 @@ export default function ProductsPage() {
         return;
       }
 
-      const { data } = await supabase
-        .from("egg_digital_products")
-        .select("*")
-        .eq("creator_id", profile.id)
-        .order("created_at", { ascending: false });
+      const [{ data: productData }, { data: orderData }] = await Promise.all([
+        supabase.from("egg_digital_products").select("*").eq("creator_id", profile.id).order("created_at", { ascending: false }),
+        supabase.from("egg_product_orders").select("*").eq("creator_id", profile.id).order("created_at", { ascending: false }),
+      ]);
 
       if (!cancelled) {
         setProfileId(profile.id);
-        setProducts((data ?? []) as Product[]);
+        setProducts((productData ?? []) as Product[]);
+        setOrders((orderData ?? []) as Order[]);
         setLoading(false);
       }
     }
 
-    void loadProducts();
+    async function loadStripeStatus() {
+      const res = await fetch("/api/stripe/connect/status");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!cancelled) {
+        setStripeConnected(Boolean(data.connected));
+        setStripeComplete(Boolean(data.complete));
+      }
+    }
+
+    void load();
+    void loadStripeStatus();
     return () => {
       cancelled = true;
     };
@@ -110,6 +147,15 @@ export default function ProductsPage() {
   function openEditModal(product: Product) {
     setEditingProduct(product);
     setModalOpen(true);
+  }
+
+  async function handleStripeOnboard() {
+    setStripeLoading(true);
+    const res = await fetch("/api/stripe/connect/onboard", { method: "POST" });
+    const data = await res.json();
+    setStripeLoading(false);
+    if (data.url) window.location.href = data.url;
+    else alert(data.error ?? "未能建立 Stripe 連結");
   }
 
   async function updateProduct(id: string, updates: Partial<Product>) {
@@ -131,6 +177,14 @@ export default function ProductsPage() {
     setProducts((current) => current.filter((product) => product.id !== id));
   }
 
+  async function reloadOrders() {
+    if (!profileId) return;
+    setOrdersLoading(true);
+    const { data } = await supabase.from("egg_product_orders").select("*").eq("creator_id", profileId).order("created_at", { ascending: false });
+    setOrders((data ?? []) as Order[]);
+    setOrdersLoading(false);
+  }
+
   function handleSaved(product: Product) {
     setProducts((current) => {
       const exists = current.some((item) => item.id === product.id);
@@ -148,26 +202,83 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-black text-zinc-950">我的貨品</h1>
           <p className="mt-2 text-zinc-500">管理你想推介或出售的產品</p>
         </div>
-        <button onClick={openAddModal} className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
-          + 新增貨品
+        <button onClick={openAddModal} className="flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
+          <Plus size={16} />
+          新增貨品
         </button>
       </div>
 
-      {loading ? (
-        <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
-      ) : products.length === 0 ? (
-        <div className="rounded-2xl border bg-white py-16 text-center">
-          <p className="text-sm text-zinc-400">暫未有貨品</p>
-          <button onClick={openAddModal} className="mt-3 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">
-            新增第一件貨品
+      {!stripeComplete && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
+          <div>
+            <p className="text-sm font-medium text-orange-800">連結 Stripe 收款帳戶</p>
+            <p className="mt-0.5 text-xs text-orange-600">連結後買家可直接喺你的貨品頁付款，款項直接入帳</p>
+          </div>
+          <button
+            onClick={handleStripeOnboard}
+            disabled={stripeLoading}
+            className="rounded-xl bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
+          >
+            {stripeLoading ? "連結中..." : stripeConnected ? "繼續設定" : "立即連結"}
           </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} onEdit={openEditModal} onUpdate={updateProduct} onDelete={deleteProduct} />
-          ))}
-        </div>
+      )}
+
+      <div className="flex border-b">
+        <button
+          onClick={() => setActiveTab("products")}
+          className={`px-5 py-3 text-sm font-medium border-b-2 transition ${activeTab === "products" ? "border-black text-black" : "border-transparent text-gray-400"}`}
+        >
+          我的貨品
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("orders");
+            void reloadOrders();
+          }}
+          className={`px-5 py-3 text-sm font-medium border-b-2 transition ${activeTab === "orders" ? "border-black text-black" : "border-transparent text-gray-400"}`}
+        >
+          訂單管理
+        </button>
+      </div>
+
+      {activeTab === "products" && (
+        <>
+          {loading ? (
+            <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+          ) : products.length === 0 ? (
+            <div className="rounded-2xl border bg-white py-16 text-center">
+              <p className="text-sm text-zinc-400">暫未有貨品</p>
+              <button onClick={openAddModal} className="mt-3 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">
+                新增第一件貨品
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} onEdit={openEditModal} onUpdate={updateProduct} onDelete={deleteProduct} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {activeTab === "orders" && (
+        <>
+          {ordersLoading ? (
+            <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+          ) : orders.length === 0 ? (
+            <div className="rounded-2xl border bg-white py-16 text-center">
+              <p className="text-sm text-zinc-400">暫未有訂單</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              {orders.map((order) => (
+                <OrderCard key={order.id} order={order} onUpdated={reloadOrders} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {modalOpen && profileId && (
@@ -196,7 +307,9 @@ function ProductCard({
   onDelete: (id: string) => Promise<void>;
   onEdit: (product: Product) => void;
 }) {
-  const meta = typeMeta[product.product_type ?? "other"] ?? typeMeta.other;
+  const kind = product.product_type ?? "other";
+  const badgeClass = productTypeBadgeClasses[kind] ?? productTypeBadgeClasses.other;
+  const label = productTypeLabels[kind] ?? productTypeLabels.other;
 
   return (
     <div className="overflow-hidden rounded-xl border bg-white">
@@ -204,7 +317,9 @@ function ProductCard({
         // eslint-disable-next-line @next/next/no-img-element
         <img src={product.thumbnail_url} className="h-40 w-full object-cover" alt={product.title} />
       ) : (
-        <div className="flex h-40 w-full items-center justify-center bg-gray-100 text-4xl">{meta.icon}</div>
+        <div className="flex h-40 w-full items-center justify-center bg-gray-100">
+          <ProductTypeIcon type={kind} size={40} />
+        </div>
       )}
       <div className="p-3">
         <div className="flex items-start justify-between gap-2">
@@ -218,30 +333,31 @@ function ProductCard({
               <p className="mt-0.5 text-xs text-gray-400">免費</p>
             )}
           </div>
-          <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${meta.className}`}>{meta.label}</span>
+          <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${badgeClass}`}>{label}</span>
         </div>
 
         {product.external_url && (
           <a href={product.external_url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-xs text-blue-500 hover:underline">
-            🔗 {product.external_url}
+            {product.external_url}
           </a>
         )}
 
         <div className="mt-3 flex items-center justify-between">
-          <label className="flex cursor-pointer items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={product.is_active ?? false}
-              onChange={() => onUpdate(product.id, { is_active: !(product.is_active ?? false) })}
-              className="h-3.5 w-3.5"
-            />
-            <span className="text-xs text-gray-500">公開顯示</span>
-          </label>
+          <button
+            onClick={() => onUpdate(product.id, { is_active: !(product.is_active ?? false) })}
+            className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-500"
+            type="button"
+          >
+            {product.is_active ? <Eye size={14} /> : <EyeOff size={14} />}
+            {product.is_active ? "公開顯示" : "已隱藏"}
+          </button>
           <div className="flex gap-1">
-            <button onClick={() => onEdit(product)} className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700">
+            <button onClick={() => onEdit(product)} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-gray-700" type="button">
+              <Pencil size={13} />
               編輯
             </button>
-            <button onClick={() => onDelete(product.id)} className="px-2 py-1 text-xs text-red-400 hover:text-red-600">
+            <button onClick={() => onDelete(product.id)} className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-600" type="button">
+              <Trash2 size={13} />
               刪除
             </button>
           </div>
@@ -329,16 +445,17 @@ function ProductModal({
           <div>
             <label className="mb-2 block text-sm font-medium">產品類型</label>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-              {Object.entries(typeMeta).map(([value, meta]) => (
+              {productTypes.map((value) => (
                 <button
                   key={value}
-                  onClick={() => setField("product_type", value as ProductType)}
-                  className={`rounded-xl border px-3 py-2 text-xs ${
+                  onClick={() => setField("product_type", value)}
+                  className={`flex items-center justify-center gap-1 rounded-xl border px-3 py-2 text-xs ${
                     form.product_type === value ? "border-black bg-black text-white" : "border-gray-200 bg-white text-gray-600"
                   }`}
                   type="button"
                 >
-                  {meta.icon} {meta.label}
+                  <ProductTypeIcon type={value} size={14} />
+                  {productTypeLabels[value]}
                 </button>
               ))}
             </div>
@@ -428,6 +545,97 @@ function ProductModal({
           outline: none;
         }
       `}</style>
+    </div>
+  );
+}
+
+function OrderCard({ order, onUpdated }: { order: Order; onUpdated: () => Promise<void> }) {
+  const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? "");
+  const [loading, setLoading] = useState(false);
+  const badge = statusLabels[order.status ?? "pending"] ?? statusLabels.pending;
+
+  async function updateStatus(status: string, tracking?: string) {
+    setLoading(true);
+    const res = await fetch("/api/orders/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        order_id: order.id,
+        status,
+        tracking_number: tracking ?? trackingNumber,
+      }),
+    });
+    setLoading(false);
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error ?? "更新訂單失敗");
+      return;
+    }
+    await onUpdated();
+  }
+
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-medium">{order.product_title ?? "未命名貨品"}</h3>
+          <p className="mt-0.5 text-xs text-gray-400">
+            {order.buyer_name ?? "未提供姓名"} · {order.buyer_email ?? "未提供電郵"}
+          </p>
+          <p className="mt-1 text-sm font-semibold">
+            {order.currency ?? "HKD"} {order.amount ?? 0}
+          </p>
+        </div>
+        <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge.color}`}>{badge.label}</span>
+      </div>
+
+      {order.delivery_address && (
+        <div className="mb-3 rounded-lg bg-gray-50 p-3">
+          <p className="mb-1 text-xs text-gray-500">寄送地址</p>
+          <p className="text-xs text-gray-700">{order.delivery_name}</p>
+          <p className="text-xs text-gray-700">
+            {order.delivery_district} {order.delivery_address}
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {order.status === "paid" && (
+          <button onClick={() => updateStatus("processing")} disabled={loading} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+            開始處理
+          </button>
+        )}
+        {order.status === "processing" && order.delivery_address && (
+          <div className="flex w-full gap-2">
+            <input
+              value={trackingNumber}
+              onChange={(event) => setTrackingNumber(event.target.value)}
+              placeholder="填寫運單號碼"
+              className="flex-1 rounded-lg border bg-white px-3 py-1.5 text-xs"
+            />
+            <button
+              onClick={() => updateStatus("shipped", trackingNumber)}
+              disabled={loading || !trackingNumber}
+              className="rounded-lg bg-purple-600 px-3 py-1.5 text-xs text-white disabled:opacity-40"
+            >
+              標記已寄出
+            </button>
+          </div>
+        )}
+        {order.status === "processing" && !order.delivery_address && (
+          <button onClick={() => updateStatus("delivered")} disabled={loading} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+            標記已完成
+          </button>
+        )}
+        {order.status === "shipped" && (
+          <button onClick={() => updateStatus("delivered")} disabled={loading} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+            確認已送達
+          </button>
+        )}
+      </div>
+
+      {order.tracking_number && <p className="mt-2 text-xs text-gray-500">運單號：{order.tracking_number}</p>}
+      <p className="mt-2 text-xs text-gray-300">{new Date(order.created_at).toLocaleString("zh-HK")}</p>
     </div>
   );
 }

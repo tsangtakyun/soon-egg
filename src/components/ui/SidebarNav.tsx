@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, Home, Lightbulb, Package, UserRound, WandSparkles, Zap } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileText, Home, Lightbulb, Package, UserRound, WandSparkles, Zap } from "lucide-react";
 
 const items = [
   { href: "/dashboard", label: "主頁", icon: Home },
@@ -16,7 +16,10 @@ const items = [
   { href: "/credits", label: "Credits", icon: Zap },
 ];
 
-const toolItems = [{ href: "/tools/idea", label: "靈感工作台", icon: Lightbulb }];
+const toolItems = [
+  { href: "/tools/idea", label: "靈感工作台", icon: Lightbulb },
+  { href: "/tools/script", label: "劇本工作台", icon: FileText },
+];
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -55,6 +58,7 @@ export function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
               active ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
             }`}

@@ -14,6 +14,7 @@ type CreditRow = {
 };
 
 export async function getCreditBalance(email: string): Promise<number> {
+  if (!email) return 0;
   try {
     const { data } = await (masterSupabase as any).from("user_credits").select("balance").eq("email", email).maybeSingle();
     return data?.balance ?? 0;
@@ -125,12 +126,14 @@ export async function addCredits({
   return { success: true, balance: newBalance };
 }
 
-export async function initKolCredits(email: string, userId: string): Promise<void> {
-  const { data } = await (masterSupabase as any).from("user_credits").select("user_id").eq("email", email).maybeSingle();
-  if (data) return;
+export async function initKolCredits(email: string, eggUserId: string): Promise<void> {
+  if (!email) return;
 
-  await (masterSupabase as any).from("user_credits").insert({
-    user_id: userId,
+  const { data: existing } = await (masterSupabase as any).from("user_credits").select("email").eq("email", email).maybeSingle();
+  if (existing) return;
+
+  const { error } = await (masterSupabase as any).from("user_credits").insert({
+    user_id: eggUserId,
     email,
     balance: 300,
     total_purchased: 0,
@@ -138,13 +141,20 @@ export async function initKolCredits(email: string, userId: string): Promise<voi
     source: "soon_egg",
   });
 
+  if (error) {
+    console.error("[credits] initKolCredits error:", error);
+    return;
+  }
+
   await (masterSupabase as any).from("credit_transactions").insert({
-    user_id: userId,
+    user_id: eggUserId,
     email,
     amount: 300,
     balance_after: 300,
     type: "signup_bonus",
-    description: "新 KOL 歡迎禮遇",
+    description: "新 KOL 歡迎禮遇 — 300 Credits",
     platform: "soon_egg",
   });
+
+  console.log("[credits] initKolCredits success:", email);
 }

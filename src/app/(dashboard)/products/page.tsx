@@ -151,11 +151,27 @@ export default function ProductsPage() {
 
   async function handleStripeOnboard() {
     setStripeLoading(true);
-    const res = await fetch("/api/stripe/connect/onboard", { method: "POST" });
-    const data = await res.json();
-    setStripeLoading(false);
-    if (data.url) window.location.href = data.url;
-    else alert(data.error ?? "未能建立 Stripe 連結");
+    try {
+      const res = await fetch("/api/stripe/connect/onboard", { method: "POST" });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
+
+      if (!res.ok) {
+        alert(data.error ?? "未能建立 Stripe 連結");
+        return;
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+
+      alert("未能建立 Stripe 連結");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "未能建立 Stripe 連結");
+    } finally {
+      setStripeLoading(false);
+    }
   }
 
   async function updateProduct(id: string, updates: Partial<Product>) {

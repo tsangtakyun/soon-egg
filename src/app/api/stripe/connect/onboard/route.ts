@@ -23,42 +23,47 @@ function appUrl(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const serverSupabase = await createServerClient();
-  if (!serverSupabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  try {
+    const serverSupabase = await createServerClient();
+    if (!serverSupabase) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
 
-  const {
-    data: { user },
-  } = await serverSupabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const {
+      data: { user },
+    } = await serverSupabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const supabaseAdmin = getSupabaseAdmin() as any;
-  const { data: profile } = await supabaseAdmin.from("egg_creator_profiles").select("id, username, stripe_account_id").eq("user_id", user.id).single();
-  if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    const supabaseAdmin = getSupabaseAdmin() as any;
+    const { data: profile } = await supabaseAdmin.from("egg_creator_profiles").select("id, username, stripe_account_id").eq("user_id", user.id).single();
+    if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
-  let accountId = profile.stripe_account_id as string | null;
-  const stripe = getStripe();
+    let accountId = profile.stripe_account_id as string | null;
+    const stripe = getStripe();
 
-  if (!accountId) {
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "HK",
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        country: "HK",
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+      });
+      accountId = account.id;
+
+      await supabaseAdmin.from("egg_creator_profiles").update({ stripe_account_id: accountId }).eq("id", profile.id);
+    }
+
+    const baseUrl = appUrl(req);
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${baseUrl}/products?stripe=refresh`,
+      return_url: `${baseUrl}/products?stripe=success`,
+      type: "account_onboarding",
     });
-    accountId = account.id;
 
-    await supabaseAdmin.from("egg_creator_profiles").update({ stripe_account_id: accountId }).eq("id", profile.id);
+    return NextResponse.json({ url: accountLink.url });
+  } catch (error) {
+    console.error("[stripe/connect/onboard]", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Stripe onboarding failed" }, { status: 500 });
   }
-
-  const baseUrl = appUrl(req);
-  const accountLink = await stripe.accountLinks.create({
-    account: accountId,
-    refresh_url: `${baseUrl}/products?stripe=refresh`,
-    return_url: `${baseUrl}/products?stripe=success`,
-    type: "account_onboarding",
-  });
-
-  return NextResponse.json({ url: accountLink.url });
 }

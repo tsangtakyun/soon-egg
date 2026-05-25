@@ -55,7 +55,15 @@ export default async function CreditsPage({ searchParams }: { searchParams: Prom
   return (
     <main className="space-y-8 pt-[10vh]">
       {params.success && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">Credits 購買成功，餘額已更新。</div>}
-      {params.insufficient && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">Credits 不足，請先增值。</div>}
+      {params.insufficient === "tools" && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+          <p className="text-sm font-medium text-orange-700">Credits 不足</p>
+          <p className="mt-0.5 text-xs text-orange-600">使用創作工具需要 10 credits，請先購買。</p>
+        </div>
+      )}
+      {params.insufficient && params.insufficient !== "tools" && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">Credits 不足，請先增值。</div>
+      )}
 
       <div className="rounded-2xl bg-gradient-to-r from-purple-600 to-purple-800 p-6 text-white">
         <p className="text-sm opacity-75">可用 Credits</p>

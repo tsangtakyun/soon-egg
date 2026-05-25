@@ -12,8 +12,13 @@ function getMasterSupabase() {
     throw new Error("SOON Core Supabase env vars are missing");
   }
 
+  console.log("[master] key prefix:", serviceKey.substring(0, 30));
+
   client = createClient(url, serviceKey, {
-    auth: { persistSession: false },
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
   });
 
   return client;

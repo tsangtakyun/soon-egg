@@ -19,6 +19,11 @@ const items = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const isActive = (href: string) => {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/brand-deals") return pathname === "/brand-deals";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
   return (
     <aside className="hidden min-h-screen w-72 shrink-0 border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:block">
@@ -34,7 +39,7 @@ export function Sidebar() {
       <nav className="mt-6 space-y-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+          const active = isActive(item.href);
           return (
             <Link
               key={item.href}

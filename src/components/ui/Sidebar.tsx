@@ -1,28 +1,16 @@
-"use client";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, CreditCard, Home, Package, Settings, UserRound, WandSparkles } from "lucide-react";
+import { CreditCard, Settings } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getCreditBalance } from "@/lib/credits";
 import { CreditBadge } from "./CreditBadge";
+import { SidebarNav } from "./SidebarNav";
 
-const items = [
-  { href: "/dashboard", label: "主頁", icon: Home },
-  { href: "/profile", label: "我的主頁", icon: UserRound },
-  { href: "/media-kit", label: "Media Kit", icon: WandSparkles },
-  { href: "/brand-deals", label: "品牌合作", icon: BriefcaseBusiness },
-  { href: "/brand-deals/discover", label: "探索品牌", icon: BriefcaseBusiness },
-  { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
-  { href: "/products", label: "數位產品", icon: Package },
-  { href: "/analytics", label: "數據分析", icon: BarChart3 },
-];
-
-export function Sidebar() {
-  const pathname = usePathname();
-  const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    if (href === "/brand-deals") return pathname === "/brand-deals";
-    return pathname === href || pathname.startsWith(`${href}/`);
-  };
+export async function Sidebar() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+  const balance = user?.email ? await getCreditBalance(user.email) : 0;
 
   return (
     <aside className="hidden min-h-screen w-72 shrink-0 border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:block">
@@ -32,27 +20,10 @@ export function Sidebar() {
       </Link>
 
       <div className="mt-6 px-2">
-        <CreditBadge credits={300} />
+        <CreditBadge credits={balance} />
       </div>
 
-      <nav className="mt-6 space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-                active ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
-              }`}
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <SidebarNav />
 
       <div className="mt-8 border-t border-zinc-200 pt-4">
         <Link href="/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { initKolCredits } from "@/lib/credits";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -9,6 +10,16 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     await supabase?.auth.exchangeCodeForSession(code);
+    const {
+      data: { user },
+    } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+    if (user?.email) {
+      try {
+        await initKolCredits(user.email, user.id);
+      } catch (error) {
+        console.error("[auth/callback] init credits failed:", error);
+      }
+    }
   }
 
   if (next === "auto" && supabase) {

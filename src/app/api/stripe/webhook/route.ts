@@ -36,6 +36,18 @@ export async function POST(req: Request) {
     const meta = session.metadata ?? {};
     const supabaseAdmin = getSupabaseAdmin() as any;
 
+    if (meta.type === "credit_purchase") {
+      const { addCredits } = await import("@/lib/credits");
+      await addCredits({
+        email: meta.user_email ?? "",
+        amount: Number.parseInt(meta.credits ?? "0", 10),
+        type: "purchase",
+        description: "購買 Credits",
+        stripe_session_id: session.id,
+      });
+      return NextResponse.json({ received: true });
+    }
+
     const { data: profile } = await supabaseAdmin.from("egg_creator_profiles").select("id").eq("username", meta.creator_username).single();
     if (!profile) return NextResponse.json({ received: true });
 

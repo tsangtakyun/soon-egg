@@ -5,7 +5,7 @@ export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
   const pathname = request.nextUrl.pathname;
   const host = request.headers.get("host");
-  const protectedRoutes = ["/onboarding", "/dashboard", "/profile", "/media-kit", "/brand-deals", "/active-deals", "/products", "/analytics"];
+  const protectedRoutes = ["/onboarding", "/dashboard", "/profile", "/media-kit", "/brand-deals", "/active-deals", "/products", "/analytics", "/credits"];
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

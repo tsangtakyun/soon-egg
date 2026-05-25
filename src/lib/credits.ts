@@ -20,7 +20,6 @@ export async function getCreditBalance(email: string): Promise<number> {
   }
   try {
     const { data, error } = await (masterSupabase as any).from("user_credits").select("balance").eq("email", email).maybeSingle();
-    console.log("[credits] getCreditBalance:", email, "→", data?.balance, error?.message);
     return data?.balance ?? 0;
   } catch (err) {
     console.error("[credits] getCreditBalance exception:", err);
@@ -141,7 +140,6 @@ export async function initKolCredits(email: string, eggUserId: string): Promise<
     }
 
     if (existing) {
-      console.log("[credits] already initialized:", email);
       return;
     }
 
@@ -169,7 +167,6 @@ export async function initKolCredits(email: string, eggUserId: string): Promise<
       platform: "soon_egg",
     });
 
-    console.log("[credits] initKolCredits success:", email);
   } catch (err) {
     console.error("[credits] initKolCredits exception:", err);
   }

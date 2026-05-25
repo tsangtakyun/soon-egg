@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, FileText, Home, Lightbulb, Package, UserRound, WandSparkles, Zap } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, FileText, Home, Layout, Lightbulb, Package, UserRound, WandSparkles, Zap } from "lucide-react";
 
 const items = [
   { href: "/dashboard", label: "主頁", icon: Home },
@@ -19,6 +19,7 @@ const items = [
 const toolItems = [
   { href: "/tools/idea", label: "靈感工作台", icon: Lightbulb },
   { href: "/tools/script", label: "劇本工作台", icon: FileText },
+  { href: "/tools/storyboard", label: "分鏡工作台", icon: Layout },
 ];
 
 export function SidebarNav() {

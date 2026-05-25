@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Check, Clipboard, FileText, Loader2, Save } from "lucide-react";
 
 export type SavedScript = {
@@ -181,7 +182,16 @@ export function ScriptClient({
             </div>
 
             {generatedScript ? (
-              <div className="whitespace-pre-wrap rounded-2xl bg-zinc-50 p-4 font-mono text-sm leading-7 text-zinc-800">{generatedScript}</div>
+              <>
+                <div className="whitespace-pre-wrap rounded-2xl bg-zinc-50 p-4 font-mono text-sm leading-7 text-zinc-800">{generatedScript}</div>
+                <Link
+                  href={`/tools/storyboard?script=${encodeURIComponent(generatedScript.substring(0, 500))}`}
+                  prefetch={false}
+                  className="mt-3 block text-xs font-medium text-purple-600 hover:underline"
+                >
+                  → 推去分鏡工作台
+                </Link>
+              </>
             ) : (
               <div className="flex min-h-[360px] items-center justify-center rounded-2xl bg-zinc-50 px-6 text-center text-sm text-zinc-400">
                 填寫左邊設定後，生成的劇本會顯示在這裡。

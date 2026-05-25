@@ -19,6 +19,8 @@ type Profile = {
   youtube_handle?: string | null;
 };
 
+type SaveStatus = "idle" | "saving" | "success" | "error";
+
 const categories = [
   "生活美學",
   "美容護膚",
@@ -79,8 +81,8 @@ export function SettingsClient({
     ...defaultNotifications,
     ...(profile?.notification_prefs ?? {}),
   });
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingSocial, setSavingSocial] = useState(false);
+  const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
+  const [socialSaveStatus, setSocialSaveStatus] = useState<SaveStatus>("idle");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const initials = (displayName || profile?.username || userEmail).slice(0, 2).toUpperCase();
@@ -103,8 +105,8 @@ export function SettingsClient({
 
   async function saveProfile() {
     if (!displayName.trim()) return;
-    setSavingProfile(true);
-    await fetch("/api/settings/profile", {
+    setProfileSaveStatus("saving");
+    const res = await fetch("/api/settings/profile", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -114,20 +116,23 @@ export function SettingsClient({
         content_categories: selectedCategories,
       }),
     });
-    setSavingProfile(false);
+    setProfileSaveStatus(res.ok ? "success" : "error");
+    setTimeout(() => setProfileSaveStatus("idle"), 3000);
   }
 
   async function saveSocial() {
-    setSavingSocial(true);
-    await fetch("/api/settings/social", {
+    setSocialSaveStatus("saving");
+    const res = await fetch("/api/settings/social", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(socials),
     });
-    setSavingSocial(false);
+    setSocialSaveStatus(res.ok ? "success" : "error");
+    setTimeout(() => setSocialSaveStatus("idle"), 3000);
   }
 
-  async function saveNotifications(next: Record<string, boolean>) {
+  async function handleToggle(key: string, value: boolean) {
+    const next = { ...notifications, [key]: value };
     setNotifications(next);
     await fetch("/api/settings/notifications", {
       method: "POST",
@@ -217,9 +222,12 @@ export function SettingsClient({
                 ))}
               </div>
             </div>
-            <button onClick={saveProfile} disabled={savingProfile || !displayName.trim()} className={primaryButtonClass}>
-              {savingProfile ? "儲存中..." : "儲存個人資料"}
-            </button>
+            <div className="flex items-center">
+              <button onClick={saveProfile} disabled={profileSaveStatus === "saving" || !displayName.trim()} className={primaryButtonClass}>
+                {profileSaveStatus === "saving" ? "儲存中..." : "儲存個人資料"}
+              </button>
+              <SaveStatusText status={profileSaveStatus} />
+            </div>
           </div>
         </section>
 
@@ -252,9 +260,12 @@ export function SettingsClient({
             <SocialInput label="Facebook" value={socials.facebook_handle} onChange={(value) => setSocials({ ...socials, facebook_handle: value })} />
             <SocialInput label="Threads" value={socials.threads_handle} onChange={(value) => setSocials({ ...socials, threads_handle: value })} />
           </div>
-          <button onClick={saveSocial} disabled={savingSocial} className={`${primaryButtonClass} mt-4`}>
-            {savingSocial ? "儲存中..." : "儲存社交帳號"}
-          </button>
+          <div className="mt-4 flex items-center">
+            <button onClick={saveSocial} disabled={socialSaveStatus === "saving"} className={primaryButtonClass}>
+              {socialSaveStatus === "saving" ? "儲存中..." : "儲存社交帳號"}
+            </button>
+            <SaveStatusText status={socialSaveStatus} />
+          </div>
         </section>
 
         <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
@@ -298,7 +309,7 @@ export function SettingsClient({
                 </div>
                 <button
                   type="button"
-                  onClick={() => saveNotifications({ ...notifications, [option.key]: !notifications[option.key] })}
+                  onClick={() => handleToggle(option.key, !notifications[option.key])}
                   className={`relative h-6 w-11 rounded-full transition ${notifications[option.key] ? "bg-purple-600" : "bg-gray-200"}`}
                 >
                   <span
@@ -344,6 +355,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   );
+}
+
+function SaveStatusText({ status }: { status: SaveStatus }) {
+  if (status === "success") return <span className="ml-3 text-xs text-green-600">✓ 已儲存</span>;
+  if (status === "error") return <span className="ml-3 text-xs text-red-500">儲存失敗，請重試</span>;
+  if (status === "saving") return <span className="ml-3 text-xs text-gray-400">儲存中...</span>;
+  return null;
 }
 
 function SocialRow({ icon, label, children }: { icon?: React.ReactNode; label: string; children: React.ReactNode }) {

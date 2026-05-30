@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BriefcaseBusiness, CreditCard, Home, Mail, Package, Settings, UserRound, WandSparkles } from "lucide-react";
-import { CreditBadge } from "./CreditBadge";
+import { BarChart3, BriefcaseBusiness, CreditCard, Home, Mail, Package, Settings, UserRound, WandSparkles, Wrench } from "lucide-react";
+import { CreditBalance } from "@/components/credits/CreditBalance";
 
 const items = [
   { href: "/dashboard", label: "主頁", icon: Home },
@@ -13,6 +13,7 @@ const items = [
   { href: "/brand-deals/discover", label: "探索品牌", icon: BriefcaseBusiness },
   { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
   { href: "/products", label: "數位產品", icon: Package },
+  { href: "/tools", label: "創作工具", icon: Wrench, showCredits: true },
   { href: "/analytics", label: "數據分析", icon: BarChart3 },
   { href: "/onboarding", label: "推廣工具", icon: Mail },
 ];
@@ -28,7 +29,7 @@ export function Sidebar() {
       </Link>
 
       <div className="mt-6 px-2">
-        <CreditBadge credits={300} />
+        <CreditBalance />
       </div>
 
       <nav className="mt-6 space-y-1">
@@ -44,7 +45,8 @@ export function Sidebar() {
               }`}
             >
               <Icon className="h-4 w-4" aria-hidden />
-              {item.label}
+              <span>{item.label}</span>
+              {item.showCredits ? <CreditBalance compact /> : null}
             </Link>
           );
         })}

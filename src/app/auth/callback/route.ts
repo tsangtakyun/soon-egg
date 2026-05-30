@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { syncUserCredits } from "@/lib/credits/syncCredits";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -15,6 +16,10 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
+      if (user.email) {
+        await syncUserCredits(user.id, user.email);
+      }
+
       const { data: profile } = await supabase
         .from("egg_creator_profiles")
         .select("onboarding_completed")

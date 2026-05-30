@@ -1,7 +1,22 @@
+// Run in Master Supabase (fqnnjwxxwxggreoognkv):
+// CREATE TABLE IF NOT EXISTS credit_packages (
+//   id text PRIMARY KEY,
+//   name text,
+//   emoji text,
+//   credits integer,
+//   price_hkd numeric
+// );
+// INSERT INTO credit_packages VALUES
+//   ('starter', 'Starter Pack', '⚡', 300, 38),
+//   ('growth', 'Growth Pack', '🚀', 1000, 98),
+//   ('creator', 'Creator Pack', '✨', 2500, 198),
+//   ('pro', 'Pro Pack', '💎', 6000, 398)
+// ON CONFLICT (id) DO NOTHING;
+
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { masterSupabase } from "@/lib/supabase/master";
+import { masterSupabase } from "@/lib/supabase-master";
 
 let stripeClient: Stripe | null = null;
 

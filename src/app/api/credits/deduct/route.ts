@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { masterSupabaseAdmin } from "@/lib/supabase-master";
 
 const COSTS = {
-  tool_enter: 10,
-  ai_generate: 3,
+  tool_enter: 0,
+  ai_generate: 10,
 } as const;
 
 type CreditAction = keyof typeof COSTS;
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
   const action = body?.action as CreditAction;
   const cost = COSTS[action];
 
-  if (!cost) {
+  if (!action || !(action in COSTS)) {
     return NextResponse.json({ error: "invalid_action" }, { status: 400 });
   }
 
@@ -38,6 +38,14 @@ export async function POST(request: NextRequest) {
 
   const balance = creditRow?.balance ?? 0;
   const totalUsed = creditRow?.total_used ?? 0;
+
+  if (cost === 0) {
+    return NextResponse.json({
+      success: true,
+      balance,
+      deducted: 0,
+    });
+  }
 
   if (balance < cost) {
     return NextResponse.json({ error: "insufficient_credits", balance, required: cost }, { status: 402 });

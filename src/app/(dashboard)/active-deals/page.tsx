@@ -15,6 +15,9 @@ type BrandPerk = {
   description: string | null;
   brand_name?: string | null;
   brand_website?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
 };
 
 type PerkClaim = {
@@ -59,50 +62,19 @@ export default function ActiveDealsPage() {
         return;
       }
 
-      const [{ data: briefData }, perkClaimsResult] = await Promise.all([
+      const [{ data: briefData }, claimsResponse] = await Promise.all([
         supabase
           .from("egg_project_briefs")
           .select("*")
           .eq("creator_id", profileData.id)
           .order("received_at", { ascending: false }),
-        supabase
-          .from("perk_claims")
-          .select(
-            `
-            *,
-            brand_perks!inner(
-              title, type, description,
-              brand_name, brand_website
-            )
-          `
-          )
-          .eq("creator_username", profileData.username)
-          .in("status", ["confirmed", "in_progress", "completed"])
-          .order("updated_at", { ascending: false }),
+        fetch("/api/perks/mine", { cache: "no-store" }),
       ]);
 
-      let activePerkClaims = (perkClaimsResult.data ?? []) as PerkClaim[];
-
-      if (perkClaimsResult.error) {
-        const { data: claimData } = await supabase
-          .from("perk_claims")
-          .select("*")
-          .eq("creator_username", profileData.username)
-          .in("status", ["confirmed", "in_progress", "completed"])
-          .order("updated_at", { ascending: false });
-
-        const claims = (claimData ?? []) as PerkClaim[];
-        const perkIds = Array.from(new Set(claims.map((claim) => claim.perk_id).filter(Boolean)));
-        const { data: perkData } =
-          perkIds.length > 0
-            ? await supabase.from("brand_perks").select("id,title,type,description,brand_name,brand_website").in("id", perkIds)
-            : { data: [] };
-        const perkById = new Map((perkData ?? []).map((perk) => [perk.id, perk]));
-        activePerkClaims = claims.map((claim) => ({
-          ...claim,
-          brand_perks: perkById.get(claim.perk_id) ?? null,
-        })) as PerkClaim[];
-      }
+      const claimsPayload = claimsResponse.ok ? await claimsResponse.json() : { claims: [] };
+      const activePerkClaims = ((claimsPayload.claims ?? []) as PerkClaim[]).filter((claim) =>
+        ["confirmed", "in_progress", "completed"].includes(claim.status ?? "")
+      );
 
       if (!cancelled) {
         setProfile(profileData as Profile);
@@ -209,6 +181,14 @@ function PerkClaimCard({ claim }: { claim: PerkClaim }) {
       {claim.brand_notes && (
         <div className="mt-2 rounded-lg bg-blue-50 px-3 py-2">
           <p className="text-xs text-blue-700">品牌備注：{claim.brand_notes}</p>
+        </div>
+      )}
+      {(perk.contact_name || perk.contact_phone || perk.contact_email) && (
+        <div className="mt-3 rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          <p className="font-medium text-zinc-800">品牌聯絡資料</p>
+          {perk.contact_name && <p className="mt-1">聯絡人：{perk.contact_name}</p>}
+          {perk.contact_phone && <p>電話：{perk.contact_phone}</p>}
+          {perk.contact_email && <p>電郵：{perk.contact_email}</p>}
         </div>
       )}
     </div>

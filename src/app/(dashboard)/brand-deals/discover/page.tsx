@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 type PerkType = "service" | "product";
 type FilterType = "all" | PerkType;
@@ -25,7 +24,6 @@ const timeSlots = ["上午 10:00-12:00", "下午 12:00-14:00", "下午 14:00-17:
 const districts = ["香港島", "九龍", "新界", "離島"];
 
 export default function DiscoverBrandsPage() {
-  const supabase = useMemo(() => createClient(), []);
   const [perks, setPerks] = useState<Perk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,18 +43,11 @@ export default function DiscoverBrandsPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load perks");
 
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        let myClaimMap: Record<string, string> = {};
-        if (user?.id) {
-          const { data: profile } = await supabase.from("egg_creator_profiles").select("id").eq("user_id", user.id).single();
-          if (profile?.id) {
-            const { data: myClaims } = await supabase.from("perk_claims").select("perk_id, status").eq("creator_id", profile.id);
-            myClaimMap = Object.fromEntries((myClaims ?? []).map((claim) => [claim.perk_id as string, (claim.status as string | null) || "pending"]));
-          }
-        }
+        const claimsResponse = await fetch("/api/perks/mine", { cache: "no-store" });
+        const claimsPayload = claimsResponse.ok ? await claimsResponse.json() : { claims: [] };
+        const myClaimMap = Object.fromEntries(
+          (claimsPayload.claims ?? []).map((claim: { perk_id: string; status: string | null }) => [claim.perk_id, claim.status || "pending"])
+        );
 
         if (!cancelled) {
           setPerks((data.perks ?? []) as Perk[]);
@@ -74,7 +65,7 @@ export default function DiscoverBrandsPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, []);
 
   const filteredPerks = useMemo(() => (filter === "all" ? perks : perks.filter((perk) => perk.type === filter)), [filter, perks]);
 

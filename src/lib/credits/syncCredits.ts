@@ -1,6 +1,8 @@
-import { masterSupabaseAdmin } from "@/lib/supabase-master";
+import { getMasterSupabaseAdmin } from "@/lib/supabase-master";
 
 export async function syncUserCredits(eggUserId: string, email: string) {
+  const masterSupabaseAdmin = getMasterSupabaseAdmin();
+  if (!masterSupabaseAdmin) return;
   const normalizedEmail = email.trim().toLowerCase();
   if (!eggUserId || !normalizedEmail) return;
 

@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { masterSupabaseAdmin } from "@/lib/supabase-master";
+import { getMasterSupabaseAdmin } from "@/lib/supabase-master";
 
 type ToolKey = "ideas" | "scripts" | "projects" | "schedules" | "reply_threads" | "soon_ai";
 
@@ -27,6 +27,8 @@ type MasterRow = {
 };
 
 async function getMasterIdentity() {
+  const masterSupabaseAdmin = getMasterSupabaseAdmin();
+  if (!masterSupabaseAdmin) return null;
   const supabase = await createClient();
   const { data: { user } = { user: null } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
   const email = user?.email?.trim().toLowerCase();
@@ -139,13 +141,15 @@ function rowBody(row: MasterRow, tool: ToolKey) {
 export async function MasterToolPage({ tool }: { tool: ToolKey }) {
   const config = toolConfig[tool];
   const identity = await getMasterIdentity();
+  const masterSupabaseAdmin = getMasterSupabaseAdmin();
 
   async function createItem(formData: FormData) {
     "use server";
 
     const nextIdentity = await getMasterIdentity();
+    const masterSupabaseAdmin = getMasterSupabaseAdmin();
     const nextConfig = toolConfig[tool];
-    if (!nextIdentity || !nextConfig.table) return;
+    if (!nextIdentity || !nextConfig.table || !masterSupabaseAdmin) return;
 
     const title = String(formData.get("title") || "").trim();
     const notes = String(formData.get("notes") || "").trim();
@@ -160,7 +164,7 @@ export async function MasterToolPage({ tool }: { tool: ToolKey }) {
     revalidatePath(`/tools/${tool === "ideas" ? "idea-library" : tool === "scripts" ? "script-generator" : tool === "projects" ? "work-board" : tool === "reply_threads" ? "reply-centre" : tool === "soon_ai" ? "soon-ai" : "schedule"}`);
   }
 
-  if (!identity) {
+  if (!identity || !masterSupabaseAdmin) {
     return (
       <div className="px-6 py-6">
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">

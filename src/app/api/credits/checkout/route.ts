@@ -16,7 +16,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { masterSupabase } from "@/lib/supabase-master";
+import { getMasterSupabase } from "@/lib/supabase-master";
 
 let stripeClient: Stripe | null = null;
 
@@ -46,7 +46,10 @@ export async function POST(req: Request) {
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { package_id } = await req.json();
-  const { data: pkg } = await (masterSupabase as any).from("credit_packages").select("*").eq("id", package_id).single();
+  const masterSupabase = getMasterSupabase();
+  const { data: pkg } = masterSupabase
+    ? await masterSupabase.from("credit_packages").select("*").eq("id", package_id).single()
+    : { data: null };
   const selectedPackage = pkg ?? fallbackPackages.find((item) => item.id === package_id);
   if (!selectedPackage) return NextResponse.json({ error: "Package not found" }, { status: 404 });
 

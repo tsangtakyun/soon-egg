@@ -2,15 +2,23 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
-const supabaseAdmin = createSupabaseAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+export const dynamic = "force-dynamic";
+
+function createAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) return null;
+  return createSupabaseAdminClient(url, serviceRoleKey, { auth: { persistSession: false } });
+}
 
 const CONTACT_VISIBLE_STATUSES = new Set(["confirmed", "in_progress", "completed"]);
 
 export async function GET() {
+  const supabaseAdmin = createAdminClient();
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: "Supabase service role env is missing" }, { status: 500 });
+  }
+
   const serverSupabase = await createServerClient();
   const {
     data: { user },
@@ -82,4 +90,3 @@ export async function GET() {
     })),
   });
 }
-

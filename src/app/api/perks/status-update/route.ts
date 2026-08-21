@@ -1,11 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+export const dynamic = "force-dynamic";
+
+function createAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) return null;
+  return createClient(url, serviceRoleKey, { auth: { persistSession: false } });
+}
 
 type StatusUpdateBody = {
   perk_id?: string;
@@ -18,6 +21,11 @@ export async function POST(req: Request) {
   const apiKey = req.headers.get("x-soon-api-key");
   if (apiKey !== process.env.SOON_INTERNAL_API_KEY) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabase = createAdminClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase service role env is missing" }, { status: 500 });
   }
 
   const { perk_id, creator_username, status, brand_notes } = (await req.json()) as StatusUpdateBody;

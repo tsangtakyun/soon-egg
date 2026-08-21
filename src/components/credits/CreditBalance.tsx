@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { Coins } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { masterSupabase } from "@/lib/supabase-master";
+import { getMasterSupabase } from "@/lib/supabase-master";
 
 export function CreditBalance({ compact = false }: { compact?: boolean }) {
   const [balance, setBalance] = useState<number | null>(null);
 
   const loadBalance = useCallback(async () => {
+    const masterSupabase = getMasterSupabase();
+    if (!masterSupabase) {
+      setBalance(null);
+      return;
+    }
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const email = user?.email?.trim().toLowerCase();

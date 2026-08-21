@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { masterSupabaseAdmin } from "@/lib/supabase-master";
+import { getMasterSupabaseAdmin } from "@/lib/supabase-master";
 
 const COSTS = {
   tool_enter: 0,
@@ -10,6 +10,10 @@ const COSTS = {
 type CreditAction = keyof typeof COSTS;
 
 export async function POST(request: NextRequest) {
+  const masterSupabaseAdmin = getMasterSupabaseAdmin();
+  if (!masterSupabaseAdmin) {
+    return NextResponse.json({ error: "master_supabase_not_configured" }, { status: 500 });
+  }
   const supabase = await createClient();
   const { data: { user } = { user: null } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
 

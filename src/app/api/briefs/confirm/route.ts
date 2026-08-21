@@ -3,13 +3,16 @@ import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { logDealActivity } from "@/lib/deals-activity";
 
-const supabaseAdmin = createSupabaseAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
+export const dynamic = "force-dynamic";
+
+function createAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) return null;
+  return createSupabaseAdminClient(url, serviceRoleKey, {
     auth: { persistSession: false },
-  }
-);
+  });
+}
 
 type ConfirmBriefBody = {
   brief_id?: string;
@@ -19,6 +22,11 @@ type ConfirmBriefBody = {
 };
 
 export async function POST(req: Request) {
+  const supabaseAdmin = createAdminClient();
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: "Supabase service role env is missing" }, { status: 500 });
+  }
+
   const serverSupabase = await createServerClient();
   if (!serverSupabase) {
     return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });

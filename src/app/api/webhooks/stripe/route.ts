@@ -1,11 +1,18 @@
 import Stripe from "stripe";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { masterSupabaseAdmin } from "@/lib/supabase-master";
+import { getMasterSupabaseAdmin } from "@/lib/supabase-master";
 
 export const runtime = "nodejs";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+let stripeClient: Stripe | null = null;
+
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  if (!stripeClient) stripeClient = new Stripe(key);
+  return stripeClient;
+}
 
 const MONTHLY_CREDITS_BY_PRICE_ID: Record<string, number> = {
   price_1Tb6uZQ7196tVqUaEFWWDZJ9: 800,
@@ -17,6 +24,8 @@ function normalizeEmail(email?: string | null) {
 }
 
 async function upsertCredits(email: string, credits: number, source: string) {
+  const masterSupabaseAdmin = getMasterSupabaseAdmin();
+  if (!masterSupabaseAdmin) throw new Error("Master Supabase env vars are missing");
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || credits <= 0) return;
 
@@ -58,7 +67,7 @@ function priceIdFromInvoice(invoice: Stripe.Invoice) {
   return line?.price?.id ?? line?.pricing?.price_details?.price ?? null;
 }
 
-async function getSubscriptionMetadata(invoice: Stripe.Invoice) {
+async function getSubscriptionMetadata(stripe: Stripe, invoice: Stripe.Invoice) {
   const invoiceWithSubscription = invoice as unknown as {
     subscription?: string | { id?: string };
     parent?: { subscription_details?: { subscription?: string; metadata?: Stripe.Metadata } };
@@ -76,11 +85,12 @@ async function getSubscriptionMetadata(invoice: Stripe.Invoice) {
 }
 
 export async function POST(req: NextRequest) {
+  const stripe = getStripe();
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!sig || !secret) {
+  if (!sig || !secret || !stripe) {
     return NextResponse.json({ error: "Missing Stripe webhook config" }, { status: 400 });
   }
 
@@ -105,7 +115,7 @@ export async function POST(req: NextRequest) {
 
     if (event.type === "invoice.payment_succeeded") {
       const invoice = event.data.object as Stripe.Invoice;
-      const metadata = await getSubscriptionMetadata(invoice);
+      const metadata = await getSubscriptionMetadata(stripe, invoice);
       const priceId = priceIdFromInvoice(invoice);
       const monthlyCredits = priceId ? MONTHLY_CREDITS_BY_PRICE_ID[priceId] : 0;
       const userEmail = normalizeEmail(invoice.customer_email || metadata.user_email);

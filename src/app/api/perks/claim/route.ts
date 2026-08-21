@@ -2,11 +2,14 @@ import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
-const supabaseAdmin = createSupabaseAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+export const dynamic = "force-dynamic";
+
+function createAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) return null;
+  return createSupabaseAdminClient(url, serviceRoleKey, { auth: { persistSession: false } });
+}
 
 type PerkClaimBody = {
   perk_id?: string;
@@ -26,7 +29,10 @@ function missingColumnName(message?: string) {
   return match?.[1] ?? null;
 }
 
-async function insertLocalPerkClaim(payload: Record<string, unknown>) {
+async function insertLocalPerkClaim(
+  supabaseAdmin: NonNullable<ReturnType<typeof createAdminClient>>,
+  payload: Record<string, unknown>
+) {
   let nextPayload = { ...payload };
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -40,12 +46,18 @@ async function insertLocalPerkClaim(payload: Record<string, unknown>) {
     }
 
     console.warn(`[perks/claim] local perk_claims missing column "${column}", retrying without it`);
-    const { [column]: _removed, ...rest } = nextPayload;
+    const rest = { ...nextPayload };
+    delete rest[column];
     nextPayload = rest;
   }
 }
 
 export async function POST(req: Request) {
+  const supabaseAdmin = createAdminClient();
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: "Supabase service role env is missing" }, { status: 500 });
+  }
+
   const serverSupabase = await createServerClient();
   const {
     data: { user },
@@ -87,7 +99,7 @@ export async function POST(req: Request) {
   };
 
   try {
-    await insertLocalPerkClaim(claimPayload);
+    await insertLocalPerkClaim(supabaseAdmin, claimPayload);
   } catch (localError) {
     console.error("SOON-EGG perk claim insert skipped:", localError);
   }

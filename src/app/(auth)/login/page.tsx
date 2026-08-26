@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -73,11 +74,10 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#f7f7f5] px-4 py-12">
       <section className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/soon-egg.png" alt="SOON-EGG" className="h-12 w-auto object-contain" />
+          <Image src="/soon-egg.png" alt="SOON-EGG" width={160} height={48} className="h-12 w-auto object-contain" priority />
         </div>
         <h1 className="text-center text-2xl font-black text-zinc-950">登入 SOON-EGG</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500">登入後會帶您回到設定流程或主頁。</p>
+        <p className="mt-2 text-center text-sm text-zinc-500">登入後會返回你的設定流程或創作者主頁。</p>
 
         <button
           type="button"
@@ -98,7 +98,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-4">
           <input
             type="email"
-            placeholder="Email"
+            placeholder="電郵地址"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -106,7 +106,7 @@ export default function LoginPage() {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="密碼"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required

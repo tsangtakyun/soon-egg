@@ -5,8 +5,11 @@ export default function ActiveDealsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-3xl font-black text-zinc-950">進行中合作</h1>
-        <p className="mt-2 text-zinc-500">追蹤 pitch、合約、deliverables、deadline 和付款狀態。</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-3xl font-black text-zinc-950">進行中合作</h1>
+          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">示範資料</span>
+        </div>
+        <p className="mt-2 text-zinc-500">以下項目只用作展示合作管理流程，並非真實合作。</p>
       </div>
       <div className="grid gap-4">
         {demoBrandMatches.slice(0, 4).map((match, index) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, Send, Sparkles, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -18,7 +18,7 @@ type Message = {
 };
 
 export function SOONAIPanel() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -27,6 +27,14 @@ export function SOONAIPanel() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const syncPanel = () => setIsOpen(media.matches);
+    syncPanel();
+    media.addEventListener("change", syncPanel);
+    return () => media.removeEventListener("change", syncPanel);
+  }, []);
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -56,7 +64,7 @@ export function SOONAIPanel() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg transition-colors hover:bg-blue-600"
+        className="fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg transition-colors hover:bg-blue-600"
         aria-label="開啟 SOON AI"
       >
         <Sparkles size={20} />
@@ -65,7 +73,7 @@ export function SOONAIPanel() {
   }
 
   return (
-    <aside className="fixed right-0 top-0 z-40 flex h-full w-[320px] flex-col border-l border-gray-100 bg-white shadow-xl">
+    <aside className="fixed inset-x-0 bottom-0 top-16 z-50 flex flex-col border-l border-gray-100 bg-white shadow-xl sm:left-auto sm:w-[360px] lg:top-0 lg:w-[320px]">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4">
         <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}

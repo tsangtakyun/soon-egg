@@ -145,10 +145,14 @@ export default async function DashboardHome() {
         </section>
 
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-bold text-zinc-950">推薦品牌配對</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-zinc-950">推薦品牌配對</h2>
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">示範資料</span>
+            </div>
             <Link href="/brand-deals" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">查看全部</Link>
           </div>
+          <p className="mb-4 text-xs leading-5 text-zinc-400">以下品牌只用作展示配對介面，並非真實合作邀請。真實邀請會顯示於「品牌合作」。</p>
           <div className="grid gap-4 lg:grid-cols-3">
             {demoBrandMatches.slice(0, 3).map((match) => (
               <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />

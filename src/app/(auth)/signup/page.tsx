@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +20,7 @@ export default function SignupPage() {
   const [passwordError, setPasswordError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmationEmail, setConfirmationEmail] = useState("");
 
   const handleSignup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -38,7 +40,7 @@ export default function SignupPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error: signupError } = await supabase.auth.signUp({
+    const { data, error: signupError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -54,7 +56,12 @@ export default function SignupPage() {
       return;
     }
 
-    router.push("/onboarding");
+    if (data.session) {
+      router.push("/onboarding");
+      return;
+    }
+
+    setConfirmationEmail(email.trim());
   };
 
   const handleGoogleSignup = async () => {
@@ -79,11 +86,27 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#f7f7f5] px-4 py-12">
       <section className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/soon-egg.png" alt="SOON-EGG" className="h-12 w-auto object-contain" />
+          <Image src="/soon-egg.png" alt="SOON-EGG" width={160} height={48} className="h-12 w-auto object-contain" priority />
         </div>
+
+        {confirmationEmail ? (
+          <div className="text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-50 text-2xl">✓</div>
+            <h1 className="mt-5 text-2xl font-black text-zinc-950">請確認你的電郵</h1>
+            <p className="mt-3 text-sm leading-6 text-zinc-500">
+              確認連結已寄到 <strong className="text-zinc-800">{confirmationEmail}</strong>。完成確認後，就可以登入並設定創作者檔案。
+            </p>
+            <Link href="/login" className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white">
+              返回登入
+            </Link>
+            <button type="button" onClick={() => setConfirmationEmail("")} className="mt-3 text-sm text-zinc-500 hover:text-zinc-900">
+              使用另一個電郵
+            </button>
+          </div>
+        ) : (
+          <>
         <h1 className="text-center text-2xl font-black text-zinc-950">建立 SOON-EGG 帳戶</h1>
-        <p className="mt-2 text-center text-sm text-zinc-500">先建立帳戶，再開始設定您的創作者主頁。</p>
+        <p className="mt-2 text-center text-sm text-zinc-500">建立帳戶後，設定你的創作者檔案及 Media Kit。</p>
 
         <button
           type="button"
@@ -109,14 +132,14 @@ export default function SignupPage() {
         <form onSubmit={handleSignup} className="space-y-4">
           <input
             type="text"
-            placeholder="Creator name"
+            placeholder="創作者名稱"
             value={creatorName}
             onChange={(event) => setCreatorName(event.target.value)}
             className="w-full rounded-2xl border border-zinc-200 px-4 py-3 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
           <input
             type="email"
-            placeholder="Email"
+            placeholder="電郵地址"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -124,7 +147,7 @@ export default function SignupPage() {
           />
           <input
             type="password"
-            placeholder="Password"
+            placeholder="密碼（至少 8 個字元）"
             value={password}
             onChange={(event) => {
               setPassword(event.target.value);
@@ -162,6 +185,8 @@ export default function SignupPage() {
         <p className="mt-5 text-center text-sm text-zinc-500">
           已經有帳戶？ <Link href="/login" className="font-semibold text-zinc-950">登入</Link>
         </p>
+          </>
+        )}
       </section>
     </main>
   );

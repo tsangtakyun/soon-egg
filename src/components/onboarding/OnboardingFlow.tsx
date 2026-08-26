@@ -327,12 +327,12 @@ export function OnboardingFlow() {
         <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
-        <p className="mb-8 text-xs font-medium uppercase tracking-wide text-gray-400">
+      <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
+        <p className="mb-5 text-xs font-medium uppercase tracking-wide text-gray-400 sm:mb-8">
           步驟 {currentStep} / {totalSteps}
         </p>
 
-        <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 shadow-sm">
+        <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-5 shadow-sm sm:p-8">
           <SOONMascot mood={stepMeta.mood} />
           <h2 className="mb-2 text-center text-xl font-bold text-gray-900">{stepMeta.title}</h2>
           <StepContent
@@ -456,7 +456,7 @@ function StepContent({
 
         <div>
           <label className="mb-2 block text-sm font-medium text-gray-700">內容類型（可多選）</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {PROFILE_CATEGORIES.map((category) => (
               <button
                 key={category}
@@ -489,7 +489,7 @@ function StepContent({
                   <div className="flex items-center gap-3 px-3 py-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={platform.logoUrl} alt={platform.label} className="h-6 w-6 shrink-0 object-contain" />
-                    <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                    <span className="w-20 shrink-0 text-sm font-semibold text-gray-700 sm:w-24">{platform.label}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-900">{igData.facebookPageName}</p>
                       <p className="text-xs text-gray-500">已連接 Facebook Page</p>
@@ -506,7 +506,7 @@ function StepContent({
                   <div className="flex items-center gap-3 px-3 py-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={platform.logoUrl} alt={platform.label} className="h-6 w-6 shrink-0 object-contain" />
-                    <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                    <span className="w-20 shrink-0 text-sm font-semibold text-gray-700 sm:w-24">{platform.label}</span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-900">@{igData.threadsUsername}</p>
                       <p className="text-xs text-gray-500">已根據 Instagram 自動填入</p>
@@ -526,7 +526,7 @@ function StepContent({
                   }`}
                 >
                   {igData ? (
-                    <div className="flex items-center gap-3 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-3 px-3 py-2 sm:flex-nowrap">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={platform.logoUrl} alt={platform.label} className="h-6 w-6 shrink-0 object-contain" />
                       {igData.avatar && (
@@ -552,12 +552,12 @@ function StepContent({
                         }}
                       />
                       <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
-                      <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                      <span className="w-20 shrink-0 text-sm font-semibold text-gray-700 sm:w-24">{platform.label}</span>
                       <input
                         value={handles.instagram ?? ""}
                         onChange={(event) => updateHandle("instagram", event.target.value)}
                         placeholder={platform.placeholder}
-                        className="min-w-0 flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                        className="min-w-[8rem] flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
                       />
                       <Link
                         href="/api/auth/instagram"
@@ -593,7 +593,7 @@ function StepContent({
                       }}
                     />
                     <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
-                    <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                    <span className="w-20 shrink-0 text-sm font-semibold text-gray-700 sm:w-24">{platform.label}</span>
                     <input
                       value={handles.youtube ?? ""}
                       onChange={(event) => updateHandle("youtube", event.target.value)}
@@ -625,7 +625,7 @@ function StepContent({
                   }}
                 />
                 <div className="hidden h-6 w-6 shrink-0 rounded-full bg-gray-300" />
-                <span className="w-24 text-sm font-semibold text-gray-700">{platform.label}</span>
+                <span className="w-20 shrink-0 text-sm font-semibold text-gray-700 sm:w-24">{platform.label}</span>
                 <input
                   value={handles[platform.id] ?? ""}
                   onChange={(event) => updateHandle(platform.id, event.target.value)}

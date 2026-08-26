@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, DollarSign, Sparkles, UserRound } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, DollarSign, Sparkles, UserRound } from "lucide-react";
 import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { createClient } from "@/lib/supabase/server";
@@ -19,6 +19,7 @@ type CreatorProfile = {
   xiaohongshu_followers: number | null;
   tiktok_followers: number | null;
   ai_profile_summary: string | null;
+  onboarding_completed: boolean | null;
 };
 
 const fallbackProfile: CreatorProfile = {
@@ -35,12 +36,14 @@ const fallbackProfile: CreatorProfile = {
   xiaohongshu_followers: 0,
   tiktok_followers: 0,
   ai_profile_summary: "連接 Instagram、Facebook 或 YouTube 後，SOON AI 會在這裡整理您的公開資料與受眾數據。",
+  onboarding_completed: false,
 };
 
 export default async function DashboardHome() {
   const supabase = await createClient();
   let creator = fallbackProfile;
   let dealsCount = 0;
+  let pendingInvitations = 0;
 
   if (supabase) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -61,7 +64,8 @@ export default async function DashboardHome() {
           youtube_subscribers,
           xiaohongshu_followers,
           tiktok_followers,
-          ai_profile_summary
+          ai_profile_summary,
+          onboarding_completed
         `)
         .eq("user_id", user.id)
         .maybeSingle();
@@ -69,12 +73,17 @@ export default async function DashboardHome() {
       if (profile) {
         creator = profile as CreatorProfile;
 
-        const { count } = await supabase
-          .from("egg_brand_deals")
-          .select("id", { count: "exact", head: true })
-          .eq("creator_id", profile.id);
+        const [{ count: dealTotal }, { count: invitationTotal }] = await Promise.all([
+          supabase.from("egg_brand_deals").select("id", { count: "exact", head: true }).eq("creator_id", profile.id),
+          supabase
+            .from("egg_brand_invitations")
+            .select("id", { count: "exact", head: true })
+            .eq("creator_id", profile.id)
+            .eq("status", "pending"),
+        ]);
 
-        dealsCount = count ?? 0;
+        dealsCount = dealTotal ?? 0;
+        pendingInvitations = invitationTotal ?? 0;
       }
     }
   }
@@ -90,11 +99,18 @@ export default async function DashboardHome() {
   const reach = reachSources.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const engagement = creator.instagram_engagement_rate ? `${creator.instagram_engagement_rate.toFixed(1)}%` : "未有數據";
   const summary = creator.ai_profile_summary || creator.bio || "完成 onboarding 後，這裡會顯示您的創作者定位。";
+  const hasSocialProfile = Boolean(creator.instagram_handle || creator.youtube_handle);
+  const setupSteps = [
+    { done: Boolean(creator.onboarding_completed), label: "完成基本創作者設定", href: "/onboarding" },
+    { done: hasSocialProfile, label: "連接或填寫社交平台", href: "/onboarding" },
+    { done: Boolean(creator.bio && creator.avatar_url), label: "完善公開創作者檔案", href: "/profile" },
+  ];
+  const nextSetupStep = setupSteps.find((step) => !step.done);
 
   return (
     <>
       <DashboardShareHeader username={creator.username} />
-      <div className="space-y-6 px-6 py-6">
+      <div className="space-y-6 px-4 py-6 sm:px-6">
         <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
           <div
             className="relative overflow-hidden rounded-2xl text-white"
@@ -114,8 +130,8 @@ export default async function DashboardHome() {
               <h1 className="mt-5 max-w-3xl text-4xl font-black leading-tight text-white sm:text-5xl">亞洲創作者的品牌合作與變現中樞</h1>
               <p className="mt-4 max-w-2xl text-white">SOON AI 幫你整理社交數據、生成 Media Kit、配對 HK/TW/SG 品牌，並起草繁體中文 pitch。</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/onboarding" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950">
-                  開始 onboarding
+                <Link href={nextSetupStep?.href ?? "/brand-deals"} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950">
+                  {nextSetupStep ? "繼續設定" : "查看合作機會"}
                   <ArrowUpRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <Link href={`/${creator.username}`} className="inline-flex items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-sm text-white">
@@ -126,6 +142,7 @@ export default async function DashboardHome() {
           </div>
 
           <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-400">你的 Creator 空間</p>
             <div className="flex items-center gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={avatarUrl} alt={displayName} className="h-16 w-16 rounded-full bg-zinc-100 object-cover" />
@@ -136,12 +153,49 @@ export default async function DashboardHome() {
             </div>
             <p className="mt-4 text-sm leading-6 text-zinc-600">{summary}</p>
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <Metric icon={UserRound} label="Reach" value={formatCompact(reach)} />
-              <Metric icon={ChartNoAxesCombined} label="Engagement" value={engagement} />
-              <Metric icon={BriefcaseBusiness} label="Deals" value={String(dealsCount)} />
-              <Metric icon={DollarSign} label="Total Earnings" value="US$0" />
+              <Metric icon={UserRound} label="總觸及人數" value={formatCompact(reach)} />
+              <Metric icon={ChartNoAxesCombined} label="互動率" value={engagement} />
+              <Metric icon={BriefcaseBusiness} label="合作項目" value={String(dealsCount)} />
+              <Metric icon={DollarSign} label="累計收入" value="US$0" />
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Link href="/profile" className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-center text-xs font-semibold text-zinc-700 hover:bg-zinc-50">編輯檔案</Link>
+              <Link href={`/${creator.username}`} className="flex-1 rounded-lg bg-zinc-950 px-3 py-2 text-center text-xs font-semibold text-white">預覽公開頁</Link>
             </div>
           </div>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-xl border border-zinc-200 bg-white p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-zinc-950">設定進度</h2>
+                <p className="mt-1 text-xs text-zinc-500">完成後，品牌可以更快了解你是否適合合作。</p>
+              </div>
+              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-600">
+                {setupSteps.filter((step) => step.done).length}/{setupSteps.length}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              {setupSteps.map((step) => (
+                <Link key={step.label} href={step.href} className="flex items-center gap-2 rounded-lg bg-zinc-50 px-3 py-3 text-xs text-zinc-700 hover:bg-zinc-100">
+                  {step.done ? <Check className="h-4 w-4 shrink-0 text-emerald-600" /> : <Circle className="h-4 w-4 shrink-0 text-zinc-300" />}
+                  {step.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <Link href="/brand-deals" className="group rounded-xl border border-zinc-200 bg-zinc-950 p-5 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs text-white/60">待處理合作</p>
+                <p className="mt-2 text-3xl font-black">{pendingInvitations}</p>
+                <p className="mt-2 text-sm text-white/75">查看品牌邀請、申請狀態及合作機會。</p>
+              </div>
+              <ArrowUpRight className="h-5 w-5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </div>
+          </Link>
         </section>
 
         <section>

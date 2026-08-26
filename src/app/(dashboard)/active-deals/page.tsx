@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BriefCard, type ProjectBrief } from "@/components/brand-deals/BriefCard";
 import { createClient } from "@/lib/supabase/client";
@@ -96,7 +97,7 @@ export default function ActiveDealsPage() {
   }
 
   return (
-    <div className="space-y-5 pt-[10vh]">
+    <div className="space-y-5 px-4 py-6 sm:px-6 lg:pt-[10vh]">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">進行中合作</h1>
         <p className="mt-2 text-zinc-500">查看品牌發來的項目簡報，了解合作詳情與交付要求。</p>
@@ -105,9 +106,10 @@ export default function ActiveDealsPage() {
       {loading ? (
         <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
       ) : !profile || (briefs.length === 0 && perkClaims.length === 0) ? (
-        <div className="py-16 text-center">
-          <p className="text-sm text-zinc-400">暫未有進行中合作</p>
-          <p className="mt-1 text-xs text-zinc-300">接受品牌邀請並收到項目簡報後，合作詳情將顯示於此。</p>
+        <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-6 py-16 text-center">
+          <p className="text-base font-semibold text-zinc-700">暫時未有進行中合作</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-400">接受品牌邀請或禮遇、收到項目簡報後，合作詳情同下一步會顯示喺呢度。</p>
+          <Link href="/brand-deals" className="mt-5 inline-flex rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white">查看合作機會</Link>
         </div>
       ) : (
         <div className="space-y-8">

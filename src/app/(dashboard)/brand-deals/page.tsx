@@ -304,7 +304,7 @@ function CampaignFeed({ profile }: { profile: Profile }) {
 
   if (loading) return <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>;
   if (error) return <div className="py-12 text-center text-sm text-red-500">{error}</div>;
-  if (campaigns.length === 0) return <div className="py-12 text-center text-sm text-zinc-400">暫無合作機會</div>;
+  if (campaigns.length === 0) return <Empty text="暫時未有公開合作機會。完善創作者檔案後，新活動會顯示喺呢度。" />;
   return (
     <>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -399,14 +399,14 @@ export default function BrandDealsPage() {
   }, [completedInvitations, profile?.id, supabase]);
 
   return (
-    <div className="space-y-5 pt-[10vh]">
+    <div className="space-y-5 px-4 py-6 sm:px-6 lg:pt-[10vh]">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">品牌合作</h1>
         <p className="mt-2 text-zinc-500">管理合作機會、品牌邀請和合作記錄。</p>
       </div>
-      <div className="mb-6 flex border-b border-zinc-200">
+      <div className="mb-6 flex overflow-x-auto border-b border-zinc-200">
         {tabs.map((tab) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 border-b-2 px-6 py-3 text-sm font-medium transition ${activeTab === tab.id ? "border-black text-black" : "border-transparent text-zinc-400"}`} type="button">
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition sm:px-6 ${activeTab === tab.id ? "border-black text-black" : "border-transparent text-zinc-400"}`} type="button">
             {tab.label}
             {tab.id === "invitations" && pendingInvitationCount > 0 && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">{pendingInvitationCount}</span>}
           </button>
@@ -458,5 +458,9 @@ function Loading() {
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="py-16 text-center text-sm text-zinc-400">{text}</div>;
+  return (
+    <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-6 py-16 text-center">
+      <p className="mx-auto max-w-md text-sm leading-6 text-zinc-500">{text}</p>
+    </div>
+  );
 }

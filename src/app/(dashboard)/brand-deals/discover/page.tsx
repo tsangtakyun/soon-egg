@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type PerkType = "service" | "product";
@@ -70,7 +71,7 @@ export default function DiscoverBrandsPage() {
   const filteredPerks = useMemo(() => (filter === "all" ? perks : perks.filter((perk) => perk.type === filter)), [filter, perks]);
 
   return (
-    <div className="space-y-5 pt-[10vh]">
+    <div className="space-y-5 px-4 py-6 sm:px-6 lg:pt-[10vh]">
       <div>
         <h1 className="text-3xl font-black text-zinc-950">探索品牌</h1>
         <p className="mt-2 text-zinc-500">申請品牌提供的免費服務或產品，主動建立合作關係。</p>
@@ -100,9 +101,10 @@ export default function DiscoverBrandsPage() {
       ) : error ? (
         <div className="py-12 text-center text-sm text-red-500">{error}</div>
       ) : filteredPerks.length === 0 ? (
-        <div className="py-16 text-center">
-          <p className="text-sm text-zinc-400">暫時未有可申請的品牌 Perks</p>
-          <p className="mt-1 text-xs text-zinc-300">品牌開放新 Perk 後會顯示於此。</p>
+        <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-6 py-16 text-center">
+          <p className="text-base font-semibold text-zinc-700">暫時未有可申請嘅品牌禮遇</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-zinc-400">品牌開放免費服務或產品後會顯示喺呢度；你可以先完善創作者檔案，方便品牌了解你。</p>
+          <Link href="/profile" className="mt-5 inline-flex rounded-xl bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white">完善創作者檔案</Link>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">

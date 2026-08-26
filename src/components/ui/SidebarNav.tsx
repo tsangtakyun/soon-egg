@@ -23,13 +23,16 @@ import {
 
 const items = [
   { href: "/dashboard", label: "主頁", icon: Home },
-  { href: "/profile", label: "我的主頁", icon: UserRound },
+  { href: "/profile", label: "創作者檔案", icon: UserRound },
   { href: "/media-kit", label: "Media Kit", icon: WandSparkles },
-  { href: "/brand-deals", label: "品牌合作", icon: BriefcaseBusiness },
-  { href: "/brand-deals/discover", label: "探索品牌", icon: BriefcaseBusiness },
-  { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
   { href: "/products", label: "數位產品", icon: Package },
   { href: "/analytics", label: "數據分析", icon: BarChart3 },
+];
+
+const brandDealItems = [
+  { href: "/brand-deals", label: "合作機會", icon: BriefcaseBusiness },
+  { href: "/brand-deals/discover", label: "品牌禮遇", icon: Package },
+  { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
 ];
 
 const creatorToolItems = [
@@ -88,6 +91,14 @@ export function SidebarNav() {
       ))}
 
       <div className="pt-5">
+        <SidebarSection label="品牌合作" defaultOpen={true}>
+          {brandDealItems.map((item) => (
+            <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+          ))}
+        </SidebarSection>
+      </div>
+
+      <div className="pt-2">
         <SidebarSection label="創作工具" defaultOpen={true}>
           {creatorToolItems.map((item) => (
             <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />

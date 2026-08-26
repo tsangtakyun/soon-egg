@@ -140,50 +140,39 @@ function ApplyModal({ campaign, onClose, onSuccess }: { campaign: Campaign; prof
 
 function InvitationCard({
   invitation,
-  profileId,
   onRespond,
 }: {
   invitation: BrandInvitation;
-  profileId: string;
   onRespond: (id: string, status: string) => void;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const isPending = invitation.status === "pending";
 
   async function respond(status: "accepted" | "declined") {
     setLoading(true);
-    const { error } = await supabase.from("egg_brand_invitations").update({ status, responded_at: new Date().toISOString() }).eq("id", invitation.id);
-    if (!error) {
-      if (status === "accepted" && invitation.brand_name) {
-        const { data: existingPartner } = await supabase
-          .from("egg_brand_partners")
-          .select("id")
-          .eq("creator_id", profileId)
-          .eq("brand_name", invitation.brand_name)
-          .maybeSingle();
+    setError("");
 
-        if (!existingPartner?.id) {
-          await supabase.from("egg_brand_partners").insert({
-            creator_id: profileId,
-            brand_name: invitation.brand_name,
-          });
-        }
-      }
-
-      await fetch("/api/invitations/respond", {
+    try {
+      const response = await fetch("/api/invitations/respond", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cw_workspace_id: invitation.cw_workspace_id,
-          cw_campaign_id: invitation.cw_campaign_id,
-          campaign_name: invitation.campaign_name,
+          invitation_id: invitation.id,
           status,
         }),
-      }).catch(() => null);
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "未能儲存回覆，請稍後重試。");
+      }
+
       onRespond(invitation.id, status);
+    } catch (respondError) {
+      setError(respondError instanceof Error ? respondError.message : "未能儲存回覆，請稍後重試。");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
@@ -227,10 +216,15 @@ function InvitationCard({
             <p className="mt-0.5 text-xs text-zinc-700">{invitation.message}</p>
           </div>
         )}
+        {error && (
+          <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs leading-5 text-red-600" role="alert">
+            {error}
+          </div>
+        )}
         {isPending ? (
           <div className="mt-2 flex gap-2">
-            <button onClick={() => respond("accepted")} disabled={loading} className="flex-1 rounded-lg bg-black py-2 text-sm font-medium text-white disabled:opacity-50" type="button">接受邀請</button>
-            <button onClick={() => respond("declined")} disabled={loading} className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500 disabled:opacity-50" type="button">婉拒</button>
+            <button onClick={() => respond("accepted")} disabled={loading} className="flex-1 rounded-lg bg-black py-2 text-sm font-medium text-white disabled:cursor-wait disabled:opacity-50" type="button">{loading ? "同步中..." : "接受邀請"}</button>
+            <button onClick={() => respond("declined")} disabled={loading} className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500 disabled:cursor-wait disabled:opacity-50" type="button">婉拒</button>
           </div>
         ) : (
           <p className="mt-2 text-center text-xs text-zinc-400">{invitation.status === "accepted" ? "已接受此邀請" : "已婉拒此邀請"}</p>
@@ -361,43 +355,6 @@ export default function BrandDealsPage() {
     { id: "completed", label: "已合作品牌" },
   ];
 
-  useEffect(() => {
-    if (!profile?.id || completedInvitations.length === 0) return;
-
-    let cancelled = false;
-
-    async function backfillBrandPartners() {
-      const brandNames = Array.from(new Set(completedInvitations.map((invitation) => invitation.brand_name?.trim()).filter(Boolean))) as string[];
-      if (brandNames.length === 0 || !profile?.id) return;
-
-      const { data: existingPartners } = await supabase
-        .from("egg_brand_partners")
-        .select("brand_name")
-        .eq("creator_id", profile.id)
-        .in("brand_name", brandNames);
-
-      if (cancelled) return;
-
-      const existingNames = new Set((existingPartners ?? []).map((partner) => partner.brand_name));
-      const missingPartners = brandNames
-        .filter((brandName) => !existingNames.has(brandName))
-        .map((brandName) => ({
-          creator_id: profile.id,
-          brand_name: brandName,
-        }));
-
-      if (missingPartners.length > 0) {
-        await supabase.from("egg_brand_partners").insert(missingPartners);
-      }
-    }
-
-    void backfillBrandPartners();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [completedInvitations, profile?.id, supabase]);
-
   return (
     <div className="space-y-5 px-4 py-6 sm:px-6 lg:pt-[10vh]">
       <div>
@@ -426,7 +383,6 @@ export default function BrandDealsPage() {
               <InvitationCard
                 key={invitation.id}
                 invitation={invitation}
-                profileId={profile.id}
                 onRespond={(id, status) =>
                   setInvitations((current) => current.map((item) => (item.id === id ? { ...item, status, responded_at: new Date().toISOString() } : item)))
                 }

@@ -55,6 +55,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Creator not found" }, { status: 404 });
   }
 
+  const { data: existingInvitation } = await supabase
+    .from("egg_brand_invitations")
+    .select("status,sent_at")
+    .eq("creator_id", profile.id)
+    .eq("cw_campaign_id", body.cw_campaign_id)
+    .maybeSingle();
+
   const { error } = await supabase.from("egg_brand_invitations").upsert(
     {
       creator_id: profile.id,
@@ -72,8 +79,8 @@ export async function POST(req: Request) {
       duration_weeks: body.duration_weeks ?? null,
       budget_range: body.budget_range ?? null,
       message: body.message,
-      status: "pending",
-      sent_at: new Date().toISOString(),
+      status: existingInvitation?.status ?? "pending",
+      sent_at: existingInvitation?.sent_at ?? new Date().toISOString(),
     },
     { onConflict: "creator_id,cw_campaign_id", ignoreDuplicates: false }
   );

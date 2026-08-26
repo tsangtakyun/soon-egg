@@ -32,7 +32,53 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Creator profile not found" }, { status: 404 });
   }
 
-  const body = (await req.json()) as ApplyBody;
+  const body = (await req.json().catch(() => null)) as ApplyBody | null;
+  if (!body?.campaign_id || !body.workspace_id) {
+    return NextResponse.json({ error: "合作活動資料不完整。" }, { status: 400 });
+  }
+
+  const baseUrl = process.env.CW_BASE_URL;
+  const apiKey = process.env.SOON_INTERNAL_API_KEY;
+
+  if (!baseUrl || !apiKey) {
+    console.error("Campaign application error: CW integration env is missing");
+    return NextResponse.json({ error: "合作申請服務暫時未完成設定。" }, { status: 503 });
+  }
+
+  const cwRes = await fetch(`${baseUrl}/api/public/applications`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-soon-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      campaign_id: body.campaign_id,
+      workspace_id: body.workspace_id,
+      creator: {
+        id: profile.id,
+        username: profile.username,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+        instagram_handle: profile.instagram_handle,
+        instagram_followers: profile.instagram_followers,
+        mediakit_url: profile.username ? `https://egg.sooncreator.network/${profile.username}/mediakit` : null,
+        pitch_message: body.pitch_message,
+      },
+    }),
+  }).catch((error) => {
+    console.error("Campaign application CW request failed:", error);
+    return null;
+  });
+
+  if (!cwRes) {
+    return NextResponse.json({ error: "暫時未能連接品牌平台，申請尚未提交。請重試。" }, { status: 502 });
+  }
+
+  const cwData = await cwRes.json().catch(() => null);
+  if (!cwRes.ok || !cwData?.success) {
+    console.error("Campaign application CW sync rejected:", cwRes.status, cwData?.error);
+    return NextResponse.json({ error: "品牌平台未能接收申請，請稍後重試。" }, { status: 502 });
+  }
 
   const { error: localError } = await supabase.from("egg_campaign_applications").upsert(
     {
@@ -52,45 +98,13 @@ export async function POST(req: Request) {
   );
 
   if (localError) {
-    return NextResponse.json({ error: localError.message }, { status: 500 });
-  }
-
-  const baseUrl = process.env.CW_BASE_URL;
-  const apiKey = process.env.SOON_INTERNAL_API_KEY;
-
-  if (!baseUrl || !apiKey) {
-    return NextResponse.json({ error: "Campaign application sync is not configured" }, { status: 500 });
-  }
-
-  const cwRes = await fetch(`${baseUrl}/api/public/applications`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-soon-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      campaign_id: body.campaign_id,
-      workspace_id: body.workspace_id,
-      creator: {
-        id: profile.id,
-        username: profile.username,
-        display_name: profile.display_name,
-        avatar_url: profile.avatar_url,
-        instagram_handle: profile.instagram_handle,
-        instagram_followers: profile.instagram_followers,
-        pitch_message: body.pitch_message,
-      },
-    }),
-  });
-
-  const cwData = await cwRes.json();
-  if (!cwRes.ok || !cwData.success) {
-    return NextResponse.json({ error: "CW sync failed", detail: cwData.error }, { status: 500 });
+    console.error("Campaign application local save failed:", localError);
+    return NextResponse.json({ error: "品牌平台已收到申請，但本地記錄未能更新。請重新載入。" }, { status: 500 });
   }
 
   await logDealActivity({
-    type: "kol_accepted",
-    title: `🤝 ${profile.display_name || profile.username} 接受咗品牌邀請`,
+    type: "kol_applied",
+    title: `🙋 ${profile.display_name || profile.username} 申請咗品牌合作`,
     body: `Campaign：${body.campaign_name ?? body.campaign_id} · 品牌：${body.brand_name ?? "未命名"}`,
     meta: {
       creator_username: profile.username,

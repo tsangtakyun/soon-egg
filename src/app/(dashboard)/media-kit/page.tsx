@@ -202,7 +202,7 @@ function TextField({
   );
 }
 
-function CaseStudiesEditor({ profileId }: { profileId: string }) {
+function CaseStudiesEditor({ profileId, onPreviewChange }: { profileId: string; onPreviewChange: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [draft, setDraft] = useState({ title: "", brand_name: "", description: "", result: "", image_url: "" });
@@ -256,6 +256,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
       setDraft({ title: "", brand_name: "", description: "", result: "", image_url: "" });
       setEditingId(null);
       setStatus("✓ 已儲存");
+      onPreviewChange();
     } else if (error) {
       setStatus(null);
       setErrorMessage(`儲存失敗：${error.message}`);
@@ -268,6 +269,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
     if (!error) {
       setCaseStudies((current) => current.filter((item) => item.id !== id));
       setStatus("✓ 已刪除");
+      onPreviewChange();
     } else {
       setStatus(null);
       setErrorMessage(`刪除失敗：${error.message}`);
@@ -353,7 +355,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
   );
 }
 
-function BrandPartnersEditor({ profileId }: { profileId: string }) {
+function BrandPartnersEditor({ profileId, onPreviewChange }: { profileId: string; onPreviewChange: () => void }) {
   const supabase = useMemo(() => createClient(), []);
   const [partners, setPartners] = useState<BrandPartner[]>([]);
   const [brandName, setBrandName] = useState("");
@@ -361,6 +363,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -407,6 +410,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
       setBrandLogoUrl("");
       setEditingId(null);
       setMessage("✓ 已儲存");
+      onPreviewChange();
     } else if (error) {
       setMessage(null);
       setErrorMessage(`儲存失敗：${error.message}`);
@@ -414,11 +418,26 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
   }
 
   async function handleDelete(id: string) {
-    const { error } = await supabase.from("egg_brand_partners").delete().eq("id", id);
-    if (!error) {
+    if (!window.confirm("確定刪除呢個品牌合作？刪除後公開 Media Kit 會即時更新。")) return;
+    setDeletingId(id);
+    setMessage("刪除中…");
+    setErrorMessage(null);
+    const { data, error } = await supabase
+      .from("egg_brand_partners")
+      .delete()
+      .eq("id", id)
+      .eq("creator_id", profileId)
+      .select("id")
+      .maybeSingle();
+    if (!error && data) {
       setPartners((current) => current.filter((partner) => partner.id !== id));
       setMessage("✓ 已刪除");
-    } else setErrorMessage(`刪除失敗：${error.message}`);
+      onPreviewChange();
+    } else {
+      setMessage(null);
+      setErrorMessage(`刪除失敗：${error?.message || "找不到可刪除資料，請重新整理後再試。"}`);
+    }
+    setDeletingId(null);
   }
 
   return (
@@ -458,7 +477,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setEditingId(partner.id); setBrandName(partner.brand_name ?? ""); setBrandLogoUrl(partner.brand_logo_url ?? ""); }} className="text-xs font-medium text-blue-600 hover:text-blue-800" type="button">編輯</button>
-                <button onClick={() => handleDelete(partner.id)} className="text-xs text-zinc-400 hover:text-red-500" type="button">刪除</button>
+                <button disabled={deletingId === partner.id} onClick={() => handleDelete(partner.id)} className="text-xs text-zinc-400 hover:text-red-500 disabled:opacity-50" type="button">{deletingId === partner.id ? "刪除中…" : "刪除"}</button>
               </div>
             </div>
           ))}
@@ -472,10 +491,12 @@ function SectionEditor({
   sectionKey,
   profile,
   onUpdate,
+  onPreviewChange,
 }: {
   sectionKey: SectionKey;
   profile: CreatorProfile;
   onUpdate: (updates: Partial<CreatorProfile>) => void;
+  onPreviewChange: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
   const hasInstagramToken = Boolean(profile.instagram_access_token);
@@ -571,10 +592,10 @@ function SectionEditor({
   }
 
   if (sectionKey === "cases") {
-    return <CaseStudiesEditor profileId={profile.id} />;
+    return <CaseStudiesEditor profileId={profile.id} onPreviewChange={onPreviewChange} />;
   }
 
-  return <BrandPartnersEditor profileId={profile.id} />;
+  return <BrandPartnersEditor profileId={profile.id} onPreviewChange={onPreviewChange} />;
 }
 
 function LockedBlockRow({
@@ -583,12 +604,14 @@ function LockedBlockRow({
   sectionKey,
   profile,
   onUpdate,
+  onPreviewChange,
 }: {
   label: string;
   toggleField: ProfileField;
   sectionKey: SectionKey;
   profile: CreatorProfile;
   onUpdate: (updates: Partial<CreatorProfile>) => void;
+  onPreviewChange: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const visible = !Boolean(profile[toggleField]);
@@ -610,7 +633,7 @@ function LockedBlockRow({
       </div>
       {expanded && (
         <div className="border-t border-zinc-100 bg-gray-50">
-          <SectionEditor sectionKey={sectionKey} profile={profile} onUpdate={onUpdate} />
+          <SectionEditor sectionKey={sectionKey} profile={profile} onUpdate={onUpdate} onPreviewChange={onPreviewChange} />
         </div>
       )}
     </div>
@@ -913,14 +936,15 @@ export default function MediaKitPage() {
 
                     <div className="space-y-3">
                       <h2 className="text-base font-semibold text-zinc-950">內容區塊</h2>
-                      <LockedBlockRow label="聯絡表單" toggleField="mediakit_lock_contact" sectionKey="contact" profile={profile} onUpdate={saveProfile} />
-                      <LockedBlockRow label="關於我" toggleField="mediakit_lock_about" sectionKey="about" profile={profile} onUpdate={saveProfile} />
+                      <LockedBlockRow label="聯絡表單" toggleField="mediakit_lock_contact" sectionKey="contact" profile={profile} onUpdate={saveProfile} onPreviewChange={() => setPreviewKey((current) => current + 1)} />
+                      <LockedBlockRow label="關於我" toggleField="mediakit_lock_about" sectionKey="about" profile={profile} onUpdate={saveProfile} onPreviewChange={() => setPreviewKey((current) => current + 1)} />
                       <LockedBlockRow
                         label="過往項目"
                         toggleField="mediakit_lock_case_studies"
                         sectionKey="cases"
                         profile={profile}
                         onUpdate={saveProfile}
+                        onPreviewChange={() => setPreviewKey((current) => current + 1)}
                       />
                       <div className="overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50">
                         <CollapsibleSection title="精選 Instagram 內容（最多 3 個）">
@@ -933,6 +957,7 @@ export default function MediaKitPage() {
                         sectionKey="partners"
                         profile={profile}
                         onUpdate={saveProfile}
+                        onPreviewChange={() => setPreviewKey((current) => current + 1)}
                       />
                       <LockedBlockRow
                         label="數據分析"
@@ -940,6 +965,7 @@ export default function MediaKitPage() {
                         sectionKey="analytics"
                         profile={profile}
                         onUpdate={saveProfile}
+                        onPreviewChange={() => setPreviewKey((current) => current + 1)}
                       />
                     </div>
 

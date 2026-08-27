@@ -84,7 +84,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [stripeConnected, setStripeConnected] = useState(false);
-  const [stripeComplete, setStripeComplete] = useState(false);
+  const [stripeComplete, setStripeComplete] = useState<boolean | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"products" | "orders">("products");
   const [modalOpen, setModalOpen] = useState(false);
@@ -249,7 +249,7 @@ export default function ProductsPage() {
         </button>
       </div>
 
-      {!stripeComplete && (
+      {stripeComplete === false && (
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
           <div>
             <p className="text-sm font-medium text-orange-800">連結 Stripe 收款帳戶</p>
@@ -286,7 +286,7 @@ export default function ProductsPage() {
       {activeTab === "products" && (
         <>
           {loading ? (
-            <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+            <ProductGridSkeleton />
           ) : products.length === 0 ? (
             <div className="rounded-2xl border bg-white py-16 text-center">
               <p className="text-sm text-zinc-400">暫未有貨品</p>
@@ -404,6 +404,23 @@ function ProductCard({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProductGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="正在載入貨品">
+      {[0, 1, 2].map((item) => (
+        <div key={item} className="overflow-hidden rounded-xl border bg-white" aria-hidden="true">
+          <div className="h-40 animate-pulse bg-zinc-100" />
+          <div className="space-y-3 p-3">
+            <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
+            <div className="h-4 w-1/3 animate-pulse rounded bg-zinc-100" />
+            <div className="h-8 animate-pulse rounded bg-zinc-50" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

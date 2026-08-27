@@ -60,6 +60,8 @@ const fallbackAnalysis: Analysis = {
   provided_data_sources: [],
 };
 
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+
 function normalizeHandles(handles: Handles = {}) {
   return Object.fromEntries(
     Object.entries(handles).map(([key, value]) => [
@@ -375,12 +377,13 @@ ${providedMetricsContext.join("\n")}
     let analysis = fallbackAnalysis;
 
     if (anthropic && (hasRealData || platformInfo)) {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [{
-          role: "user",
-          content: `你是一個專門分析亞洲創作者的 AI 助理。
+      try {
+        const response = await anthropic.messages.create({
+          model: ANTHROPIC_MODEL,
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: `你是一個專門分析亞洲創作者的 AI 助理。
 
 ${hasRealData ? "以下是創作者的真實社交平台數據：" : "以下是創作者的社交平台帳號："}
 
@@ -400,14 +403,17 @@ ${hasRealData ? realDataContext.join("\n") : platformInfo}
   "xiaohongshu_followers": ${normalizedFollowerCounts.xiaohongshu || 0},
   "suggested_theme": "藍天白雲"
 }`,
-        }],
-      });
+          }],
+        });
 
-      const text = response.content[0]?.type === "text" ? response.content[0].text : "{}";
-      analysis = {
-        ...fallbackAnalysis,
-        ...parseJsonFromText<Partial<Analysis>>(text.replace(/```json|```/g, "").trim(), {}),
-      };
+        const text = response.content[0]?.type === "text" ? response.content[0].text : "{}";
+        analysis = {
+          ...fallbackAnalysis,
+          ...parseJsonFromText<Partial<Analysis>>(text.replace(/```json|```/g, "").trim(), {}),
+        };
+      } catch (error) {
+        console.error("Anthropic analysis error:", error);
+      }
     }
 
     const storedProfile = await fetchStoredCreatorProfile();

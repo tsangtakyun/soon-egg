@@ -33,9 +33,6 @@ export default function HeroSection() {
             <Link href="/signup" className="rounded-full bg-blue-500 px-7 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-600">
               免費開始
             </Link>
-            <button type="button" className="px-2 py-3.5 text-sm font-semibold text-blue-500 transition-colors hover:text-blue-600">
-              觀看示範 →
-            </button>
           </div>
         </div>
 
@@ -61,7 +58,7 @@ export default function HeroSection() {
               <Handshake size={16} className="text-[#f5a623]" />
               品牌合作邀請
             </div>
-            <p className="text-sm text-gray-500">卓悅 wants to collab</p>
+            <p className="text-sm text-gray-500">New brand wants to collab</p>
             <button className="mt-2 rounded-full bg-black px-3 py-1 text-xs text-white">查看</button>
           </div>
 

@@ -4,6 +4,10 @@ alter table public.egg_digital_products
 create index if not exists egg_digital_products_creator_active_idx
   on public.egg_digital_products (creator_id, is_active, is_archived);
 
+create unique index if not exists egg_product_orders_stripe_session_unique_idx
+  on public.egg_product_orders (stripe_session_id)
+  where stripe_session_id is not null;
+
 -- The existing Egg.Soon catalogue was seeded demo data. Archive it instead of
 -- deleting products or their linked order history.
 update public.egg_digital_products as product
@@ -26,3 +30,21 @@ create policy "egg_public_active_products_viewable" on public.egg_digital_produc
       select id from public.egg_creator_profiles where is_public = true
     )
   );
+
+create or replace function public.increment_product_sales(p_product_id uuid, p_amount numeric)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.egg_digital_products
+  set total_sales = coalesce(total_sales, 0) + 1,
+      total_revenue = coalesce(total_revenue, 0) + coalesce(p_amount, 0),
+      stock = case
+        when coalesce(is_unlimited_stock, true) then stock
+        else greatest(coalesce(stock, 0) - 1, 0)
+      end
+  where id = p_product_id;
+end;
+$$;

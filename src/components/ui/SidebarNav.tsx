@@ -95,7 +95,7 @@ export function SidebarNav() {
         prefetch={false}
       />
 
-      <div className="pt-2">
+      <div>
         {creatorToolItems.map((item) => (
           <SidebarItem
             key={item.href}

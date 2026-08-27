@@ -118,18 +118,14 @@ export function ScriptClient({
   }
 
   return (
-    <main className="space-y-6 pt-[10vh]">
-      <header className="overflow-hidden rounded-3xl border bg-white">
-        <div className="h-44 bg-[radial-gradient(circle_at_20%_20%,#ede9fe,transparent_30%),linear-gradient(135deg,#7c3aed,#111827)]" />
-        <div className="flex flex-col gap-4 p-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-purple-600">SOON Tools</p>
-            <h1 className="mt-2 text-3xl font-black text-zinc-950">劇本工作台</h1>
-            <p className="mt-2 text-sm text-zinc-500">用 IG Reel 節奏設計 Hook、轉場同 Ending。</p>
-          </div>
-          <div className="rounded-2xl border bg-zinc-50 px-4 py-3 text-sm text-zinc-500">
-            目前餘額 <span className="font-semibold text-zinc-950">{balance.toLocaleString()}</span> credits
-          </div>
+    <main className="space-y-6 bg-[#f7f7f8] px-4 pb-10 pt-[10vh] sm:px-6">
+      <header className="flex flex-col gap-4 lg:ml-[10%] lg:flex-row lg:items-end lg:justify-between lg:pr-6">
+        <div>
+          <h1 className="text-3xl font-black text-zinc-950">劇本工作台</h1>
+          <p className="mt-2 text-zinc-500">按你的主題、語氣及影片節奏，生成適合 Instagram Reels 的完整劇本。</p>
+        </div>
+        <div className="w-fit rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-500 shadow-sm">
+          目前餘額 <span className="font-semibold text-zinc-950">{balance.toLocaleString()}</span> credits
         </div>
       </header>
 

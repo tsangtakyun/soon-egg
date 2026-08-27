@@ -1,0 +1,53 @@
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+
+const statuses = [
+  "pending",
+  "applied",
+  "accepted",
+  "in_progress",
+  "completed",
+  "declined",
+] as const;
+
+export async function POST(req: Request) {
+  if (req.headers.get("x-soon-api-key") !== process.env.SOON_INTERNAL_API_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const body = (await req.json().catch(() => null)) as {
+    campaign_id?: string;
+    creator_id?: string;
+    status?: string;
+  } | null;
+  if (
+    !body?.campaign_id ||
+    !body.creator_id ||
+    !statuses.includes(body.status as (typeof statuses)[number])
+  ) {
+    return NextResponse.json(
+      { error: "Invalid status update" },
+      { status: 400 },
+    );
+  }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key)
+    return NextResponse.json(
+      { error: "Supabase is not configured" },
+      { status: 500 },
+    );
+  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  const { data, error } = await supabase
+    .from("egg_campaign_applications")
+    .update({ status: body.status })
+    .eq("creator_id", body.creator_id)
+    .eq("cw_campaign_id", body.campaign_id)
+    .select("id,status")
+    .maybeSingle();
+  if (error || !data)
+    return NextResponse.json(
+      { error: "Application not found" },
+      { status: 404 },
+    );
+  return NextResponse.json({ success: true, application: data });
+}

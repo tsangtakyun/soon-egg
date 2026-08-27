@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Link2, Minus, TrendingDown, TrendingUp, UserRound } from "lucide-react";
-import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { CreatorAvatar } from "@/components/ui/CreatorAvatar";
 import { createClient } from "@/lib/supabase/server";
-import { demoBrandMatches } from "@/lib/mock-data";
 
 type CreatorProfile = {
   id: string;
@@ -217,21 +215,6 @@ export default async function DashboardHome() {
           </div>
         </section>
 
-        <section>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-zinc-950">品牌配對示範</h2>
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">非真實邀請</span>
-            </div>
-            <Link href="/brand-deals" className="text-sm font-medium text-zinc-600 hover:text-zinc-950">查看全部</Link>
-          </div>
-          <p className="mb-4 text-xs leading-5 text-zinc-500">以下品牌及配對分數只用作展示介面，並非 AI 分析結果或真實合作邀請。真實邀請會顯示於「品牌合作」。</p>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {demoBrandMatches.slice(0, 3).map((match) => (
-              <BrandCard key={match.brand.id} brand={match.brand} score={match.match_score} reason={match.reason_zh} />
-            ))}
-          </div>
-        </section>
       </div>
     </>
   );

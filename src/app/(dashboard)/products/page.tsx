@@ -107,7 +107,9 @@ export default function ProductsPage() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeComplete, setStripeComplete] = useState<boolean | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"products" | "orders">("products");
+  const [activeTab, setActiveTab] = useState<
+    "products" | "orders" | "analytics"
+  >("products");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const paidOrders = orders.filter((order) =>
@@ -361,6 +363,15 @@ export default function ProductsPage() {
         >
           訂單管理
         </button>
+        <button
+          onClick={() => {
+            setActiveTab("analytics");
+            void reloadOrders();
+          }}
+          className={`px-5 py-3 text-sm font-medium border-b-2 transition ${activeTab === "analytics" ? "border-black text-black" : "border-transparent text-gray-400"}`}
+        >
+          銷售分析
+        </button>
       </div>
 
       {activeTab === "products" && (
@@ -395,35 +406,6 @@ export default function ProductsPage() {
 
       {activeTab === "orders" && (
         <>
-          {!ordersLoading && (
-            <section className="space-y-4">
-              <div>
-                <h2 className="text-lg font-bold text-zinc-900">銷售分析</h2>
-                <p className="mt-1 text-sm text-zinc-400">
-                  根據真實訂單計算收入及最近六個月銷售趨勢。
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <OrderSummary
-                  label="已付款訂單"
-                  value={paidOrders.length.toLocaleString("zh-HK")}
-                />
-                <OrderSummary
-                  label="貨品收入"
-                  value={`HK$${orderRevenue.toLocaleString("zh-HK")}`}
-                />
-                <OrderSummary
-                  label="平均訂單金額"
-                  value={`HK$${Math.round(averageOrderValue).toLocaleString("zh-HK")}`}
-                />
-                <OrderSummary
-                  label="全部訂單"
-                  value={orders.length.toLocaleString("zh-HK")}
-                />
-              </div>
-              <SalesTrendChart data={salesTrend} />
-            </section>
-          )}
           {ordersLoading ? (
             <div className="py-12 text-center text-sm text-zinc-400">
               載入中...
@@ -444,6 +426,44 @@ export default function ProductsPage() {
             </div>
           )}
         </>
+      )}
+
+      {activeTab === "analytics" && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-zinc-900">銷售分析</h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              根據真實訂單計算收入及最近六個月銷售趨勢。
+            </p>
+          </div>
+          {ordersLoading ? (
+            <div className="py-12 text-center text-sm text-zinc-400">
+              載入中...
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <OrderSummary
+                  label="已付款訂單"
+                  value={paidOrders.length.toLocaleString("zh-HK")}
+                />
+                <OrderSummary
+                  label="貨品收入"
+                  value={`HK$${orderRevenue.toLocaleString("zh-HK")}`}
+                />
+                <OrderSummary
+                  label="平均訂單金額"
+                  value={`HK$${Math.round(averageOrderValue).toLocaleString("zh-HK")}`}
+                />
+                <OrderSummary
+                  label="全部訂單"
+                  value={orders.length.toLocaleString("zh-HK")}
+                />
+              </div>
+              <SalesTrendChart data={salesTrend} />
+            </>
+          )}
+        </section>
       )}
 
       {modalOpen && profileId && (

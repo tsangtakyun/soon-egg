@@ -12,11 +12,11 @@ export type MayanMessage = {
 
 const quickPrompts = ["幫我回覆一個品牌合作邀請", "幫我寫一個 IG caption", "幫我回覆粉絲留言", "幫我優化呢段文字"];
 
-export function ReplyClient({ messages: initialMessages, balance: initialBalance }: { messages: MayanMessage[]; balance: number; userEmail: string }) {
+export function ReplyClient({ messages: initialMessages }: { messages: MayanMessage[] }) {
   const [messages, setMessages] = useState<MayanMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [balance, setBalance] = useState(initialBalance);
+  const [error, setError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,39 +30,44 @@ export function ReplyClient({ messages: initialMessages, balance: initialBalance
     setMessages((current) => [...current, userMsg]);
     setInput("");
     setLoading(true);
+    setError("");
 
-    const res = await fetch("/api/tools/reply/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: nextInput, history }),
-    });
-    const data = await res.json();
+    try {
+      const res = await fetch("/api/tools/reply/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: nextInput, history }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.reply) throw new Error(data.error ?? "請稍後再試");
 
-    if (data.error === "Insufficient credits") {
-      window.location.href = "/credits?insufficient=tools";
-      return;
-    }
-
-    if (!res.ok) {
-      alert(`Mayan 暫時回覆唔到：${data.error ?? "請稍後再試"}`);
+      const assistantMsg: MayanMessage = {
+        role: "assistant",
+        content: data.reply,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((current) => [...current, assistantMsg]);
+      if (data.warning) setError(data.warning);
+    } catch (sendError) {
+      setMessages((current) => current.filter((message) => message !== userMsg));
+      setInput(nextInput);
+      setError(`Mayan 暫時回覆唔到：${sendError instanceof Error ? sendError.message : "請稍後再試"}`);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const assistantMsg: MayanMessage = {
-      role: "assistant",
-      content: data.reply,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((current) => [...current, assistantMsg]);
-    if (typeof data.balance === "number") setBalance(data.balance);
-    setLoading(false);
   }
 
   async function clearHistory() {
-    const res = await fetch("/api/tools/reply/clear", { method: "POST" });
-    const data = await res.json();
-    if (data.success) setMessages([]);
+    if (!messages.length || !window.confirm("確定清空全部回覆記錄？")) return;
+    setError("");
+    try {
+      const res = await fetch("/api/tools/reply/clear", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error ?? "清空失敗");
+      setMessages([]);
+    } catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : "清空失敗，請稍後再試。");
+    }
   }
 
   return (
@@ -71,20 +76,20 @@ export function ReplyClient({ messages: initialMessages, balance: initialBalance
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 text-xl text-purple-700">🪬</div>
           <div>
-            <h1 className="text-2xl font-black text-zinc-950">Mayan</h1>
-            <p className="text-sm text-zinc-500">你的亞洲市場創作夥伴</p>
+            <h1 className="text-2xl font-black text-zinc-950">回覆中心</h1>
+            <p className="text-sm text-zinc-500">貼上品牌或粉絲訊息，Mayan 幫你起草合適回覆。</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="rounded-xl border bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
-            目前餘額 <span className="font-semibold text-zinc-950">{balance.toLocaleString()}</span> credits
-          </div>
+          <div className="rounded-xl border bg-zinc-50 px-3 py-2 text-xs text-zinc-500">Egg 原生工具 · 暫時免費使用</div>
           <button onClick={clearHistory} className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs text-zinc-500 hover:bg-zinc-50" type="button">
             <Trash2 className="h-3.5 w-3.5" />
             清空
           </button>
         </div>
       </header>
+
+      {error ? <p role="alert" className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p> : null}
 
       <section className="min-h-0 flex-1 overflow-y-auto rounded-2xl border bg-white p-5">
         {messages.length === 0 ? (

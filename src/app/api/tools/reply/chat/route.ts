@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
-import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { masterSupabase } from "@/lib/supabase/master";
 
@@ -18,25 +17,20 @@ export async function POST(req: Request) {
   } = await serverSupabase.auth.getUser();
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await deductCredits({
-    email: user.email,
-    amount: CREDIT_COSTS.AI_GENERATION,
-    type: "ai_generation",
-    tool: "reply",
-    description: "Mayan AI 回覆",
-  });
+  const { message, history } = (await req.json().catch(() => ({}))) as {
+    message?: string;
+    history?: HistoryMessage[];
+  };
+  const cleanMessage = message?.trim();
+  if (!cleanMessage) return NextResponse.json({ error: "請輸入想回覆的訊息" }, { status: 400 });
+  if (cleanMessage.length > 8000) return NextResponse.json({ error: "訊息太長，請縮短後再試" }, { status: 400 });
 
-  if (!result.success) {
-    return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
-  }
-
-  const { message, history } = await req.json();
   const anthropic = getAnthropic();
   if (!anthropic) return NextResponse.json({ error: "Anthropic API key missing" }, { status: 500 });
 
   const apiMessages = [
-    ...((history ?? []) as HistoryMessage[]).map((item) => ({ role: item.role, content: item.content })),
-    { role: "user" as const, content: message },
+    ...(history ?? []).slice(-10).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role, content: String(item.content).slice(0, 8000) })),
+    { role: "user" as const, content: cleanMessage },
   ];
 
   try {
@@ -58,12 +52,16 @@ export async function POST(req: Request) {
 
     const reply = response.content[0]?.type === "text" ? response.content[0].text : "";
 
-    await (masterSupabase as any).from("mayan_messages").insert([
-      { user_id: user.id, role: "user", content: message },
+    const { error: persistenceError } = await masterSupabase.from("mayan_messages").insert([
+      { user_id: user.id, role: "user", content: cleanMessage },
       { user_id: user.id, role: "assistant", content: reply },
     ]);
+    if (persistenceError) console.error("[mayan chat] history persistence failed:", persistenceError.message);
 
-    return NextResponse.json({ reply, balance: result.balance });
+    return NextResponse.json({
+      reply,
+      warning: persistenceError ? "回覆已生成，但暫時未能儲存到對話記錄。" : undefined,
+    });
   } catch (error) {
     console.error("[mayan chat] error:", error);
     return NextResponse.json({ error: "Mayan chat failed" }, { status: 500 });

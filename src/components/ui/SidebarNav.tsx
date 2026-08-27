@@ -1,6 +1,5 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,15 +7,12 @@ import {
   BriefcaseBusiness,
   Calendar,
   Captions,
-  ChevronDown,
   FileText,
-  FolderOpen,
   Home,
   MessageSquare,
   Package,
   UserRound,
   WandSparkles,
-  Wallet,
 } from "lucide-react";
 
 const items = [
@@ -32,10 +28,8 @@ const creatorToolItems = [
   { href: "/tools/subtitle", label: "字幕工作台", icon: Captions },
 ];
 
-const productionToolItems = [
-  { href: "/tools/docs", label: "文件中心", icon: FolderOpen },
+const utilityToolItems = [
   { href: "/tools/schedule", label: "行程中心", icon: Calendar },
-  { href: "/tools/finance", label: "財務中心", icon: Wallet },
   { href: "/tools/reply", label: "回覆中心", icon: MessageSquare },
 ];
 
@@ -47,35 +41,6 @@ export function SidebarNav() {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  function SidebarItem({
-    href,
-    icon: Icon,
-    label,
-    prefetch = true,
-  }: {
-    href: string;
-    icon: typeof Home;
-    label: string;
-    prefetch?: boolean;
-  }) {
-    const active = isActive(href);
-
-    return (
-      <Link
-        href={href}
-        prefetch={prefetch}
-        className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-          active
-            ? "bg-zinc-950 text-white"
-            : "text-zinc-600 hover:bg-white hover:text-zinc-950"
-        }`}
-      >
-        <Icon className="h-4 w-4" aria-hidden />
-        {label}
-      </Link>
-    );
-  }
-
   return (
     <nav className="mt-6 space-y-1">
       {items.map((item) => (
@@ -85,6 +50,7 @@ export function SidebarNav() {
           icon={item.icon}
           label={item.label}
           prefetch={false}
+          active={isActive(item.href)}
         />
       ))}
 
@@ -93,6 +59,7 @@ export function SidebarNav() {
         icon={BriefcaseBusiness}
         label="合作機會"
         prefetch={false}
+        active={isActive("/brand-deals")}
       />
 
       <div>
@@ -103,56 +70,50 @@ export function SidebarNav() {
             icon={item.icon}
             label={item.label}
             prefetch={false}
+            active={isActive(item.href)}
           />
         ))}
 
-        <SidebarSection label="制片工具" defaultOpen={true} small={true}>
-          {productionToolItems.map((item) => (
-            <SidebarItem
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              prefetch={false}
-            />
-          ))}
-        </SidebarSection>
+        {utilityToolItems.map((item) => (
+          <SidebarItem
+            key={item.href}
+            href={item.href}
+            icon={item.icon}
+            label={item.label}
+            prefetch={false}
+            active={isActive(item.href)}
+          />
+        ))}
       </div>
     </nav>
   );
 }
 
-function SidebarSection({
+function SidebarItem({
+  href,
+  icon: Icon,
   label,
-  children,
-  defaultOpen = true,
-  small = false,
+  active,
+  prefetch = true,
 }: {
+  href: string;
+  icon: typeof Home;
   label: string;
-  children: ReactNode;
-  defaultOpen?: boolean;
-  small?: boolean;
+  active: boolean;
+  prefetch?: boolean;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-
   return (
-    <div className="mb-1">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 hover:bg-white"
-      >
-        <span
-          className={`font-medium uppercase tracking-wider text-gray-400 ${small ? "text-[10px]" : "text-xs"}`}
-        >
-          {label}
-        </span>
-        <ChevronDown
-          size={12}
-          className={`text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && <div className="mt-0.5">{children}</div>}
-    </div>
+    <Link
+      href={href}
+      prefetch={prefetch}
+      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
+        active
+          ? "bg-zinc-950 text-white"
+          : "text-zinc-600 hover:bg-white hover:text-zinc-950"
+      }`}
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+      {label}
+    </Link>
   );
 }

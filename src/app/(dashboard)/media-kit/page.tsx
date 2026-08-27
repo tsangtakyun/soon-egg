@@ -784,7 +784,7 @@ export default function MediaKitPage() {
 
   return (
     <div className="min-h-screen pt-20">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex items-center justify-between gap-4 md:ml-[10%] md:w-[90%]">
         <div>
           <h1 className="text-3xl font-black text-zinc-950">Media Kit</h1>
           <p className="mt-2 text-zinc-500">編輯你的公開 Media Kit，讓品牌快速了解你的受眾、作品和合作報價。</p>
@@ -809,7 +809,7 @@ export default function MediaKitPage() {
           <div className="flex border-b border-zinc-100 bg-zinc-50 p-2">
             {[
               { key: "design", label: "設計" },
-              { key: "permissions", label: "權限" },
+              { key: "permissions", label: "內容與公開" },
               { key: "rates", label: "報價" },
             ].map((tab) => (
               <button

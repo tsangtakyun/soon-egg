@@ -99,9 +99,14 @@ export default async function DashboardHome() {
   ];
   const reach = reachSources.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const engagement = creator.instagram_engagement_rate ? `${creator.instagram_engagement_rate.toFixed(1)}%` : "未有數據";
-  const connectedPlatforms = [creator.instagram_handle, creator.youtube_handle].filter(Boolean).length;
+  const connectedPlatforms = [
+    Boolean(creator.instagram_handle || creator.instagram_followers),
+    Boolean(creator.youtube_handle || creator.youtube_subscribers),
+    Boolean(creator.xiaohongshu_followers),
+    Boolean(creator.tiktok_followers),
+  ].filter(Boolean).length;
   const summary = creator.ai_profile_summary || creator.bio || "完成 onboarding 後，這裡會顯示您的創作者定位。";
-  const hasSocialProfile = Boolean(creator.instagram_handle || creator.youtube_handle);
+  const hasSocialProfile = connectedPlatforms > 0;
   const setupSteps = [
     { done: Boolean(creator.onboarding_completed), label: "完成基本創作者設定", href: "/onboarding" },
     { done: hasSocialProfile, label: "連接或填寫社交平台", href: "/onboarding" },

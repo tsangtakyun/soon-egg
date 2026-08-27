@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <MobileDashboardNav avatarUrl={profile?.avatar_url} creatorName={creatorName} />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:pr-[320px]">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>

@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { LogOut, Settings, Zap } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getCreditBalance } from "@/lib/credits";
 import { CreditBadge } from "./CreditBadge";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { EggBrandMark } from "./EggBrandMark";
@@ -12,16 +11,13 @@ export async function Sidebar() {
   const {
     data: { user },
   } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-  const [balance, profileResult] = await Promise.all([
-    user?.email ? getCreditBalance(user.email) : Promise.resolve(0),
-    user && supabase
-      ? supabase
-          .from("egg_creator_profiles")
-          .select("display_name,username,avatar_url")
-          .eq("user_id", user.id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const profileResult = user && supabase
+    ? await supabase
+        .from("egg_creator_profiles")
+        .select("display_name,username,avatar_url")
+        .eq("user_id", user.id)
+        .maybeSingle()
+    : { data: null };
   const profile = profileResult.data;
   const creatorName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || "Creator";
 
@@ -41,7 +37,7 @@ export async function Sidebar() {
         </Link>
 
         <div className="mt-6 px-2">
-          <CreditBadge credits={balance} />
+          <CreditBadge />
         </div>
       </div>
 
@@ -53,10 +49,6 @@ export async function Sidebar() {
         <Link href="/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
           <Settings className="h-4 w-4" aria-hidden />
           設定
-        </Link>
-        <Link href="/credits" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
-          <Zap className="h-4 w-4" aria-hidden />
-          Credits
         </Link>
         <form action="/api/auth/signout" method="POST">
           <button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">

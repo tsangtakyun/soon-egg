@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronRight, Send, Sparkles, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -27,14 +27,6 @@ export function SOONAIPanel() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1024px)");
-    const syncPanel = () => setIsOpen(media.matches);
-    syncPanel();
-    media.addEventListener("change", syncPanel);
-    return () => media.removeEventListener("change", syncPanel);
-  }, []);
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -144,9 +136,7 @@ export function SOONAIPanel() {
       )}
 
       <div className="border-t border-gray-100 px-4 py-2">
-        <p className="text-xs text-gray-400">
-          每次對話消耗 <span className="font-semibold text-blue-500">3 credits</span>
-        </p>
+        <p className="text-xs text-gray-400">點數功能暫時未公開</p>
       </div>
 
       <div className="border-t border-gray-100 p-4">

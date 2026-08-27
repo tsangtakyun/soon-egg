@@ -77,6 +77,22 @@ type ProfileBlock = {
   url: string | null;
 };
 
+type FeaturedMedia = {
+  id: string;
+  media_type: string | null;
+  media_product_type: string | null;
+  caption: string | null;
+  permalink: string | null;
+  media_url: string | null;
+  thumbnail_url: string | null;
+  views: number | null;
+  reach: number | null;
+  plays: number | null;
+  like_count: number;
+  comments_count: number;
+  sort_order: number;
+};
+
 function blockHref(block: ProfileBlock, username: string) {
   const title = block.title?.trim() ?? "";
   const url = block.url ?? "#";
@@ -110,6 +126,13 @@ function fontHref(font: string) {
 
 function money(value: number | null | undefined) {
   return `HK$${Number(value ?? 0).toLocaleString()}`;
+}
+
+function featuredMetric(media: FeaturedMedia) {
+  if (media.views != null) return { label: "觀看", value: media.views };
+  if (media.plays != null) return { label: "播放", value: media.plays };
+  if (media.reach != null) return { label: "觸及", value: media.reach };
+  return { label: "互動", value: media.like_count + media.comments_count };
 }
 
 function truncate(value: string | null | undefined, length: number) {
@@ -185,7 +208,7 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
     notFound();
   }
 
-  const [{ data: rateCards }, { data: brandPartners }, { data: caseStudies }, { data: blocks }] = await Promise.all([
+  const [{ data: rateCards }, { data: brandPartners }, { data: caseStudies }, { data: blocks }, { data: featuredMedia }] = await Promise.all([
     supabase.from("egg_rate_cards").select("*").eq("creator_id", profile.id).eq("is_active", true).order("sort_order", { ascending: true }),
     supabase.from("egg_brand_partners").select("*").eq("creator_id", profile.id).order("sort_order", { ascending: true }),
     supabase.from("egg_case_studies").select("*").eq("creator_id", profile.id).order("sort_order", { ascending: true }),
@@ -195,6 +218,13 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
       .eq("creator_id", profile.id)
       .eq("is_visible", true)
       .order("sort_order", { ascending: true }),
+    supabase
+      .from("egg_instagram_media")
+      .select("id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,views,reach,plays,like_count,comments_count,sort_order")
+      .eq("creator_id", profile.id)
+      .eq("is_featured", true)
+      .order("sort_order", { ascending: true })
+      .limit(3),
   ]);
 
   const bgColor = profile.mediakit_bg_color ?? "#FFF5E6";
@@ -212,6 +242,7 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
   const activeBrandPartners = (brandPartners ?? []) as BrandPartner[];
   const activeCaseStudies = (caseStudies ?? []) as CaseStudy[];
   const activeBlocks = ((blocks ?? []) as ProfileBlock[]).filter((block) => block.title?.trim() !== "Creator Media Kit 模板");
+  const activeFeaturedMedia = (featuredMedia ?? []) as FeaturedMedia[];
   const tagline = truncate(profile.bio, 80);
   const hasSocials = Boolean(profile.instagram_handle || profile.youtube_handle || profile.tiktok_handle || profile.xiaohongshu_handle);
   const platformBreakdown = [
@@ -422,6 +453,33 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
             <p style={{ color: bodyTextColor, fontSize: 16, lineHeight: 1.8, maxWidth: 720, fontFamily: font, opacity: 1 }}>
               {profile.mediakit_bio ?? profile.bio ?? "—"}
             </p>
+          </section>
+        )}
+
+        {activeFeaturedMedia.length > 0 && (
+          <section style={{ background: bgColor, padding: "32px 48px", borderBottom: `1px solid ${borderColor}` }}>
+            <p style={{ color: mutedTextColor, fontSize: 11, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 16 }}>FEATURED CONTENT</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+              {activeFeaturedMedia.map((media) => {
+                const imageUrl = media.thumbnail_url || media.media_url;
+                const metric = featuredMetric(media);
+                return (
+                  <a key={media.id} href={media.permalink || "#"} target="_blank" rel="noopener noreferrer" style={{ display: "block", overflow: "hidden", borderRadius: 16, border: `1px solid ${borderColor}`, color: bodyTextColor, textDecoration: "none", background: isLightColor(bgColor) ? "rgba(0,0,0,0.03)" : "rgba(255,255,255,0.08)" }}>
+                    <div style={{ aspectRatio: "1 / 1", background: borderColor }}>
+                      {imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={imageUrl} alt={media.caption || "Instagram featured content"} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : null}
+                    </div>
+                    <div style={{ padding: 14 }}>
+                      <p style={{ margin: 0, fontSize: 12, color: mutedTextColor }}>{media.media_product_type === "REELS" ? "Instagram Reel" : "Instagram Post"}</p>
+                      <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 600, lineHeight: 1.45 }}>{truncate(media.caption, 70) || "查看 Instagram 內容"}</p>
+                      <p style={{ margin: "10px 0 0", color: accentColor, fontSize: 13, fontWeight: 700 }}>{metric.value.toLocaleString()} {metric.label}</p>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
           </section>
         )}
 

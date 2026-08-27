@@ -1,7 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type InstagramProfile = { id?: string; username?: string; followers_count?: number; error?: { message?: string } };
-type InstagramMedia = { like_count?: number; comments_count?: number };
+type InstagramMedia = {
+  id: string;
+  media_type?: string;
+  media_product_type?: string;
+  caption?: string;
+  permalink?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  timestamp?: string;
+  like_count?: number;
+  comments_count?: number;
+};
 type InstagramMediaResponse = { data?: InstagramMedia[]; error?: { message?: string } };
 type InstagramInsightRow = { name?: string; values?: Array<{ value?: number }>; total_value?: { value?: number } };
 type InstagramInsightsResponse = { data?: InstagramInsightRow[]; error?: { message?: string } };
@@ -46,11 +57,35 @@ async function fetchInstagramProfile(instagramUserId: string | null, accessToken
 
 async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: string): Promise<InstagramMediaResponse> {
   const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}/media`);
-  url.searchParams.set("fields", "id,like_count,comments_count,timestamp");
+  url.searchParams.set("fields", "id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,like_count,comments_count,timestamp");
   url.searchParams.set("limit", "12");
   url.searchParams.set("access_token", accessToken);
   const response = await fetch(url.toString(), { cache: "no-store" });
   return (await response.json()) as InstagramMediaResponse;
+}
+
+async function fetchMediaInsights(mediaId: string, accessToken: string) {
+  const metrics: Record<string, number> = {};
+  for (const metric of ["views", "plays", "reach", "total_interactions"]) {
+    const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(mediaId)}/insights`);
+    url.searchParams.set("metric", metric);
+    url.searchParams.set("access_token", accessToken);
+    try {
+      const response = await fetch(url.toString(), { cache: "no-store" });
+      const payload = (await response.json()) as InstagramInsightsResponse;
+      if (!response.ok || payload.error) continue;
+      const row = payload.data?.[0];
+      if (row) metrics[metric] = insightValue(row);
+    } catch {
+      // Metric availability differs by media type and Meta API version.
+    }
+  }
+  return metrics;
+}
+
+function mediaScore(media: InstagramMedia, insights: Record<string, number>) {
+  return insights.views ?? insights.plays ?? insights.reach ?? insights.total_interactions
+    ?? ((media.like_count ?? 0) + (media.comments_count ?? 0));
 }
 
 function insightValue(row: InstagramInsightRow) {
@@ -109,9 +144,11 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
   let engagementSampleSize = 0;
   let engagementUnavailableReason: string | null = null;
 
+  let recentMedia: InstagramMedia[] = [];
   if (instagramUserId && followers > 0) {
     const mediaResponse = await fetchRecentInstagramMedia(instagramUserId, profile.instagram_access_token);
     const media = mediaResponse.data ?? [];
+    recentMedia = media;
     if (mediaResponse.error) engagementUnavailableReason = mediaResponse.error.message || "Meta 暫時未提供貼文互動數據";
     else if (media.length === 0) engagementUnavailableReason = "未有可用嘅 Instagram 貼文數據";
     else {
@@ -162,6 +199,56 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
     captured_at: syncedAt,
   }, { onConflict: "creator_id,snapshot_date" });
   if (snapshotError) throw new Error(`Instagram snapshot failed: ${snapshotError.message}`);
+
+  if (recentMedia.length > 0) {
+    const enriched = await Promise.all(recentMedia.map(async (media) => ({
+      media,
+      insights: await fetchMediaInsights(media.id, profile.instagram_access_token),
+    })));
+    const mediaRows = enriched.map(({ media, insights }) => ({
+      creator_id: profile.id,
+      instagram_media_id: media.id,
+      media_type: media.media_type ?? null,
+      media_product_type: media.media_product_type ?? null,
+      caption: media.caption ?? null,
+      permalink: media.permalink ?? null,
+      media_url: media.media_url ?? null,
+      thumbnail_url: media.thumbnail_url ?? null,
+      published_at: media.timestamp ?? null,
+      like_count: media.like_count ?? 0,
+      comments_count: media.comments_count ?? 0,
+      views: insights.views ?? null,
+      reach: insights.reach ?? null,
+      plays: insights.plays ?? null,
+      total_interactions: insights.total_interactions ?? null,
+      synced_at: syncedAt,
+    }));
+    const { error: mediaError } = await supabase
+      .from("egg_instagram_media")
+      .upsert(mediaRows, { onConflict: "creator_id,instagram_media_id" });
+    if (mediaError) throw new Error(`Instagram media sync failed: ${mediaError.message}`);
+
+    const { data: featured } = await supabase
+      .from("egg_instagram_media")
+      .select("id")
+      .eq("creator_id", profile.id)
+      .eq("is_featured", true)
+      .limit(1);
+    if (!featured?.length) {
+      const topThreeIds = enriched
+        .toSorted((a, b) => mediaScore(b.media, b.insights) - mediaScore(a.media, a.insights))
+        .slice(0, 3)
+        .map(({ media }) => media.id);
+      for (const [sortOrder, instagramMediaId] of topThreeIds.entries()) {
+        const { error } = await supabase
+          .from("egg_instagram_media")
+          .update({ is_featured: true, sort_order: sortOrder })
+          .eq("creator_id", profile.id)
+          .eq("instagram_media_id", instagramMediaId);
+        if (error) throw new Error(`Instagram featured media failed: ${error.message}`);
+      }
+    }
+  }
 
   return {
     followers,

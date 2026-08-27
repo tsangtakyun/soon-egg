@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
+import { FeaturedMediaEditor } from "@/components/media-kit/FeaturedMediaEditor";
 import { createClient } from "@/lib/supabase/client";
 
 type CreatorProfile = {
@@ -203,6 +204,9 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
   const [draft, setDraft] = useState({ title: "", brand_name: "", description: "", result: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -225,29 +229,51 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
 
   async function handleAdd() {
     if (!draft.title.trim()) return;
-
-    const { data, error } = await supabase
-      .from("egg_case_studies")
-      .insert({
+    setStatus("儲存中…");
+    setErrorMessage(null);
+    const payload = {
         creator_id: profileId,
         title: draft.title.trim(),
         brand_name: draft.brand_name.trim() || null,
         description: draft.description.trim() || null,
         result: draft.result.trim() || null,
-        sort_order: caseStudies.length,
-      })
+        sort_order: editingId ? caseStudies.find((item) => item.id === editingId)?.sort_order ?? 0 : caseStudies.length,
+      };
+    const query = editingId
+      ? supabase.from("egg_case_studies").update(payload).eq("id", editingId).eq("creator_id", profileId)
+      : supabase.from("egg_case_studies").insert(payload);
+    const { data, error } = await query
       .select()
       .single();
 
     if (!error && data) {
-      setCaseStudies((current) => [...current, data as CaseStudy]);
+      setCaseStudies((current) => editingId
+        ? current.map((item) => item.id === editingId ? data as CaseStudy : item)
+        : [...current, data as CaseStudy]);
       setDraft({ title: "", brand_name: "", description: "", result: "" });
+      setEditingId(null);
+      setStatus("✓ 已儲存");
+    } else if (error) {
+      setStatus(null);
+      setErrorMessage(`儲存失敗：${error.message}`);
     }
   }
 
   async function handleDelete(id: string) {
+    setStatus("刪除中…");
     const { error } = await supabase.from("egg_case_studies").delete().eq("id", id);
-    if (!error) setCaseStudies((current) => current.filter((item) => item.id !== id));
+    if (!error) {
+      setCaseStudies((current) => current.filter((item) => item.id !== id));
+      setStatus("✓ 已刪除");
+    } else {
+      setStatus(null);
+      setErrorMessage(`刪除失敗：${error.message}`);
+    }
+  }
+
+  function startEdit(item: CaseStudy) {
+    setEditingId(item.id);
+    setDraft({ title: item.title ?? "", brand_name: item.brand_name ?? "", description: item.description ?? "", result: item.result ?? "" });
   }
 
   return (
@@ -285,10 +311,13 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
             className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-40"
             type="button"
           >
-            新增過往項目
+            {editingId ? "儲存修改" : "新增過往項目"}
           </button>
+          {editingId && <button type="button" onClick={() => { setEditingId(null); setDraft({ title: "", brand_name: "", description: "", result: "" }); }} className="rounded-xl border border-zinc-200 px-4 py-2 text-sm text-zinc-600">取消編輯</button>}
         </div>
       </div>
+      {status && <p role="status" className="text-xs font-medium text-green-700">{status}</p>}
+      {errorMessage && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{errorMessage}</p>}
 
       {caseStudies.length === 0 ? (
         <p className="rounded-xl bg-white px-4 py-6 text-center text-sm text-zinc-400">尚未新增過往項目。</p>
@@ -302,9 +331,10 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
                 {item.description && <p className="mt-1 text-xs leading-relaxed text-zinc-500">{item.description}</p>}
                 {item.result && <p className="mt-1 text-xs font-medium text-blue-600">{item.result}</p>}
               </div>
-              <button onClick={() => handleDelete(item.id)} className="text-xs text-zinc-300 hover:text-red-400" type="button">
-                刪除
-              </button>
+              <div className="flex shrink-0 gap-2">
+                <button onClick={() => startEdit(item)} className="text-xs font-medium text-blue-600 hover:text-blue-800" type="button">編輯</button>
+                <button onClick={() => handleDelete(item.id)} className="text-xs text-zinc-400 hover:text-red-500" type="button">刪除</button>
+              </div>
             </div>
           ))}
         </div>
@@ -317,6 +347,9 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [partners, setPartners] = useState<BrandPartner[]>([]);
   const [brandName, setBrandName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,25 +373,39 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
   async function handleAdd() {
     if (!brandName.trim()) return;
 
-    const { data, error } = await supabase
-      .from("egg_brand_partners")
-      .insert({
+    setMessage("儲存中…");
+    setErrorMessage(null);
+    const payload = {
         creator_id: profileId,
         brand_name: brandName.trim(),
-        sort_order: partners.length,
-      })
+        sort_order: editingId ? partners.find((partner) => partner.id === editingId)?.sort_order ?? 0 : partners.length,
+      };
+    const query = editingId
+      ? supabase.from("egg_brand_partners").update(payload).eq("id", editingId).eq("creator_id", profileId)
+      : supabase.from("egg_brand_partners").insert(payload);
+    const { data, error } = await query
       .select()
       .single();
 
     if (!error && data) {
-      setPartners((current) => [...current, data as BrandPartner]);
+      setPartners((current) => editingId
+        ? current.map((partner) => partner.id === editingId ? data as BrandPartner : partner)
+        : [...current, data as BrandPartner]);
       setBrandName("");
+      setEditingId(null);
+      setMessage("✓ 已儲存");
+    } else if (error) {
+      setMessage(null);
+      setErrorMessage(`儲存失敗：${error.message}`);
     }
   }
 
   async function handleDelete(id: string) {
     const { error } = await supabase.from("egg_brand_partners").delete().eq("id", id);
-    if (!error) setPartners((current) => current.filter((partner) => partner.id !== id));
+    if (!error) {
+      setPartners((current) => current.filter((partner) => partner.id !== id));
+      setMessage("✓ 已刪除");
+    } else setErrorMessage(`刪除失敗：${error.message}`);
   }
 
   return (
@@ -376,9 +423,12 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
           className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-40"
           type="button"
         >
-          新增
+          {editingId ? "儲存" : "新增"}
         </button>
       </div>
+      {editingId && <button type="button" onClick={() => { setEditingId(null); setBrandName(""); }} className="text-xs text-zinc-500 underline">取消編輯</button>}
+      {message && <p role="status" className="text-xs font-medium text-green-700">{message}</p>}
+      {errorMessage && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{errorMessage}</p>}
 
       {partners.length === 0 ? (
         <p className="rounded-xl bg-white px-4 py-6 text-center text-sm text-zinc-400">尚未新增品牌合作。</p>
@@ -397,9 +447,10 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
                 )}
                 <p className="text-sm font-medium text-zinc-900">{partner.brand_name}</p>
               </div>
-              <button onClick={() => handleDelete(partner.id)} className="text-xs text-zinc-300 hover:text-red-400" type="button">
-                刪除
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => { setEditingId(partner.id); setBrandName(partner.brand_name ?? ""); }} className="text-xs font-medium text-blue-600 hover:text-blue-800" type="button">編輯</button>
+                <button onClick={() => handleDelete(partner.id)} className="text-xs text-zinc-400 hover:text-red-500" type="button">刪除</button>
+              </div>
             </div>
           ))}
         </div>
@@ -564,8 +615,11 @@ export default function MediaKitPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("design");
   const [showAddRate, setShowAddRate] = useState(false);
   const [newRate, setNewRate] = useState(emptyRate);
+  const [editingRateId, setEditingRateId] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -611,46 +665,84 @@ export default function MediaKitPage() {
 
   async function saveProfile(updates: Partial<CreatorProfile>, refreshPreview = true) {
     if (!profile) return;
-
+    const previous = profile;
+    setSaveState("saving");
+    setSaveError(null);
+    setProfile((current) => (current ? { ...current, ...updates } : current));
     const { error } = await supabase.from("egg_creator_profiles").update(updates).eq("id", profile.id);
-
-    if (!error) {
-      setProfile((current) => (current ? { ...current, ...updates } : current));
-      if (refreshPreview) setPreviewKey((current) => current + 1);
+    if (error) {
+      setProfile(previous);
+      setSaveState("error");
+      setSaveError(error.message);
+      return;
     }
+    setSaveState("saved");
+    if (refreshPreview) setPreviewKey((current) => current + 1);
+    window.setTimeout(() => setSaveState("idle"), 2500);
   }
 
   async function handleSaveRate() {
     if (!profile) return;
     if (!newRate.service_name && !newRate.service_name_zh) return;
 
-    const { data, error } = await supabase
-      .from("egg_rate_cards")
-      .insert({
+    setSaveState("saving");
+    setSaveError(null);
+    const payload = {
         creator_id: profile.id,
         service_name: newRate.service_name || newRate.service_name_zh,
         service_name_zh: newRate.service_name_zh,
         platform: newRate.platform,
         price: newRate.price,
         currency: "HKD",
-        sort_order: rateCards.length,
+        sort_order: editingRateId ? rateCards.find((rate) => rate.id === editingRateId)?.sort_order ?? 0 : rateCards.length,
         is_active: true,
-      })
+      };
+    const query = editingRateId
+      ? supabase.from("egg_rate_cards").update(payload).eq("id", editingRateId).eq("creator_id", profile.id)
+      : supabase.from("egg_rate_cards").insert(payload);
+    const { data, error } = await query
       .select()
       .single();
 
     if (!error && data) {
-      setRateCards((current) => [...current, data as RateCard]);
+      setRateCards((current) => editingRateId
+        ? current.map((rate) => rate.id === editingRateId ? data as RateCard : rate)
+        : [...current, data as RateCard]);
       setShowAddRate(false);
+      setEditingRateId(null);
       setNewRate(emptyRate);
       setPreviewKey((current) => current + 1);
+      setSaveState("saved");
+      window.setTimeout(() => setSaveState("idle"), 2500);
+    } else if (error) {
+      setSaveState("error");
+      setSaveError(error.message);
     }
   }
 
   async function handleDeleteRate(id: string) {
-    await supabase.from("egg_rate_cards").update({ is_active: false }).eq("id", id);
+    setSaveState("saving");
+    const { error } = await supabase.from("egg_rate_cards").update({ is_active: false }).eq("id", id).eq("creator_id", profile?.id);
+    if (error) {
+      setSaveState("error");
+      setSaveError(error.message);
+      return;
+    }
     setRateCards((current) => current.filter((rate) => rate.id !== id));
     setPreviewKey((current) => current + 1);
+    setSaveState("saved");
+    window.setTimeout(() => setSaveState("idle"), 2500);
+  }
+
+  function startEditRate(rate: RateCard) {
+    setEditingRateId(rate.id);
+    setNewRate({
+      service_name: rate.service_name ?? "",
+      service_name_zh: rate.service_name_zh ?? "",
+      platform: rate.platform ?? "",
+      price: Number(rate.price ?? 0),
+    });
+    setShowAddRate(true);
   }
 
   const bgColor = profile?.mediakit_bg_color ?? "#FFF5E6";
@@ -672,6 +764,12 @@ export default function MediaKitPage() {
         >
           分享
         </a>
+      </div>
+
+      <div aria-live="polite" className="mb-4 min-h-6">
+        {saveState === "saving" && <p className="text-sm font-medium text-blue-600">儲存中…</p>}
+        {saveState === "saved" && <p className="text-sm font-medium text-green-700">✓ 已儲存並更新公開預覽</p>}
+        {saveState === "error" && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">儲存失敗：{saveError || "請檢查網絡後重試。"}</p>}
       </div>
 
       <div className="grid min-h-[720px] gap-6 xl:grid-cols-[480px_minmax(0,1fr)]">
@@ -786,6 +884,9 @@ export default function MediaKitPage() {
 
                 {activeTab === "permissions" && (
                   <div className="space-y-6 p-5">
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+                      請確認目前嘅報價、品牌合作及過往項目都係真實資料，確認後先將 Media Kit 分享俾品牌。
+                    </div>
                     <div className="space-y-3">
                       <h2 className="text-base font-semibold text-zinc-950">公開設定</h2>
                       <ToggleRow
@@ -812,6 +913,11 @@ export default function MediaKitPage() {
                         profile={profile}
                         onUpdate={saveProfile}
                       />
+                      <div className="overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50">
+                        <CollapsibleSection title="精選 Instagram 內容（最多 3 個）">
+                          <FeaturedMediaEditor profileId={profile.id} onPreviewChange={() => setPreviewKey((current) => current + 1)} />
+                        </CollapsibleSection>
+                      </div>
                       <LockedBlockRow
                         label="品牌合作"
                         toggleField="mediakit_lock_brand_partners"
@@ -879,6 +985,9 @@ export default function MediaKitPage() {
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="font-medium text-zinc-950">HK${Number(rate.price ?? 0).toLocaleString()}</span>
+                              <button onClick={() => startEditRate(rate)} className="text-xs font-medium text-blue-600 hover:text-blue-800" type="button">
+                                編輯
+                              </button>
                               <button onClick={() => handleDeleteRate(rate.id)} className="text-xs text-zinc-300 hover:text-red-400" type="button">
                                 刪除
                               </button>
@@ -922,7 +1031,7 @@ export default function MediaKitPage() {
       {showAddRate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6">
-            <h3 className="mb-4 text-lg font-medium text-zinc-950">新增服務報價</h3>
+            <h3 className="mb-4 text-lg font-medium text-zinc-950">{editingRateId ? "編輯服務報價" : "新增服務報價"}</h3>
 
             <label className="mb-1 block text-sm text-zinc-500">服務名稱（中文）</label>
             <input
@@ -968,7 +1077,7 @@ export default function MediaKitPage() {
               <button onClick={handleSaveRate} className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white" type="button">
                 儲存
               </button>
-              <button onClick={() => setShowAddRate(false)} className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500" type="button">
+              <button onClick={() => { setShowAddRate(false); setEditingRateId(null); setNewRate(emptyRate); }} className="flex-1 rounded-lg border border-zinc-200 py-2 text-sm text-zinc-500" type="button">
                 取消
               </button>
             </div>

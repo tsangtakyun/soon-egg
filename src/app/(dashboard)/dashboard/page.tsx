@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Link2, Sparkles, UserRound } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Link2, UserRound } from "lucide-react";
 import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { CreatorAvatar } from "@/components/ui/CreatorAvatar";
@@ -112,8 +112,6 @@ export default async function DashboardHome() {
     { done: hasSocialProfile, label: "連接或填寫社交平台", href: "/onboarding" },
     { done: Boolean(creator.bio && creator.avatar_url), label: "完善公開創作者檔案", href: "/profile" },
   ];
-  const nextSetupStep = setupSteps.find((step) => !step.done);
-
   return (
     <>
       <DashboardShareHeader username={creator.username} />
@@ -151,55 +149,29 @@ export default async function DashboardHome() {
           </Link>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
-          <div
-            className="relative overflow-hidden rounded-2xl text-white"
-            style={{
-              backgroundImage: "url(/hero-bg.jpg)",
-              backgroundPosition: "center top",
-              backgroundRepeat: "no-repeat",
-              backgroundSize: "cover",
-            }}
-          >
-            <div className="absolute inset-0 bg-black/30" />
-            <div className="relative z-10 p-6 sm:p-7">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm text-white">
-                <Sparkles className="h-4 w-4" aria-hidden />
-                SOON-EGG Creator Network
+        <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)] lg:items-center">
+            <div>
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-400">你的創作者空間</p>
+              <div className="flex items-center gap-4">
+                <CreatorAvatar avatarUrl={avatarUrl} creatorName={displayName} className="h-16 w-16" />
+                <div className="min-w-0">
+                  <h2 className="truncate text-xl font-bold text-zinc-950">{displayName}</h2>
+                  <p className="text-sm text-zinc-500">@{creator.username}</p>
+                </div>
               </div>
-              <h1 className="mt-4 max-w-3xl text-3xl font-black leading-tight text-white sm:text-4xl">亞洲創作者的品牌合作與變現中樞</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/90">整理社交數據、建立媒體資料包（Media Kit），並探索適合你的品牌合作。</p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                <Link href={nextSetupStep?.href ?? "/brand-deals"} className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-zinc-950">
-                  {nextSetupStep ? "繼續設定" : "查看合作機會"}
-                  <ArrowUpRight className="h-4 w-4" aria-hidden />
-                </Link>
-                <Link href={`/${creator.username}`} className="inline-flex items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-sm text-white">
-                  查看公開主頁
-                </Link>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-zinc-600">{summary}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link href="/profile" className="rounded-lg border border-zinc-200 px-4 py-2 text-center text-xs font-semibold text-zinc-700 hover:bg-zinc-50">編輯檔案</Link>
+                <Link href={`/${creator.username}`} className="rounded-lg bg-zinc-950 px-4 py-2 text-center text-xs font-semibold text-white">預覽公開頁</Link>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-400">你的 Creator 空間</p>
-            <div className="flex items-center gap-4">
-              <CreatorAvatar avatarUrl={avatarUrl} creatorName={displayName} className="h-16 w-16" />
-              <div className="min-w-0">
-                <h2 className="truncate text-xl font-bold text-zinc-950">{displayName}</h2>
-                <p className="text-sm text-zinc-500">@{creator.username}</p>
-              </div>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-zinc-600">{summary}</p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Metric icon={UserRound} label="總粉絲數" value={formatCompact(reach)} />
               <Metric icon={ChartNoAxesCombined} label="Instagram 互動率" value={engagement} />
               <Metric icon={BriefcaseBusiness} label="合作項目" value={String(dealsCount)} />
               <Metric icon={Link2} label="已連接平台" value={String(connectedPlatforms)} />
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Link href="/profile" className="flex-1 rounded-lg border border-zinc-200 px-3 py-2 text-center text-xs font-semibold text-zinc-700 hover:bg-zinc-50">編輯檔案</Link>
-              <Link href={`/${creator.username}`} className="flex-1 rounded-lg bg-zinc-950 px-3 py-2 text-center text-xs font-semibold text-white">預覽公開頁</Link>
             </div>
           </div>
         </section>

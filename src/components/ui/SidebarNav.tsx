@@ -92,14 +92,12 @@ export function SidebarNav() {
         />
       ))}
 
-      <div className="pt-5">
-        <SidebarItem
-          href="/brand-deals"
-          icon={BriefcaseBusiness}
-          label="合作機會"
-          prefetch={false}
-        />
-      </div>
+      <SidebarItem
+        href="/brand-deals"
+        icon={BriefcaseBusiness}
+        label="合作機會"
+        prefetch={false}
+      />
 
       <div className="pt-2">
         <SidebarSection label="創作工具" defaultOpen={true}>

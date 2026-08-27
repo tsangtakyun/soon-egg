@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 type CreatorProfile = {
   id: string;
   username: string;
+  bio?: string | null;
   instagram_handle: string | null;
   instagram_followers?: number | null;
   instagram_access_token?: string | null;
@@ -516,7 +517,7 @@ function SectionEditor({
         />
         <TextField
           label="個人簡介"
-          value={profile.mediakit_bio ?? ""}
+          value={profile.mediakit_bio ?? profile.bio ?? ""}
           placeholder="介紹你的內容定位、受眾和合作亮點"
           multiline
           onSave={(value) => onUpdate({ mediakit_bio: value })}

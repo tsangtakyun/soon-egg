@@ -81,22 +81,24 @@ export default function ActiveDealsPage() {
         return;
       }
 
-      const [{ data: briefData }, { data: applicationData }, claimsResponse] =
+      const [{ data: briefData }, applicationsResponse, claimsResponse] =
         await Promise.all([
           supabase
             .from("egg_project_briefs")
             .select("*")
             .eq("creator_id", profileData.id)
             .order("received_at", { ascending: false }),
-          supabase
-            .from("egg_campaign_applications")
-            .select(
-              "id,campaign_name,brand_name,theme,call_to_action,starts_on,status",
-            )
-            .eq("creator_id", profileData.id)
-            .in("status", ["accepted", "in_progress"]),
+          fetch("/api/campaigns/mine", { cache: "no-store" }),
           fetch("/api/perks/mine", { cache: "no-store" }),
         ]);
+
+      const applicationsPayload = applicationsResponse.ok
+        ? await applicationsResponse.json()
+        : { applications: [] };
+      const applicationData = (applicationsPayload.applications ?? []).filter(
+        (application: CampaignApplication) =>
+          ["accepted", "in_progress"].includes(application.status),
+      );
 
       const claimsPayload = claimsResponse.ok
         ? await claimsResponse.json()

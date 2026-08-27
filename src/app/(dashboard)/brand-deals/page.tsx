@@ -536,7 +536,6 @@ function CompletedBrandCard({ invitation }: { invitation: BrandInvitation }) {
 }
 
 function CampaignFeed({ profile }: { profile: Profile }) {
-  const supabase = useMemo(() => createClient(), []);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [applications, setApplications] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -552,19 +551,20 @@ function CampaignFeed({ profile }: { profile: Profile }) {
       try {
         const [campaignRes, applicationRes] = await Promise.all([
           fetch("/api/campaigns/feed"),
-          supabase
-            .from("egg_campaign_applications")
-            .select("cw_campaign_id")
-            .eq("creator_id", profile.id),
+          fetch("/api/campaigns/mine", { cache: "no-store" }),
         ]);
         const campaignData = await campaignRes.json();
+        const applicationData = applicationRes.ok
+          ? await applicationRes.json()
+          : { applications: [] };
         if (!cancelled) {
           if (!campaignRes.ok)
             setError(campaignData.error || "未能載入合作機會");
           setCampaigns(campaignData.campaigns ?? []);
           setApplications(
-            applicationRes.data?.map((item) => item.cw_campaign_id as string) ??
-              [],
+            applicationData.applications?.map(
+              (item: { cw_campaign_id: string }) => item.cw_campaign_id,
+            ) ?? [],
           );
         }
       } catch {
@@ -577,7 +577,7 @@ function CampaignFeed({ profile }: { profile: Profile }) {
     return () => {
       cancelled = true;
     };
-  }, [profile.id, supabase]);
+  }, [profile.id]);
 
   if (loading)
     return (
@@ -673,17 +673,15 @@ export default function BrandDealsPage() {
         .select("*")
         .eq("creator_id", profile.id)
         .order("sent_at", { ascending: false }),
-      supabase
-        .from("egg_campaign_applications")
-        .select(
-          "id,cw_campaign_id,campaign_name,brand_name,cover_image_url,status",
-        )
-        .eq("creator_id", profile.id),
-    ]).then(([invitationResult, applicationResult]) => {
+      fetch("/api/campaigns/mine", { cache: "no-store" }),
+    ]).then(async ([invitationResult, applicationResponse]) => {
+      const applicationResult = applicationResponse.ok
+        ? await applicationResponse.json()
+        : { applications: [] };
       if (!cancelled) {
         setInvitations((invitationResult.data ?? []) as BrandInvitation[]);
         setApplications(
-          (applicationResult.data ?? []) as CampaignApplication[],
+          (applicationResult.applications ?? []) as CampaignApplication[],
         );
       }
     });

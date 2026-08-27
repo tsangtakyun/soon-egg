@@ -29,12 +29,6 @@ const items = [
   { href: "/analytics", label: "社交數據", icon: BarChart3 },
 ];
 
-const brandDealItems = [
-  { href: "/brand-deals", label: "合作機會", icon: BriefcaseBusiness },
-  { href: "/brand-deals/discover", label: "品牌禮遇", icon: Package },
-  { href: "/active-deals", label: "進行中合作", icon: BriefcaseBusiness },
-];
-
 const creatorToolItems = [
   { href: "/tools", label: "工具總覽", icon: Wrench },
   { href: "/tools/idea", label: "靈感工作台", icon: Lightbulb },
@@ -99,17 +93,12 @@ export function SidebarNav() {
       ))}
 
       <div className="pt-5">
-        <SidebarSection label="品牌合作" defaultOpen={true}>
-          {brandDealItems.map((item) => (
-            <SidebarItem
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              prefetch={false}
-            />
-          ))}
-        </SidebarSection>
+        <SidebarItem
+          href="/brand-deals"
+          icon={BriefcaseBusiness}
+          label="合作機會"
+          prefetch={false}
+        />
       </div>
 
       <div className="pt-2">

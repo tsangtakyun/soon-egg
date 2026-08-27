@@ -139,7 +139,7 @@ export function ReplyClient({ messages: initialMessages, balance: initialBalance
           </button>
         </div>
         <p className="mt-2 flex items-center gap-1 text-xs text-zinc-400">
-          <MessageSquare className="h-3.5 w-3.5" /> 每次 AI 回覆扣 3 credits
+          <MessageSquare className="h-3.5 w-3.5" /> 暫時免費使用
         </p>
       </footer>
     </main>

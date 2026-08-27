@@ -17,6 +17,7 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { getMasterSupabase } from "@/lib/supabase-master";
+import { CREDIT_SYSTEM_ENABLED } from "@/lib/credits";
 
 let stripeClient: Stripe | null = null;
 
@@ -44,6 +45,9 @@ export async function POST(req: Request) {
     data: { user },
   } = await serverSupabase.auth.getUser();
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!CREDIT_SYSTEM_ENABLED) {
+    return NextResponse.json({ error: "點數功能暫時未公開，所有工具現時免費使用。" }, { status: 409 });
+  }
 
   const { package_id } = await req.json();
   const masterSupabase = getMasterSupabase();

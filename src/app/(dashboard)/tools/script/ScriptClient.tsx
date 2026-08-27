@@ -169,7 +169,7 @@ export function ScriptClient({
             {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <FileText className="h-4 w-4" aria-hidden />}
             {loading ? "生成中..." : "AI 生成 IG Reel 劇本"}
           </button>
-          <p className="text-center text-xs text-zinc-400">每次 AI 生成扣 3 credits</p>
+          <p className="text-center text-xs text-zinc-400">暫時免費使用</p>
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">

@@ -1,10 +1,12 @@
 import { masterSupabase } from "@/lib/supabase/master";
 
 export const CREDIT_COSTS = {
-  TOOL_ENTRY: 10,
-  AI_GENERATION: 3,
+  TOOL_ENTRY: 0,
+  AI_GENERATION: 0,
   FREE: 0,
 } as const;
+
+export const CREDIT_SYSTEM_ENABLED = false;
 
 type CreditRow = {
   user_id: string;
@@ -14,6 +16,7 @@ type CreditRow = {
 };
 
 export async function getCreditBalance(email: string): Promise<number> {
+  if (!CREDIT_SYSTEM_ENABLED) return 0;
   if (!email) {
     console.error("[credits] getCreditBalance called with empty email");
     return 0;
@@ -42,6 +45,7 @@ export async function deductCredits({
   tool?: string;
   platform?: string;
 }): Promise<{ success: boolean; balance: number; error?: string }> {
+  if (!CREDIT_SYSTEM_ENABLED) return { success: true, balance: 0 };
   if (amount <= 0) {
     const balance = await getCreditBalance(email);
     return { success: true, balance };
@@ -95,6 +99,7 @@ export async function addCredits({
   description?: string;
   stripe_session_id?: string;
 }): Promise<{ success: boolean; balance: number }> {
+  if (!CREDIT_SYSTEM_ENABLED) return { success: true, balance: 0 };
   const { data: credit } = await (masterSupabase as any)
     .from("user_credits")
     .select("user_id, balance, total_purchased")
@@ -130,6 +135,7 @@ export async function addCredits({
 }
 
 export async function initKolCredits(email: string, eggUserId: string): Promise<void> {
+  if (!CREDIT_SYSTEM_ENABLED) return;
   if (!email) return;
 
   try {

@@ -4,7 +4,7 @@ import { getMasterSupabaseAdmin } from "@/lib/supabase-master";
 
 const COSTS = {
   tool_enter: 0,
-  ai_generate: 10,
+  ai_generate: 0,
 } as const;
 
 type CreditAction = keyof typeof COSTS;
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
   if (cost === 0) {
     return NextResponse.json({
       success: true,
-      balance,
+      balance: 0,
       deducted: 0,
     });
   }

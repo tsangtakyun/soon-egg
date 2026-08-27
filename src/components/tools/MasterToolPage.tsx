@@ -10,7 +10,7 @@ const toolConfig: Record<ToolKey, { table?: string; title: string; subtitle: str
   projects: { table: "projects", title: "工作板", subtitle: "Work Board", empty: "暫時未有項目" },
   schedules: { table: "schedules", title: "日程", subtitle: "Schedule", empty: "暫時未有日程" },
   reply_threads: { table: "reply_threads", title: "回覆中心", subtitle: "Reply Centre", empty: "暫時未有回覆 thread" },
-  soon_ai: { title: "SOON AI", subtitle: "AI Assistant", empty: "SOON AI 會使用 Master credits 扣 3 Credits/次" },
+  soon_ai: { title: "SOON AI", subtitle: "AI Assistant", empty: "SOON AI 暫時免費使用" },
 };
 
 type MasterRow = {
@@ -181,9 +181,7 @@ export async function MasterToolPage({ tool }: { tool: ToolKey }) {
         <Header title={config.title} subtitle={config.subtitle} />
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <p className="text-sm leading-6 text-zinc-600">
-            SOON AI 已連接 Master Credits。正式對話 UI 會沿用現有右側 SOON AI panel；每次 AI 生成應透過
-            <code className="mx-1 rounded bg-zinc-100 px-1.5 py-0.5">/api/credits/deduct</code>
-            扣除 3 Credits。
+            SOON AI 會沿用現有右側對話 panel，點數功能開放前暫時免費使用。
           </p>
         </div>
       </div>

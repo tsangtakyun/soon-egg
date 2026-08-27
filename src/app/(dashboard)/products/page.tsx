@@ -239,7 +239,7 @@ export default function ProductsPage() {
   return (
     <div className="space-y-6 pt-[10vh]">
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="lg:ml-[10%]">
           <h1 className="text-3xl font-black text-zinc-950">我的貨品</h1>
           <p className="mt-2 text-zinc-500">管理你想推介或出售的產品</p>
         </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { logDealActivity } from "@/lib/deals-activity";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 type ApplyBody = {
   campaign_id: string;
@@ -18,13 +19,26 @@ type ApplyBody = {
 };
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  if (!supabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
+  const serverSupabase = await createServerClient();
+  if (!serverSupabase) return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await serverSupabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error("Campaign application error: Supabase service env is missing");
+    return NextResponse.json({ error: "合作申請服務暫時未完成設定。" }, { status: 503 });
+  }
+
+  // Authentication is verified with the user's session above. Persistence uses
+  // the server-only service role so browser-facing RLS policies stay locked down.
+  const supabase = createServiceClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
 
   const { data: profile, error: profileError } = await supabase.from("egg_creator_profiles").select("*").eq("user_id", user.id).single();
 

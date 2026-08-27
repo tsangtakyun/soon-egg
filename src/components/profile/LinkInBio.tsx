@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, Copy, Upload, X } from "lucide-react";
+import { Check, Copy, Sparkles, Upload, X } from "lucide-react";
 import { BlockEditor } from "./BlockEditor";
 import { PhonePreview, type PhonePreviewProfile, type PhonePreviewTheme, type ProfileBlock } from "./PhonePreview";
 
@@ -38,6 +38,10 @@ export function LinkInBio({
   const [profileBio, setProfileBio] = useState(initialProfile.bio || "");
   const [savingProfileInfo, setSavingProfileInfo] = useState(false);
   const [profileInfoMessage, setProfileInfoMessage] = useState("");
+  const [generatingBio, setGeneratingBio] = useState(false);
+  const [bioSuggestions, setBioSuggestions] = useState<string[]>([]);
+  const [bioSources, setBioSources] = useState<string[]>([]);
+  const [bioGenerationError, setBioGenerationError] = useState("");
   const [savingVisibility, setSavingVisibility] = useState(false);
   const [visibilityMessage, setVisibilityMessage] = useState("");
   const publicUrl = `https://egg.sooncreator.network/${profile.username}`;
@@ -155,6 +159,26 @@ export function LinkInBio({
     }
   };
 
+  const generateBioSuggestions = async () => {
+    setGeneratingBio(true);
+    setBioGenerationError("");
+    setBioSuggestions([]);
+    setBioSources([]);
+    try {
+      const response = await fetch("/api/profile/bio-suggestions", { method: "POST" });
+      const result = await response.json();
+      if (!response.ok || !Array.isArray(result.suggestions)) {
+        throw new Error(result.error || "Generation failed");
+      }
+      setBioSuggestions(result.suggestions);
+      setBioSources(Array.isArray(result.sources) ? result.sources : []);
+    } catch (error) {
+      setBioGenerationError(error instanceof Error ? error.message : "AI 暫時未能產生介紹，請稍後再試。");
+    } finally {
+      setGeneratingBio(false);
+    }
+  };
+
   return (
     <div className="flex min-w-0 flex-col items-start gap-6 p-4 sm:p-6 xl:flex-row xl:gap-8">
       <div className="flex min-w-0 w-full flex-1 flex-col gap-4">
@@ -265,6 +289,41 @@ export function LinkInBio({
                 rows={3}
                 className="w-full resize-none rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
               />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void generateBioSuggestions()}
+                  disabled={generatingBio}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 disabled:opacity-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                  {generatingBio ? "分析 Instagram 中…" : "AI 重新生成"}
+                </button>
+                <span className="text-[11px] text-zinc-400">只會提供建議，唔會自動覆蓋。</span>
+              </div>
+              {bioGenerationError ? <p className="mt-2 text-xs text-red-600" role="alert">{bioGenerationError}</p> : null}
+              {bioSuggestions.length > 0 ? (
+                <div className="mt-3 space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-3">
+                  <p className="text-xs font-semibold text-violet-900">選擇一個版本，再按「儲存資料」確認：</p>
+                  {bioSuggestions.map((suggestion, index) => (
+                    <button
+                      key={`${index}-${suggestion}`}
+                      type="button"
+                      onClick={() => {
+                        setProfileBio(suggestion);
+                        setProfileInfoMessage("");
+                      }}
+                      className={`w-full rounded-lg border p-3 text-left text-sm leading-relaxed transition ${profileBio === suggestion ? "border-violet-500 bg-white ring-2 ring-violet-100" : "border-zinc-200 bg-white hover:border-violet-300"}`}
+                    >
+                      <span className="mr-2 font-semibold text-violet-700">版本 {index + 1}</span>
+                      {suggestion}
+                    </button>
+                  ))}
+                  {bioSources.length > 0 ? (
+                    <p className="text-[11px] text-zinc-500">生成依據：{bioSources.join("、")}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div className="flex items-center gap-3">
               <button

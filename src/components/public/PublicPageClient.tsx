@@ -60,7 +60,6 @@ type PublicPageClientProps = {
   sections: PublicPageSection[];
   profile: PublicPageProfile;
   blocks: PublicPageBlock[];
-  shopBlock: PublicPageBlock | null;
   products: PublicProduct[];
   rateCards: PublicRateCard[];
   followerCount: number;
@@ -219,6 +218,7 @@ function formatMoney(value: number, currency = "HKD") {
 export function PublicPageClient({
   sections,
   profile,
+  blocks,
   products,
   rateCards,
   followerCount,
@@ -240,6 +240,31 @@ export function PublicPageClient({
     () => Object.fromEntries(sections.map((section, index) => [section.id, index])),
     [sections],
   );
+
+  const navigationItems = useMemo(() => {
+    const representedSections = new Set<string>();
+    const blockItems = blocks.map((block) => {
+      const title = block.title?.trim().toLowerCase() || "";
+      const url = block.url?.trim().toLowerCase() || "";
+      let sectionId: string | null = null;
+
+      if (title.includes("media kit") || url.includes("/mediakit")) sectionId = "media-kit";
+      else if (title.includes("合作查詢") || url.startsWith("mailto:")) sectionId = "contact";
+      else if (title.includes("貨品") || title.includes("shop") || url.includes("/shop")) sectionId = "shop";
+
+      if (sectionId && sectionIndex[sectionId] !== undefined) representedSections.add(sectionId);
+      return { block, sectionId: sectionId && sectionIndex[sectionId] !== undefined ? sectionId : null };
+    });
+
+    const fallbackItems = renderedSections
+      .filter((section) => !representedSections.has(section.id))
+      .map((section) => ({
+        block: { id: `section-${section.id}`, title: section.label, url: null } as PublicPageBlock,
+        sectionId: section.id,
+      }));
+
+    return [...blockItems, ...fallbackItems];
+  }, [blocks, renderedSections, sectionIndex]);
 
   const cartTotal = cartItems.reduce((sum, item) => {
     const product = products.find((candidate) => candidate.id === item.productId);
@@ -430,28 +455,49 @@ export function PublicPageClient({
               />
 
               <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10, marginTop: 2 }}>
-                {renderedSections.map((section) => (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => goTo(sectionIndex[section.id])}
-                    style={solidButtonStyle(btnColor, btnRadius, {
-                      width: "100%",
-                      padding: "12px 15px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      cursor: "pointer",
-                      textAlign: "left",
-                    })}
-                  >
-                    <IconBox>
-                      <NavIcon id={section.id} />
-                    </IconBox>
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{section.label}</span>
-                    <span style={{ color: "rgba(255,255,255,0.65)", fontSize: 15 }}>›</span>
-                  </button>
-                ))}
+                {navigationItems.map(({ block, sectionId }) => {
+                  const sharedStyle = solidButtonStyle(btnColor, btnRadius, {
+                    width: "100%",
+                    padding: "12px 15px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    textDecoration: "none",
+                    fontFamily: "inherit",
+                  });
+                  const content = (
+                    <>
+                      <IconBox>
+                        <NavIcon id={sectionId || block.block_type || "link"} />
+                      </IconBox>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>{block.title}</span>
+                      <span style={{ color: "rgba(255,255,255,0.65)", fontSize: 15 }}>›</span>
+                    </>
+                  );
+
+                  return sectionId ? (
+                    <button
+                      key={block.id}
+                      type="button"
+                      onClick={() => goTo(sectionIndex[sectionId])}
+                      style={sharedStyle}
+                    >
+                      {content}
+                    </button>
+                  ) : (
+                    <a
+                      key={block.id}
+                      href={block.url || "#"}
+                      target={block.url?.startsWith("mailto:") ? undefined : "_blank"}
+                      rel={block.url?.startsWith("mailto:") ? undefined : "noopener noreferrer"}
+                      style={sharedStyle}
+                    >
+                      {content}
+                    </a>
+                  );
+                })}
 
                 <a
                   href="https://egg.sooncreator.network/signup"

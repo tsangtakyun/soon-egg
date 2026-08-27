@@ -107,10 +107,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
   const typedProfile = profile as PublicPageProfile;
   const typedTheme = theme as PublicTheme | null;
-  const visibleBlocks = ((blocks ?? []) as PublicPageBlock[]).filter((block) => {
-    const title = block.title?.trim().toLowerCase() || "";
-    return block.is_visible !== false && title !== "creator media kit 模板".toLowerCase();
-  });
+  const visibleBlocks = ((blocks ?? []) as PublicPageBlock[]).filter((block) => block.is_visible !== false);
   const activeProducts = (products ?? []) as PublicProduct[];
   const activeRateCards = (rateCards ?? []) as PublicRateCard[];
 
@@ -135,7 +132,6 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       sections={sections}
       profile={typedProfile}
       blocks={visibleBlocks}
-      shopBlock={null}
       products={activeProducts}
       rateCards={activeRateCards}
       followerCount={followsResult.count ?? 0}

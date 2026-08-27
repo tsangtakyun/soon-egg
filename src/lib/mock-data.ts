@@ -26,7 +26,7 @@ export const demoCreator: CreatorProfile = {
 
 export const demoBlocks: ProfileBlock[] = [
   { id: "block-1", block_type: "link", title: "最新香港咖啡店地圖", url: "https://sooncreator.network", is_visible: true, sort_order: 1, click_count: 1830 },
-  { id: "block-2", block_type: "product", title: "Creator Media Kit 模板", url: "https://sooncreator.network/products", is_visible: true, sort_order: 2, click_count: 962 },
+  { id: "block-2", block_type: "product", title: "Creator Media Kit 模板", url: "https://egg.sooncreator.network/soon_egg/mediakit", is_visible: true, sort_order: 2, click_count: 962 },
   { id: "block-3", block_type: "contact", title: "品牌合作查詢", url: "mailto:hello@sooncreator.network", is_visible: true, sort_order: 3, click_count: 412 },
 ];
 

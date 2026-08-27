@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { AtSign, Check, Lock, Mail, Play, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AtSign, Check, Globe2, Mail, Play, Upload } from "lucide-react";
+import Link from "next/link";
+import { isValidProfileUsername, normalizeProfileUsername } from "@/lib/profile-username";
 
 type Profile = {
   avatar_url?: string | null;
@@ -20,6 +22,7 @@ type Profile = {
 };
 
 type SaveStatus = "idle" | "saving" | "success" | "error";
+type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 const categories = [
   "生活美學",
@@ -67,6 +70,10 @@ export function SettingsClient({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? "");
   const [displayName, setDisplayName] = useState(profile?.display_name ?? "");
+  const [username, setUsername] = useState(profile?.username ?? "");
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>(
+    isValidProfileUsername(profile?.username ?? "") ? "available" : "idle",
+  );
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [selectedCategories, setSelectedCategories] = useState<string[]>(profile?.content_categories ?? []);
   const [socials, setSocials] = useState({
@@ -86,6 +93,27 @@ export function SettingsClient({
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const initials = (displayName || profile?.username || userEmail).slice(0, 2).toUpperCase();
+
+  useEffect(() => {
+    const normalized = normalizeProfileUsername(username);
+    if (!isValidProfileUsername(normalized) || normalized === profile?.username) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/settings/profile?username=${encodeURIComponent(normalized)}`, { signal: controller.signal });
+        const result = await response.json();
+        setUsernameStatus(response.ok && result.available ? "available" : "taken");
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setUsernameStatus("idle");
+      }
+    }, 450);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [profile?.username, username]);
 
   function toggleCategory(category: string) {
     setSelectedCategories((current) =>
@@ -110,13 +138,16 @@ export function SettingsClient({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        username: normalizeProfileUsername(username),
         avatar_url: avatarUrl || null,
         display_name: displayName.trim(),
         bio: bio.trim() || null,
         content_categories: selectedCategories,
       }),
     });
+    const data = await res.json();
     setProfileSaveStatus(res.ok ? "success" : "error");
+    if (!res.ok && data.error === "呢個用戶名已經有人使用。") setUsernameStatus("taken");
     setTimeout(() => setProfileSaveStatus("idle"), 3000);
   }
 
@@ -193,11 +224,39 @@ export function SettingsClient({
             <Field label="創作者名稱 *">
               <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
             </Field>
-            <Field label="用戶名">
+            <Field label="公開網址用戶名">
               <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input value={profile?.username ?? ""} readOnly className={`${inputClass} bg-gray-50 pl-9 text-gray-400`} />
+                <Globe2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={username}
+                  onChange={(event) => {
+                    const next = normalizeProfileUsername(event.target.value).replace(/[^a-z0-9._-]/g, "");
+                    setUsername(next);
+                    setUsernameStatus(
+                      !isValidProfileUsername(next)
+                        ? "invalid"
+                        : next === profile?.username
+                          ? "available"
+                          : "checking",
+                    );
+                  }}
+                  maxLength={30}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={`${inputClass} pl-9 pr-24`}
+                  aria-describedby="username-help username-status"
+                />
+                <span id="username-status" className={`absolute right-3 top-1/2 -translate-y-1/2 text-xs ${usernameStatus === "available" ? "text-emerald-600" : usernameStatus === "taken" || usernameStatus === "invalid" ? "text-red-500" : "text-gray-400"}`}>
+                  {usernameStatus === "checking" ? "檢查中…" : usernameStatus === "available" ? "可以使用" : usernameStatus === "taken" ? "已被使用" : usernameStatus === "invalid" ? "格式不符" : ""}
+                </span>
               </div>
+              <p id="username-help" className="mt-1 break-all text-xs text-gray-400">
+                egg.sooncreator.network/{normalizeProfileUsername(username) || "你的用戶名"}
+              </p>
+              {normalizeProfileUsername(username) !== profile?.username ? (
+                <p className="mt-1 text-xs text-amber-600">儲存後舊網址將會失效，記得更新已分享嘅連結。</p>
+              ) : null}
             </Field>
             <Field label="一句介紹">
               <textarea value={bio} onChange={(e) => setBio(e.target.value.slice(0, 150))} rows={3} className={`${inputClass} resize-none`} />
@@ -223,7 +282,7 @@ export function SettingsClient({
               </div>
             </div>
             <div className="flex items-center">
-              <button onClick={saveProfile} disabled={profileSaveStatus === "saving" || !displayName.trim()} className={primaryButtonClass}>
+              <button onClick={saveProfile} disabled={profileSaveStatus === "saving" || !displayName.trim() || usernameStatus !== "available"} className={primaryButtonClass}>
                 {profileSaveStatus === "saving" ? "儲存中..." : "儲存個人資料"}
               </button>
               <SaveStatusText status={profileSaveStatus} />
@@ -249,9 +308,9 @@ export function SettingsClient({
                 ) : (
                   <span className="text-xs text-gray-400">未連結</span>
                 )}
-                <a href="/api/auth/instagram" className="text-xs text-purple-600 hover:underline">
+                <Link href="/api/auth/instagram" prefetch={false} className="text-xs text-purple-600 hover:underline">
                   重新連結 IG OAuth
-                </a>
+                </Link>
               </div>
             </SocialRow>
             <SocialInput icon={<Play size={16} />} label="YouTube" value={socials.youtube_handle} onChange={(value) => setSocials({ ...socials, youtube_handle: value })} />

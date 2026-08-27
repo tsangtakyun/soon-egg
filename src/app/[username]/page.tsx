@@ -7,25 +7,9 @@ import {
   type PublicRateCard,
 } from "@/components/public/PublicPageClient";
 import type { PublicProduct } from "@/components/public/ProductCard";
+import { RESERVED_PROFILE_USERNAMES } from "@/lib/profile-username";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-
-const RESERVED_ROUTES = [
-  "dashboard",
-  "profile",
-  "login",
-  "signup",
-  "onboarding",
-  "media-kit",
-  "brand-deals",
-  "brands",
-  "analytics",
-  "settings",
-  "products",
-  "api",
-  "auth",
-  "mediakit",
-];
 
 type PublicTheme = {
   background_image: string | null;
@@ -62,7 +46,7 @@ function getBackgroundStyle(profile: PublicPageProfile, theme: PublicTheme | nul
 
 export default async function PublicProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
-  if (RESERVED_ROUTES.includes(username)) notFound();
+  if (RESERVED_PROFILE_USERNAMES.has(username.toLowerCase())) notFound();
 
   const supabase = await createClient();
   if (!supabase) notFound();

@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Eye, EyeOff, GripVertical, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Check, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { ProfileBlock } from "./PhonePreview";
 
 type Draft = {
@@ -17,12 +16,10 @@ function isValidUrl(url: string) {
 }
 
 export function BlockEditor({
-  creatorId,
   blocks,
   onBlocksChange,
   blocksError,
 }: {
-  creatorId: string;
   blocks: ProfileBlock[];
   onBlocksChange: (blocks: ProfileBlock[]) => void;
   blocksError?: string;
@@ -46,10 +43,15 @@ export function BlockEditor({
     window.setTimeout(() => setToast(""), 2400);
   };
 
-  const persistBlock = async (id: string, values: Partial<ProfileBlock>) => {
-    const supabase = createClient();
-    const { error } = await supabase.from("egg_profile_blocks").update(values).eq("id", id);
-    if (error) throw error;
+  const requestBlocks = async (method: "POST" | "PATCH" | "DELETE", body: Record<string, unknown>) => {
+    const response = await fetch("/api/profile/blocks", {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "操作失敗");
+    return result;
   };
 
   const toggleVisible = async (block: ProfileBlock) => {
@@ -58,7 +60,7 @@ export function BlockEditor({
     onBlocksChange(nextBlocks);
 
     try {
-      await persistBlock(block.id, { is_visible: nextVisible });
+      await requestBlocks("PATCH", { id: block.id, is_visible: nextVisible });
     } catch {
       onBlocksChange(blocks);
       showError();
@@ -79,7 +81,7 @@ export function BlockEditor({
     setEditingId(null);
 
     try {
-      await persistBlock(block.id, { title: editDraft.title.trim(), url: editDraft.url.trim() });
+      await requestBlocks("PATCH", { id: block.id, title: editDraft.title.trim(), url: editDraft.url.trim() });
     } catch {
       onBlocksChange(blocks);
       showError();
@@ -92,9 +94,7 @@ export function BlockEditor({
     setConfirmDeleteId(null);
 
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from("egg_profile_blocks").delete().eq("id", block.id);
-      if (error) throw error;
+      await requestBlocks("DELETE", { id: block.id });
     } catch {
       onBlocksChange(blocks);
       showError();
@@ -104,23 +104,9 @@ export function BlockEditor({
   const addBlock = async () => {
     if (!canAdd) return;
 
-    const maxSortOrder = sortedBlocks.reduce((max, block) => Math.max(max, block.sort_order ?? 0), 0);
-    const payload = {
-      creator_id: creatorId,
-      title: newDraft.title.trim(),
-      url: newDraft.url.trim(),
-      block_type: "link",
-      is_visible: true,
-      sort_order: maxSortOrder + 1,
-      click_count: 0,
-    };
-
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase.from("egg_profile_blocks").insert(payload).select("*").single();
-      if (error) throw error;
-
-      onBlocksChange([...blocks, data as ProfileBlock]);
+      const result = await requestBlocks("POST", { title: newDraft.title.trim(), url: newDraft.url.trim() });
+      onBlocksChange([...blocks, result.block as ProfileBlock]);
       setNewDraft(emptyDraft);
       setIsAdding(false);
     } catch {
@@ -130,17 +116,25 @@ export function BlockEditor({
 
   const persistSortOrder = async (nextBlocks: ProfileBlock[]) => {
     try {
-      const supabase = createClient();
-      await Promise.all(
-        nextBlocks.map((block, index) => (
-          supabase
-            .from("egg_profile_blocks")
-            .update({ sort_order: index + 1 })
-            .eq("id", block.id)
-        )),
-      );
+      await requestBlocks("PATCH", { order: nextBlocks.map((block) => block.id) });
     } catch {
       showError("排序未能儲存，請稍後再試。");
+      throw new Error("Sort failed");
+    }
+  };
+
+  const moveBlock = async (blockId: string, direction: -1 | 1) => {
+    const current = [...sortedBlocks];
+    const fromIndex = current.findIndex((block) => block.id === blockId);
+    const toIndex = fromIndex + direction;
+    if (fromIndex < 0 || toIndex < 0 || toIndex >= current.length) return;
+    [current[fromIndex], current[toIndex]] = [current[toIndex], current[fromIndex]];
+    const nextBlocks = current.map((block, index) => ({ ...block, sort_order: index + 1 }));
+    onBlocksChange(nextBlocks);
+    try {
+      await persistSortOrder(nextBlocks);
+    } catch {
+      onBlocksChange(blocks);
     }
   };
 
@@ -157,14 +151,14 @@ export function BlockEditor({
     const nextBlocks = current.map((block, index) => ({ ...block, sort_order: index + 1 }));
     onBlocksChange(nextBlocks);
     setDraggingId(null);
-    void persistSortOrder(nextBlocks);
+    void persistSortOrder(nextBlocks).catch(() => onBlocksChange(blocks));
   };
 
   return (
     <section className="relative rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-zinc-950">Link in Bio Blocks</h2>
+          <h2 className="font-semibold text-zinc-950">個人連結</h2>
           <p className="mt-1 text-sm text-zinc-500">管理你的公開連結、顯示狀態和排序。</p>
         </div>
         <button type="button" onClick={() => setIsAdding(true)} className="inline-flex items-center gap-2 rounded-md bg-zinc-950 px-3 py-2 text-sm text-white">
@@ -193,13 +187,16 @@ export function BlockEditor({
               onDragStart={() => setDraggingId(block.id)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={() => dropOnBlock(block.id)}
-              className={`flex items-center gap-3 rounded-lg border border-zinc-200 p-3 ${isVisible ? "" : "opacity-50"}`}
+              className={`flex min-w-0 flex-col gap-3 rounded-lg border border-zinc-200 p-3 sm:flex-row sm:items-center ${isVisible ? "" : "bg-zinc-50"}`}
             >
-              <GripVertical className="h-4 w-4 cursor-grab text-zinc-400" aria-hidden />
-              <Link2 className="h-4 w-4 text-zinc-500" aria-hidden />
+              <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+                <GripVertical className="hidden h-4 w-4 cursor-grab text-zinc-400 sm:block" aria-hidden />
+                <Link2 className="h-4 w-4 shrink-0 text-zinc-500" aria-hidden />
+                {!isVisible ? <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-semibold text-zinc-600">已隱藏</span> : null}
+              </div>
 
               {isEditing ? (
-                <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                <div className="grid w-full min-w-0 flex-1 gap-2 sm:grid-cols-2">
                   <input
                     value={editDraft.title}
                     onChange={(event) => setEditDraft((draft) => ({ ...draft, title: event.target.value }))}
@@ -214,13 +211,13 @@ export function BlockEditor({
                   />
                 </div>
               ) : (
-                <div className="min-w-0 flex-1">
+                <div className="w-full min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-zinc-950">{block.title}</div>
                   <div className="truncate text-xs text-zinc-500">{block.url}</div>
                 </div>
               )}
 
-              <div className="flex items-center gap-1">
+              <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto sm:flex-nowrap">
                 {isEditing ? (
                   <>
                     <IconButton label="儲存" onClick={() => saveEdit(block)} disabled={!editDraft.title.trim() || !isValidUrl(editDraft.url)}>
@@ -232,6 +229,12 @@ export function BlockEditor({
                   </>
                 ) : (
                   <>
+                    <IconButton label="上移" onClick={() => void moveBlock(block.id, -1)} disabled={sortedBlocks[0]?.id === block.id}>
+                      <ChevronUp className="h-4 w-4" aria-hidden />
+                    </IconButton>
+                    <IconButton label="下移" onClick={() => void moveBlock(block.id, 1)} disabled={sortedBlocks.at(-1)?.id === block.id}>
+                      <ChevronDown className="h-4 w-4" aria-hidden />
+                    </IconButton>
                     <IconButton label={isVisible ? "隱藏" : "顯示"} onClick={() => toggleVisible(block)}>
                       {isVisible ? <Eye className="h-4 w-4" aria-hidden /> : <EyeOff className="h-4 w-4" aria-hidden />}
                     </IconButton>
@@ -260,7 +263,6 @@ export function BlockEditor({
                 </div>
               )}
 
-              <div className="font-mono text-xs text-zinc-500">{block.click_count ?? 0} clicks</div>
             </div>
           );
         })}

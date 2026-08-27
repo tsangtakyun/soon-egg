@@ -10,6 +10,7 @@ type Profile = {
   avatar_url: string | null;
   cover_url?: string | null;
   ai_profile_summary: string | null;
+  is_public?: boolean | null;
   buy_me_a_coffee_url?: string | null;
   youtube_latest_video_id?: string | null;
 };
@@ -30,6 +31,7 @@ const fallbackProfile: Profile = {
   avatar_url: null,
   cover_url: null,
   ai_profile_summary: null,
+  is_public: false,
   buy_me_a_coffee_url: null,
   youtube_latest_video_id: null,
 };

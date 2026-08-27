@@ -8,6 +8,7 @@ export type PhonePreviewProfile = {
   avatar_url: string | null;
   cover_url?: string | null;
   ai_profile_summary: string | null;
+  is_public?: boolean | null;
   buy_me_a_coffee_url?: string | null;
   youtube_latest_video_id?: string | null;
 };
@@ -101,6 +102,9 @@ export function PhonePreview({
               style={{ backgroundColor: buttonColor }}
             >
               {block.title}
+              {block.is_visible === false ? (
+                <span className="ml-2 rounded-full bg-black/25 px-2 py-0.5 text-[10px] font-medium">已隱藏</span>
+              ) : null}
             </div>
           ))}
         </div>

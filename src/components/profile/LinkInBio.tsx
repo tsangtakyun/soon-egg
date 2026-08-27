@@ -38,9 +38,8 @@ export function LinkInBio({
   const [profileBio, setProfileBio] = useState(initialProfile.bio || "");
   const [savingProfileInfo, setSavingProfileInfo] = useState(false);
   const [profileInfoMessage, setProfileInfoMessage] = useState("");
-  const [coffeeUrl, setCoffeeUrl] = useState(initialProfile.buy_me_a_coffee_url || "");
-  const [savingCoffeeUrl, setSavingCoffeeUrl] = useState(false);
-  const [coffeeMessage, setCoffeeMessage] = useState("");
+  const [savingVisibility, setSavingVisibility] = useState(false);
+  const [visibilityMessage, setVisibilityMessage] = useState("");
   const publicUrl = `https://egg.sooncreator.network/${profile.username}`;
 
   const copyPublicUrl = async () => {
@@ -136,36 +135,34 @@ export function LinkInBio({
     }
   };
 
-  const saveCoffeeUrl = async () => {
-    setSavingCoffeeUrl(true);
-    setCoffeeMessage("");
-
+  const togglePublicProfile = async () => {
+    const nextPublic = profile.is_public !== true;
+    setSavingVisibility(true);
+    setVisibilityMessage("");
     try {
       const response = await fetch("/api/profile/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ buy_me_a_coffee_url: coffeeUrl.trim() || null }),
+        body: JSON.stringify({ is_public: nextPublic }),
       });
-
       if (!response.ok) throw new Error("Save failed");
-
-      setProfile((current) => ({ ...current, buy_me_a_coffee_url: coffeeUrl.trim() || null }));
-      setCoffeeMessage("已儲存");
+      setProfile((current) => ({ ...current, is_public: nextPublic }));
+      setVisibilityMessage(nextPublic ? "公開主頁已啟用" : "公開主頁已暫停");
     } catch {
-      setCoffeeMessage("未能儲存，請稍後再試。");
+      setVisibilityMessage("未能更新公開狀態，請稍後再試。");
     } finally {
-      setSavingCoffeeUrl(false);
+      setSavingVisibility(false);
     }
   };
 
   return (
-    <div className="p-6 flex gap-8 items-start">
-      <div className="flex-1 flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col items-start gap-6 p-4 sm:p-6 xl:flex-row xl:gap-8">
+      <div className="flex min-w-0 w-full flex-1 flex-col gap-4">
         <div>
           <h1 className="text-2xl font-bold mb-1 text-zinc-950">我的主頁</h1>
-          <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
+          <p className="mb-4 flex min-w-0 flex-wrap items-center gap-1 text-sm text-gray-500">
             編輯你的 Link in Bio，公開網址為{" "}
-            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="max-w-full truncate text-blue-600 hover:underline">
               egg.sooncreator.network/{profile.username}
             </a>
             <button
@@ -211,6 +208,27 @@ export function LinkInBio({
         {avatarError && <p className="text-sm text-red-600">{avatarError}</p>}
         {coverError && <p className="text-sm text-red-600">{coverError}</p>}
 
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-100 bg-white p-4">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900">公開主頁</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              {profile.is_public === true ? "任何有連結嘅人都可以查看。" : "目前只有你可以管理，訪客無法開啟。"}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={profile.is_public === true}
+            onClick={togglePublicProfile}
+            disabled={savingVisibility}
+            className={`relative h-7 w-12 rounded-full transition ${profile.is_public === true ? "bg-emerald-500" : "bg-zinc-300"}`}
+          >
+            <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${profile.is_public === true ? "left-6" : "left-1"}`} />
+            <span className="sr-only">{profile.is_public === true ? "暫停公開主頁" : "公開主頁"}</span>
+          </button>
+          {visibilityMessage ? <p className="w-full text-xs text-zinc-500" role="status">{visibilityMessage}</p> : null}
+        </div>
+
         <div className="rounded-2xl border border-zinc-100 bg-white p-4">
           <h2 className="text-sm font-semibold text-zinc-900">創作者資料</h2>
           <div className="mt-3 space-y-3">
@@ -225,9 +243,6 @@ export function LinkInBio({
                 onChange={(event) => {
                   setProfileDisplayName(event.target.value);
                   setProfileInfoMessage("");
-                }}
-                onBlur={() => {
-                  if (profileDisplayName.trim() !== (profile.display_name || "")) void saveProfileInfo();
                 }}
                 placeholder="例如：Rosary Lifestyle"
                 maxLength={50}
@@ -244,9 +259,6 @@ export function LinkInBio({
                 onChange={(event) => {
                   setProfileBio(event.target.value);
                   setProfileInfoMessage("");
-                }}
-                onBlur={() => {
-                  if (profileBio.trim() !== (profile.bio || "")) void saveProfileInfo();
                 }}
                 placeholder="例如：分享精緻生活美學與日常靈感"
                 maxLength={150}
@@ -268,41 +280,12 @@ export function LinkInBio({
           </div>
         </div>
 
-        <BlockEditor creatorId={profile.id} blocks={blocks} onBlocksChange={setBlocks} blocksError={blocksError} />
+        <BlockEditor blocks={blocks} onBlocksChange={setBlocks} blocksError={blocksError} />
 
-        <div className="rounded-2xl border border-zinc-100 bg-white p-4">
-          <label htmlFor="buy-me-a-coffee-url" className="text-sm font-semibold text-zinc-900">
-            Buy Me A Coffee 連結
-          </label>
-          <div className="mt-3 flex gap-2">
-            <input
-              id="buy-me-a-coffee-url"
-              type="url"
-              value={coffeeUrl}
-              onChange={(event) => {
-                setCoffeeUrl(event.target.value);
-                setCoffeeMessage("");
-              }}
-              onBlur={() => {
-                if (coffeeUrl !== (profile.buy_me_a_coffee_url || "")) void saveCoffeeUrl();
-              }}
-              placeholder="https://buymeacoffee.com/yourname"
-              className="flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
-            />
-            <button
-              type="button"
-              onClick={saveCoffeeUrl}
-              disabled={savingCoffeeUrl}
-              className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
-            >
-              {savingCoffeeUrl ? "儲存中" : "儲存"}
-            </button>
-          </div>
-          {coffeeMessage && <p className="mt-2 text-xs text-gray-500">{coffeeMessage}</p>}
-        </div>
       </div>
 
-      <div className="flex-none">
+      <div className="w-full flex-none xl:sticky xl:top-6 xl:w-auto">
+        <p className="mb-3 text-center text-xs font-medium text-zinc-500">公開頁預覽</p>
         <PhonePreview
           profile={profile}
           theme={theme}
@@ -314,7 +297,7 @@ export function LinkInBio({
 
       {coverModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-6">
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-lg font-bold text-zinc-950">選擇封面背景</h2>
               <button
@@ -326,7 +309,7 @@ export function LinkInBio({
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {COVER_OPTIONS.map((option) => {
                 const selected = profile.cover_url === option.src;
 

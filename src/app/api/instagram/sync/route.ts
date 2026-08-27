@@ -11,6 +11,18 @@ type InstagramProfile = {
   };
 };
 
+type InstagramMedia = {
+  like_count?: number;
+  comments_count?: number;
+};
+
+type InstagramMediaResponse = {
+  data?: InstagramMedia[];
+  error?: {
+    message?: string;
+  };
+};
+
 async function fetchInstagramProfile(instagramUserId: string | null, accessToken: string): Promise<InstagramProfile> {
   const fields = "id,username,followers_count,media_count";
 
@@ -35,6 +47,16 @@ async function fetchInstagramProfile(instagramUserId: string | null, accessToken
   return (await basicRes.json()) as InstagramProfile;
 }
 
+async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: string): Promise<InstagramMediaResponse> {
+  const url = new URL(`https://graph.facebook.com/v21.0/${encodeURIComponent(instagramUserId)}/media`);
+  url.searchParams.set("fields", "id,like_count,comments_count,timestamp");
+  url.searchParams.set("limit", "12");
+  url.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(url.toString(), { next: { revalidate: 0 } });
+  return (await response.json()) as InstagramMediaResponse;
+}
+
 export async function POST() {
   const supabase = await createClient();
 
@@ -47,7 +69,7 @@ export async function POST() {
 
   const { data: profile } = await supabase
     .from("egg_creator_profiles")
-    .select("instagram_access_token, instagram_user_id")
+    .select("instagram_access_token, instagram_user_id, audience_demographics")
     .eq("user_id", user.id)
     .single();
 
@@ -67,13 +89,60 @@ export async function POST() {
     return NextResponse.json({ error: data.error.message || "Instagram sync failed" }, { status: 400 });
   }
 
+  const instagramUserId = data.id || profile.instagram_user_id;
+  const followers = data.followers_count ?? 0;
+  let engagementRate: number | null = null;
+  let engagementSampleSize = 0;
+  let engagementUnavailableReason: string | null = null;
+
+  if (instagramUserId && followers > 0) {
+    const mediaResponse = await fetchRecentInstagramMedia(instagramUserId, profile.instagram_access_token);
+    const media = mediaResponse.data ?? [];
+
+    if (mediaResponse.error) {
+      engagementUnavailableReason = mediaResponse.error.message || "Meta 暫時未提供貼文互動數據";
+    } else if (media.length === 0) {
+      engagementUnavailableReason = "未有可用嘅 Instagram 貼文數據";
+    } else {
+      engagementSampleSize = media.length;
+      const totalInteractions = media.reduce(
+        (sum, item) => sum + (item.like_count ?? 0) + (item.comments_count ?? 0),
+        0,
+      );
+      engagementRate = Number(((totalInteractions / media.length / followers) * 100).toFixed(2));
+    }
+  } else {
+    engagementUnavailableReason = "缺少 Instagram 帳戶或粉絲數據";
+  }
+
+  const syncedAt = new Date().toISOString();
+  const currentAudience = (
+    typeof profile.audience_demographics === "object" &&
+    profile.audience_demographics !== null &&
+    !Array.isArray(profile.audience_demographics)
+  ) ? profile.audience_demographics : {};
+
+  const updates: Record<string, unknown> = {
+    instagram_handle: data.username,
+    instagram_followers: followers,
+    instagram_user_id: data.id,
+    audience_demographics: {
+      ...currentAudience,
+      instagram_sync: {
+        synced_at: syncedAt,
+        engagement_sample_size: engagementSampleSize,
+        engagement_method: "recent_media_interactions_by_followers",
+      },
+    },
+  };
+
+  if (engagementRate !== null) {
+    updates.instagram_engagement_rate = engagementRate;
+  }
+
   const { error } = await supabase
     .from("egg_creator_profiles")
-    .update({
-      instagram_handle: data.username,
-      instagram_followers: data.followers_count ?? 0,
-      instagram_user_id: data.id,
-    })
+    .update(updates)
     .eq("user_id", user.id);
 
   if (error) {
@@ -82,7 +151,11 @@ export async function POST() {
 
   return NextResponse.json({
     success: true,
-    followers: data.followers_count ?? 0,
+    followers,
     username: data.username,
+    engagement_rate: engagementRate,
+    engagement_sample_size: engagementSampleSize,
+    engagement_unavailable_reason: engagementUnavailableReason,
+    synced_at: syncedAt,
   });
 }

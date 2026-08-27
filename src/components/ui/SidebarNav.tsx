@@ -12,13 +12,11 @@ import {
   FileText,
   FolderOpen,
   Home,
-  Lightbulb,
   MessageSquare,
   Package,
   UserRound,
   WandSparkles,
   Wallet,
-  Wrench,
 } from "lucide-react";
 
 const items = [
@@ -30,8 +28,6 @@ const items = [
 ];
 
 const creatorToolItems = [
-  { href: "/tools", label: "工具總覽", icon: Wrench },
-  { href: "/tools/idea", label: "靈感工作台", icon: Lightbulb },
   { href: "/tools/script", label: "劇本工作台", icon: FileText },
   { href: "/tools/subtitle", label: "字幕工作台", icon: Captions },
 ];
@@ -100,17 +96,15 @@ export function SidebarNav() {
       />
 
       <div className="pt-2">
-        <SidebarSection label="創作工具" defaultOpen={true}>
-          {creatorToolItems.map((item) => (
-            <SidebarItem
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              prefetch={false}
-            />
-          ))}
-        </SidebarSection>
+        {creatorToolItems.map((item) => (
+          <SidebarItem
+            key={item.href}
+            href={item.href}
+            icon={item.icon}
+            label={item.label}
+            prefetch={false}
+          />
+        ))}
 
         <SidebarSection label="制片工具" defaultOpen={true} small={true}>
           {productionToolItems.map((item) => (

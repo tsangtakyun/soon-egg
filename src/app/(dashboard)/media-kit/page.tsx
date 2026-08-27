@@ -53,6 +53,7 @@ type CaseStudy = {
   brand_name: string | null;
   description: string | null;
   result: string | null;
+  image_url: string | null;
   sort_order: number | null;
 };
 
@@ -203,7 +204,7 @@ function TextField({
 function CaseStudiesEditor({ profileId }: { profileId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [caseStudies, setCaseStudies] = useState<CaseStudy[]>([]);
-  const [draft, setDraft] = useState({ title: "", brand_name: "", description: "", result: "" });
+  const [draft, setDraft] = useState({ title: "", brand_name: "", description: "", result: "", image_url: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -237,6 +238,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
         brand_name: draft.brand_name.trim() || null,
         description: draft.description.trim() || null,
         result: draft.result.trim() || null,
+        image_url: draft.image_url.trim() || null,
         sort_order: editingId ? caseStudies.find((item) => item.id === editingId)?.sort_order ?? 0 : caseStudies.length,
       };
     const query = editingId
@@ -250,7 +252,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
       setCaseStudies((current) => editingId
         ? current.map((item) => item.id === editingId ? data as CaseStudy : item)
         : [...current, data as CaseStudy]);
-      setDraft({ title: "", brand_name: "", description: "", result: "" });
+      setDraft({ title: "", brand_name: "", description: "", result: "", image_url: "" });
       setEditingId(null);
       setStatus("✓ 已儲存");
     } else if (error) {
@@ -273,7 +275,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
 
   function startEdit(item: CaseStudy) {
     setEditingId(item.id);
-    setDraft({ title: item.title ?? "", brand_name: item.brand_name ?? "", description: item.description ?? "", result: item.result ?? "" });
+    setDraft({ title: item.title ?? "", brand_name: item.brand_name ?? "", description: item.description ?? "", result: item.result ?? "", image_url: item.image_url ?? "" });
   }
 
   return (
@@ -305,6 +307,13 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
             placeholder="成果，例如：帶來 30K+ 觸及"
             className="rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
           />
+          <input
+            type="url"
+            value={draft.image_url}
+            onChange={(event) => setDraft((current) => ({ ...current, image_url: event.target.value }))}
+            placeholder="案例圖片網址（選填）"
+            className="rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+          />
           <button
             onClick={handleAdd}
             disabled={!draft.title.trim()}
@@ -313,7 +322,7 @@ function CaseStudiesEditor({ profileId }: { profileId: string }) {
           >
             {editingId ? "儲存修改" : "新增過往項目"}
           </button>
-          {editingId && <button type="button" onClick={() => { setEditingId(null); setDraft({ title: "", brand_name: "", description: "", result: "" }); }} className="rounded-xl border border-zinc-200 px-4 py-2 text-sm text-zinc-600">取消編輯</button>}
+          {editingId && <button type="button" onClick={() => { setEditingId(null); setDraft({ title: "", brand_name: "", description: "", result: "", image_url: "" }); }} className="rounded-xl border border-zinc-200 px-4 py-2 text-sm text-zinc-600">取消編輯</button>}
         </div>
       </div>
       {status && <p role="status" className="text-xs font-medium text-green-700">{status}</p>}
@@ -347,6 +356,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
   const supabase = useMemo(() => createClient(), []);
   const [partners, setPartners] = useState<BrandPartner[]>([]);
   const [brandName, setBrandName] = useState("");
+  const [brandLogoUrl, setBrandLogoUrl] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -378,6 +388,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
     const payload = {
         creator_id: profileId,
         brand_name: brandName.trim(),
+        brand_logo_url: brandLogoUrl.trim() || null,
         sort_order: editingId ? partners.find((partner) => partner.id === editingId)?.sort_order ?? 0 : partners.length,
       };
     const query = editingId
@@ -392,6 +403,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
         ? current.map((partner) => partner.id === editingId ? data as BrandPartner : partner)
         : [...current, data as BrandPartner]);
       setBrandName("");
+      setBrandLogoUrl("");
       setEditingId(null);
       setMessage("✓ 已儲存");
     } else if (error) {
@@ -410,13 +422,9 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
 
   return (
     <div className="space-y-3 p-4">
-      <div className="flex gap-2 rounded-2xl border border-zinc-100 bg-white p-3">
-        <input
-          value={brandName}
-          onChange={(event) => setBrandName(event.target.value)}
-          placeholder="品牌名稱"
-          className="min-w-0 flex-1 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-        />
+      <div className="grid gap-2 rounded-2xl border border-zinc-100 bg-white p-3">
+        <input value={brandName} onChange={(event) => setBrandName(event.target.value)} placeholder="品牌名稱" className="min-w-0 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" />
+        <input type="url" value={brandLogoUrl} onChange={(event) => setBrandLogoUrl(event.target.value)} placeholder="品牌 Logo 圖片網址（選填）" className="min-w-0 rounded-xl border border-zinc-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200" />
         <button
           onClick={handleAdd}
           disabled={!brandName.trim()}
@@ -426,7 +434,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
           {editingId ? "儲存" : "新增"}
         </button>
       </div>
-      {editingId && <button type="button" onClick={() => { setEditingId(null); setBrandName(""); }} className="text-xs text-zinc-500 underline">取消編輯</button>}
+      {editingId && <button type="button" onClick={() => { setEditingId(null); setBrandName(""); setBrandLogoUrl(""); }} className="text-xs text-zinc-500 underline">取消編輯</button>}
       {message && <p role="status" className="text-xs font-medium text-green-700">{message}</p>}
       {errorMessage && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">{errorMessage}</p>}
 
@@ -448,7 +456,7 @@ function BrandPartnersEditor({ profileId }: { profileId: string }) {
                 <p className="text-sm font-medium text-zinc-900">{partner.brand_name}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => { setEditingId(partner.id); setBrandName(partner.brand_name ?? ""); }} className="text-xs font-medium text-blue-600 hover:text-blue-800" type="button">編輯</button>
+                <button onClick={() => { setEditingId(partner.id); setBrandName(partner.brand_name ?? ""); setBrandLogoUrl(partner.brand_logo_url ?? ""); }} className="text-xs font-medium text-blue-600 hover:text-blue-800" type="button">編輯</button>
                 <button onClick={() => handleDelete(partner.id)} className="text-xs text-zinc-400 hover:text-red-500" type="button">刪除</button>
               </div>
             </div>

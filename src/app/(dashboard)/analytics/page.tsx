@@ -104,14 +104,12 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-6 bg-[#f7f7f8] pt-[10vh]">
       <header className="lg:ml-[10%]">
-        <h1 className="text-3xl font-black text-zinc-950">
-          Instagram 數據分析
-        </h1>
+        <h1 className="text-3xl font-black text-zinc-950">社交平台數據分析</h1>
         <p className="mt-2 text-zinc-500">
-          直接讀取 Meta API，追蹤受眾、觸及、互動及內容表現。
+          集中查看已連接社交平台嘅受眾、觸及、互動及內容表現。
         </p>
         <p className="mt-1 text-xs text-zinc-400">
-          @{profile.instagram_handle ?? "尚未連接 Instagram"}
+          Instagram · @{profile.instagram_handle ?? "尚未連接"}
         </p>
       </header>
 
@@ -188,8 +186,9 @@ export default async function AnalyticsPage() {
 
       <InstagramSyncButton lastSyncedAt={sync.synced_at ?? null} />
       <p className="text-xs leading-5 text-zinc-400">
-        數據來源：已授權嘅 Instagram Professional 帳戶及 Meta Graph
-        API。每日同步一次；手動更新會即時刷新。趨勢需要至少兩日快照先會顯示升跌。
+        目前數據來源：已授權嘅 Instagram Professional 帳戶及 Meta Graph
+        API。每日自動同步一次；手動更新會即時刷新。Threads 會喺完成獨立授權及
+        Insights 接駁後加入同一頁，未接通前唔會顯示模擬數據。
       </p>
     </div>
   );

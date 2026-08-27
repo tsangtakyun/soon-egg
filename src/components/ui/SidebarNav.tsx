@@ -26,7 +26,7 @@ const items = [
   { href: "/profile", label: "創作者檔案", icon: UserRound },
   { href: "/media-kit", label: "Media Kit", icon: WandSparkles },
   { href: "/products", label: "數位產品", icon: Package },
-  { href: "/analytics", label: "Instagram 分析", icon: BarChart3 },
+  { href: "/analytics", label: "社交數據", icon: BarChart3 },
 ];
 
 const brandDealItems = [

@@ -10,6 +10,10 @@ import {
   productTypeLabels,
   type ProductType,
 } from "@/components/products/ProductTypeIcon";
+import {
+  SalesTrendChart,
+  type SalesTrendPoint,
+} from "@/components/analytics/SalesTrendChart";
 
 type Product = {
   id: string;
@@ -113,6 +117,26 @@ export default function ProductsPage() {
     (sum, order) => sum + Number(order.amount ?? 0),
     0,
   );
+  const averageOrderValue = paidOrders.length
+    ? orderRevenue / paidOrders.length
+    : 0;
+  const salesTrend = useMemo<SalesTrendPoint[]>(() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const amount = paidOrders
+        .filter((order) => {
+          const createdAt = new Date(order.created_at);
+          return (
+            createdAt.getFullYear() === year && createdAt.getMonth() === month
+          );
+        })
+        .reduce((sum, order) => sum + Number(order.amount ?? 0), 0);
+      return { month: `${month + 1}月`, amount };
+    });
+  }, [paidOrders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -372,20 +396,33 @@ export default function ProductsPage() {
       {activeTab === "orders" && (
         <>
           {!ordersLoading && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <OrderSummary
-                label="已付款訂單"
-                value={paidOrders.length.toLocaleString("zh-HK")}
-              />
-              <OrderSummary
-                label="貨品收入"
-                value={`HK$${orderRevenue.toLocaleString("zh-HK")}`}
-              />
-              <OrderSummary
-                label="全部訂單"
-                value={orders.length.toLocaleString("zh-HK")}
-              />
-            </div>
+            <section className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-900">銷售分析</h2>
+                <p className="mt-1 text-sm text-zinc-400">
+                  根據真實訂單計算收入及最近六個月銷售趨勢。
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <OrderSummary
+                  label="已付款訂單"
+                  value={paidOrders.length.toLocaleString("zh-HK")}
+                />
+                <OrderSummary
+                  label="貨品收入"
+                  value={`HK$${orderRevenue.toLocaleString("zh-HK")}`}
+                />
+                <OrderSummary
+                  label="平均訂單金額"
+                  value={`HK$${Math.round(averageOrderValue).toLocaleString("zh-HK")}`}
+                />
+                <OrderSummary
+                  label="全部訂單"
+                  value={orders.length.toLocaleString("zh-HK")}
+                />
+              </div>
+              <SalesTrendChart data={salesTrend} />
+            </section>
           )}
           {ordersLoading ? (
             <div className="py-12 text-center text-sm text-zinc-400">

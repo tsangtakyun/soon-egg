@@ -39,7 +39,7 @@ export function InstagramSyncButton({ lastSyncedAt }: { lastSyncedAt?: string | 
       const engagementMessage = data.engagement_rate !== null && data.engagement_rate !== undefined
         ? `，已按最近 ${data.engagement_sample_size ?? 0} 篇貼文更新互動率`
         : `；${data.engagement_unavailable_reason || "暫時未能計算互動率"}`;
-      const insightsMessage = data.official_insights
+      const insightsMessage = typeof data.official_insights?.reach === "number"
         ? "，官方 Reach insights 已更新"
         : "；官方 Reach 需要重新授權 Insights 權限";
       setMessage(`已更新至 ${Number(data.followers ?? 0).toLocaleString()} 位粉絲${engagementMessage}${insightsMessage}。`);

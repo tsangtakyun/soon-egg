@@ -4,7 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { ProductTypeIcon, productTypeBadgeClasses, productTypeLabels, type ProductType } from "@/components/products/ProductTypeIcon";
+import {
+  ProductTypeIcon,
+  productTypeBadgeClasses,
+  productTypeLabels,
+  type ProductType,
+} from "@/components/products/ProductTypeIcon";
 
 type Product = {
   id: string;
@@ -65,7 +70,13 @@ const emptyForm: ProductForm = {
   is_active: true,
 };
 
-const productTypes: ProductType[] = ["physical", "digital", "service", "workshop", "other"];
+const productTypes: ProductType[] = [
+  "physical",
+  "digital",
+  "service",
+  "workshop",
+  "other",
+];
 
 const statusLabels: Record<string, { label: string; color: string }> = {
   pending: { label: "待付款", color: "bg-gray-100 text-gray-500" },
@@ -75,6 +86,12 @@ const statusLabels: Record<string, { label: string; color: string }> = {
   delivered: { label: "已完成", color: "bg-green-50 text-green-700" },
   cancelled: { label: "已取消", color: "bg-red-50 text-red-500" },
 };
+const paidOrderStatuses = new Set([
+  "paid",
+  "processing",
+  "shipped",
+  "delivered",
+]);
 
 export default function ProductsPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -89,6 +106,13 @@ export default function ProductsPage() {
   const [activeTab, setActiveTab] = useState<"products" | "orders">("products");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const paidOrders = orders.filter((order) =>
+    paidOrderStatuses.has(order.status ?? ""),
+  );
+  const orderRevenue = paidOrders.reduce(
+    (sum, order) => sum + Number(order.amount ?? 0),
+    0,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -104,7 +128,11 @@ export default function ProductsPage() {
         return;
       }
 
-      const { data: profile } = await supabase.from("egg_creator_profiles").select("id").eq("user_id", user.id).single();
+      const { data: profile } = await supabase
+        .from("egg_creator_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
       if (!profile?.id) {
         if (!cancelled) setLoading(false);
         return;
@@ -117,7 +145,11 @@ export default function ProductsPage() {
           .eq("creator_id", profile.id)
           .eq("is_archived", false)
           .order("created_at", { ascending: false }),
-        supabase.from("egg_product_orders").select("*").eq("creator_id", profile.id).order("created_at", { ascending: false }),
+        supabase
+          .from("egg_product_orders")
+          .select("*")
+          .eq("creator_id", profile.id)
+          .order("created_at", { ascending: false }),
       ]);
 
       if (!cancelled) {
@@ -158,7 +190,9 @@ export default function ProductsPage() {
   async function handleStripeOnboard() {
     setStripeLoading(true);
     try {
-      const res = await fetch("/api/stripe/connect/onboard", { method: "POST" });
+      const res = await fetch("/api/stripe/connect/onboard", {
+        method: "POST",
+      });
       const text = await res.text();
       const data = text ? JSON.parse(text) : {};
 
@@ -194,11 +228,17 @@ export default function ProductsPage() {
       alert(error.message);
       return;
     }
-    if (data) setProducts((current) => current.map((product) => (product.id === id ? (data as Product) : product)));
+    if (data)
+      setProducts((current) =>
+        current.map((product) =>
+          product.id === id ? (data as Product) : product,
+        ),
+      );
   }
 
   async function deleteProduct(id: string) {
-    if (!profileId || !confirm("確定移除此貨品？已建立的訂單紀錄會保留。")) return;
+    if (!profileId || !confirm("確定移除此貨品？已建立的訂單紀錄會保留。"))
+      return;
     const { data, error } = await supabase
       .from("egg_digital_products")
       .update({ is_archived: true, is_active: false })
@@ -221,7 +261,11 @@ export default function ProductsPage() {
   async function reloadOrders() {
     if (!profileId) return;
     setOrdersLoading(true);
-    const { data } = await supabase.from("egg_product_orders").select("*").eq("creator_id", profileId).order("created_at", { ascending: false });
+    const { data } = await supabase
+      .from("egg_product_orders")
+      .select("*")
+      .eq("creator_id", profileId)
+      .order("created_at", { ascending: false });
     setOrders((data ?? []) as Order[]);
     setOrdersLoading(false);
   }
@@ -229,7 +273,8 @@ export default function ProductsPage() {
   function handleSaved(product: Product) {
     setProducts((current) => {
       const exists = current.some((item) => item.id === product.id);
-      if (exists) return current.map((item) => (item.id === product.id ? product : item));
+      if (exists)
+        return current.map((item) => (item.id === product.id ? product : item));
       return [product, ...current];
     });
     setModalOpen(false);
@@ -243,7 +288,10 @@ export default function ProductsPage() {
           <h1 className="text-3xl font-black text-zinc-950">我的貨品</h1>
           <p className="mt-2 text-zinc-500">管理你想推介或出售的產品</p>
         </div>
-        <button onClick={openAddModal} className="flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800">
+        <button
+          onClick={openAddModal}
+          className="flex items-center gap-2 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+        >
           <Plus size={16} />
           新增貨品
         </button>
@@ -252,15 +300,23 @@ export default function ProductsPage() {
       {stripeComplete === false && (
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-orange-200 bg-orange-50 p-4">
           <div>
-            <p className="text-sm font-medium text-orange-800">連結 Stripe 收款帳戶</p>
-            <p className="mt-0.5 text-xs text-orange-600">連結後買家可直接喺你的貨品頁付款，款項直接入帳</p>
+            <p className="text-sm font-medium text-orange-800">
+              連結 Stripe 收款帳戶
+            </p>
+            <p className="mt-0.5 text-xs text-orange-600">
+              連結後買家可直接喺你的貨品頁付款，款項直接入帳
+            </p>
           </div>
           <button
             onClick={handleStripeOnboard}
             disabled={stripeLoading}
             className="rounded-xl bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
           >
-            {stripeLoading ? "連結中..." : stripeConnected ? "繼續設定" : "立即連結"}
+            {stripeLoading
+              ? "連結中..."
+              : stripeConnected
+                ? "繼續設定"
+                : "立即連結"}
           </button>
         </div>
       )}
@@ -290,14 +346,23 @@ export default function ProductsPage() {
           ) : products.length === 0 ? (
             <div className="rounded-2xl border bg-white py-16 text-center">
               <p className="text-sm text-zinc-400">暫未有貨品</p>
-              <button onClick={openAddModal} className="mt-3 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">
+              <button
+                onClick={openAddModal}
+                className="mt-3 rounded-xl bg-black px-4 py-2 text-sm font-medium text-white"
+              >
                 新增第一件貨品
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} onEdit={openEditModal} onUpdate={updateProduct} onDelete={deleteProduct} />
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onEdit={openEditModal}
+                  onUpdate={updateProduct}
+                  onDelete={deleteProduct}
+                />
               ))}
             </div>
           )}
@@ -306,8 +371,26 @@ export default function ProductsPage() {
 
       {activeTab === "orders" && (
         <>
+          {!ordersLoading && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <OrderSummary
+                label="已付款訂單"
+                value={paidOrders.length.toLocaleString("zh-HK")}
+              />
+              <OrderSummary
+                label="貨品收入"
+                value={`HK$${orderRevenue.toLocaleString("zh-HK")}`}
+              />
+              <OrderSummary
+                label="全部訂單"
+                value={orders.length.toLocaleString("zh-HK")}
+              />
+            </div>
+          )}
           {ordersLoading ? (
-            <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+            <div className="py-12 text-center text-sm text-zinc-400">
+              載入中...
+            </div>
           ) : orders.length === 0 ? (
             <div className="rounded-2xl border bg-white py-16 text-center">
               <p className="text-sm text-zinc-400">暫未有訂單</p>
@@ -315,7 +398,11 @@ export default function ProductsPage() {
           ) : (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
               {orders.map((order) => (
-                <OrderCard key={order.id} order={order} onUpdated={reloadOrders} />
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onUpdated={reloadOrders}
+                />
               ))}
             </div>
           )}
@@ -349,14 +436,19 @@ function ProductCard({
   onEdit: (product: Product) => void;
 }) {
   const kind = product.product_type ?? "other";
-  const badgeClass = productTypeBadgeClasses[kind] ?? productTypeBadgeClasses.other;
+  const badgeClass =
+    productTypeBadgeClasses[kind] ?? productTypeBadgeClasses.other;
   const label = productTypeLabels[kind] ?? productTypeLabels.other;
 
   return (
     <div className="overflow-hidden rounded-xl border bg-white">
       {product.thumbnail_url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={product.thumbnail_url} className="h-40 w-full object-cover" alt={product.title} />
+        <img
+          src={product.thumbnail_url}
+          className="h-40 w-full object-cover"
+          alt={product.title}
+        />
       ) : (
         <div className="flex h-40 w-full items-center justify-center bg-gray-100">
           <ProductTypeIcon type={kind} size={40} />
@@ -374,18 +466,29 @@ function ProductCard({
               <p className="mt-0.5 text-xs text-gray-400">免費</p>
             )}
           </div>
-          <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${badgeClass}`}>{label}</span>
+          <span
+            className={`flex-shrink-0 rounded-full px-2 py-0.5 text-xs ${badgeClass}`}
+          >
+            {label}
+          </span>
         </div>
 
         {product.external_url && (
-          <a href={product.external_url} target="_blank" rel="noopener noreferrer" className="mt-1 block truncate text-xs text-blue-500 hover:underline">
+          <a
+            href={product.external_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block truncate text-xs text-blue-500 hover:underline"
+          >
             {product.external_url}
           </a>
         )}
 
         <div className="mt-3 flex items-center justify-between">
           <button
-            onClick={() => onUpdate(product.id, { is_active: !(product.is_active ?? false) })}
+            onClick={() =>
+              onUpdate(product.id, { is_active: !(product.is_active ?? false) })
+            }
             className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-500"
             type="button"
           >
@@ -393,11 +496,19 @@ function ProductCard({
             {product.is_active ? "公開顯示" : "已隱藏"}
           </button>
           <div className="flex gap-1">
-            <button onClick={() => onEdit(product)} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-gray-700" type="button">
+            <button
+              onClick={() => onEdit(product)}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-gray-700"
+              type="button"
+            >
               <Pencil size={13} />
               編輯
             </button>
-            <button onClick={() => onDelete(product.id)} className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-600" type="button">
+            <button
+              onClick={() => onDelete(product.id)}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:text-red-600"
+              type="button"
+            >
               <Trash2 size={13} />
               刪除
             </button>
@@ -410,9 +521,16 @@ function ProductCard({
 
 function ProductGridSkeleton() {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="正在載入貨品">
+    <div
+      className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+      aria-label="正在載入貨品"
+    >
       {[0, 1, 2].map((item) => (
-        <div key={item} className="overflow-hidden rounded-xl border bg-white" aria-hidden="true">
+        <div
+          key={item}
+          className="overflow-hidden rounded-xl border bg-white"
+          aria-hidden="true"
+        >
           <div className="h-40 animate-pulse bg-zinc-100" />
           <div className="space-y-3 p-3">
             <div className="h-4 w-2/3 animate-pulse rounded bg-zinc-100" />
@@ -421,6 +539,15 @@ function ProductGridSkeleton() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function OrderSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <p className="text-xs text-zinc-400">{label}</p>
+      <p className="mt-1 text-xl font-bold text-zinc-900">{value}</p>
     </div>
   );
 }
@@ -445,17 +572,21 @@ function ProductModal({
           title: product.title || "",
           description: product.description || "",
           price: product.price ? String(product.price) : "",
-          currency: Number(product.price ?? 0) > 0 ? product.currency || "HKD" : "FREE",
+          currency:
+            Number(product.price ?? 0) > 0 ? product.currency || "HKD" : "FREE",
           external_url: product.external_url || "",
           thumbnail_url: product.thumbnail_url || "",
           stock_unlimited: product.is_unlimited_stock ?? true,
           stock_quantity: product.stock ? String(product.stock) : "",
           is_active: product.is_active ?? true,
         }
-      : emptyForm
+      : emptyForm,
   );
 
-  function setField<K extends keyof ProductForm>(key: K, value: ProductForm[K]) {
+  function setField<K extends keyof ProductForm>(
+    key: K,
+    value: ProductForm[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -483,8 +614,17 @@ function ProductModal({
     };
 
     const query = product
-      ? supabase.from("egg_digital_products").update(payload).eq("id", product.id).select("*").single()
-      : supabase.from("egg_digital_products").insert(payload).select("*").single();
+      ? supabase
+          .from("egg_digital_products")
+          .update(payload)
+          .eq("id", product.id)
+          .select("*")
+          .single()
+      : supabase
+          .from("egg_digital_products")
+          .insert(payload)
+          .select("*")
+          .single();
 
     const { data, error } = await query;
     setSaving(false);
@@ -499,7 +639,9 @@ function ProductModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6">
-        <h2 className="text-lg font-semibold">{product ? "編輯貨品" : "新增貨品"}</h2>
+        <h2 className="text-lg font-semibold">
+          {product ? "編輯貨品" : "新增貨品"}
+        </h2>
         <div className="mt-5 space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium">產品類型</label>
@@ -509,7 +651,9 @@ function ProductModal({
                   key={value}
                   onClick={() => setField("product_type", value)}
                   className={`flex items-center justify-center gap-1 rounded-xl border px-3 py-2 text-xs ${
-                    form.product_type === value ? "border-black bg-black text-white" : "border-gray-200 bg-white text-gray-600"
+                    form.product_type === value
+                      ? "border-black bg-black text-white"
+                      : "border-gray-200 bg-white text-gray-600"
                   }`}
                   type="button"
                 >
@@ -521,16 +665,29 @@ function ProductModal({
           </div>
 
           <Field label="產品名稱 *">
-            <input value={form.title} onChange={(event) => setField("title", event.target.value)} className="field-input" />
+            <input
+              value={form.title}
+              onChange={(event) => setField("title", event.target.value)}
+              className="field-input"
+            />
           </Field>
 
           <Field label="產品描述">
-            <textarea value={form.description} onChange={(event) => setField("description", event.target.value)} rows={3} className="field-input resize-none" />
+            <textarea
+              value={form.description}
+              onChange={(event) => setField("description", event.target.value)}
+              rows={3}
+              className="field-input resize-none"
+            />
           </Field>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Field label="貨幣">
-              <select value={form.currency} onChange={(event) => setField("currency", event.target.value)} className="field-input">
+              <select
+                value={form.currency}
+                onChange={(event) => setField("currency", event.target.value)}
+                className="field-input"
+              >
                 <option value="HKD">HKD</option>
                 <option value="TWD">TWD</option>
                 <option value="SGD">SGD</option>
@@ -550,13 +707,21 @@ function ProductModal({
             <Field label="庫存">
               <div className="flex gap-2">
                 <label className="flex items-center gap-1 text-sm text-gray-500">
-                  <input type="checkbox" checked={form.stock_unlimited} onChange={(event) => setField("stock_unlimited", event.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={form.stock_unlimited}
+                    onChange={(event) =>
+                      setField("stock_unlimited", event.target.checked)
+                    }
+                  />
                   無限
                 </label>
                 <input
                   type="number"
                   value={form.stock_quantity}
-                  onChange={(event) => setField("stock_quantity", event.target.value)}
+                  onChange={(event) =>
+                    setField("stock_quantity", event.target.value)
+                  }
                   disabled={form.stock_unlimited}
                   className="field-input flex-1 disabled:bg-gray-100"
                 />
@@ -574,20 +739,37 @@ function ProductModal({
           </Field>
 
           <Field label="縮圖 URL">
-            <input value={form.thumbnail_url} onChange={(event) => setField("thumbnail_url", event.target.value)} className="field-input" />
+            <input
+              value={form.thumbnail_url}
+              onChange={(event) =>
+                setField("thumbnail_url", event.target.value)
+              }
+              className="field-input"
+            />
           </Field>
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.is_active} onChange={(event) => setField("is_active", event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={form.is_active}
+              onChange={(event) => setField("is_active", event.target.checked)}
+            />
             公開顯示
           </label>
         </div>
 
         <div className="mt-6 flex gap-3">
-          <button onClick={saveProduct} disabled={saving} className="flex-1 rounded-xl bg-black py-2.5 text-sm font-medium text-white disabled:opacity-50">
+          <button
+            onClick={saveProduct}
+            disabled={saving}
+            className="flex-1 rounded-xl bg-black py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          >
             {saving ? "儲存中..." : "儲存"}
           </button>
-          <button onClick={onClose} className="flex-1 rounded-xl border py-2.5 text-sm text-gray-500">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border py-2.5 text-sm text-gray-500"
+          >
             取消
           </button>
         </div>
@@ -608,8 +790,16 @@ function ProductModal({
   );
 }
 
-function OrderCard({ order, onUpdated }: { order: Order; onUpdated: () => Promise<void> }) {
-  const [trackingNumber, setTrackingNumber] = useState(order.tracking_number ?? "");
+function OrderCard({
+  order,
+  onUpdated,
+}: {
+  order: Order;
+  onUpdated: () => Promise<void>;
+}) {
+  const [trackingNumber, setTrackingNumber] = useState(
+    order.tracking_number ?? "",
+  );
   const [loading, setLoading] = useState(false);
   const badge = statusLabels[order.status ?? "pending"] ?? statusLabels.pending;
 
@@ -637,15 +827,22 @@ function OrderCard({ order, onUpdated }: { order: Order; onUpdated: () => Promis
     <div className="rounded-xl border bg-white p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium">{order.product_title ?? "未命名貨品"}</h3>
+          <h3 className="text-sm font-medium">
+            {order.product_title ?? "未命名貨品"}
+          </h3>
           <p className="mt-0.5 text-xs text-gray-400">
-            {order.buyer_name ?? "未提供姓名"} · {order.buyer_email ?? "未提供電郵"}
+            {order.buyer_name ?? "未提供姓名"} ·{" "}
+            {order.buyer_email ?? "未提供電郵"}
           </p>
           <p className="mt-1 text-sm font-semibold">
             {order.currency ?? "HKD"} {order.amount ?? 0}
           </p>
         </div>
-        <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge.color}`}>{badge.label}</span>
+        <span
+          className={`rounded-full px-2 py-1 text-xs font-medium ${badge.color}`}
+        >
+          {badge.label}
+        </span>
       </div>
 
       {order.delivery_address && (
@@ -660,7 +857,11 @@ function OrderCard({ order, onUpdated }: { order: Order; onUpdated: () => Promis
 
       <div className="flex flex-wrap gap-2">
         {order.status === "paid" && (
-          <button onClick={() => updateStatus("processing")} disabled={loading} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+          <button
+            onClick={() => updateStatus("processing")}
+            disabled={loading}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+          >
             開始處理
           </button>
         )}
@@ -682,19 +883,33 @@ function OrderCard({ order, onUpdated }: { order: Order; onUpdated: () => Promis
           </div>
         )}
         {order.status === "processing" && !order.delivery_address && (
-          <button onClick={() => updateStatus("delivered")} disabled={loading} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+          <button
+            onClick={() => updateStatus("delivered")}
+            disabled={loading}
+            className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+          >
             標記已完成
           </button>
         )}
         {order.status === "shipped" && (
-          <button onClick={() => updateStatus("delivered")} disabled={loading} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white disabled:opacity-50">
+          <button
+            onClick={() => updateStatus("delivered")}
+            disabled={loading}
+            className="rounded-lg bg-green-600 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+          >
             確認已送達
           </button>
         )}
       </div>
 
-      {order.tracking_number && <p className="mt-2 text-xs text-gray-500">運單號：{order.tracking_number}</p>}
-      <p className="mt-2 text-xs text-gray-300">{new Date(order.created_at).toLocaleString("zh-HK")}</p>
+      {order.tracking_number && (
+        <p className="mt-2 text-xs text-gray-500">
+          運單號：{order.tracking_number}
+        </p>
+      )}
+      <p className="mt-2 text-xs text-gray-300">
+        {new Date(order.created_at).toLocaleString("zh-HK")}
+      </p>
     </div>
   );
 }
@@ -702,7 +917,9 @@ function OrderCard({ order, onUpdated }: { order: Order; onUpdated: () => Promis
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-gray-600">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-gray-600">
+        {label}
+      </span>
       {children}
     </label>
   );

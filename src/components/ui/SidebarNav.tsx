@@ -26,7 +26,7 @@ const items = [
   { href: "/profile", label: "創作者檔案", icon: UserRound },
   { href: "/media-kit", label: "Media Kit", icon: WandSparkles },
   { href: "/products", label: "數位產品", icon: Package },
-  { href: "/analytics", label: "數據分析", icon: BarChart3 },
+  { href: "/analytics", label: "Instagram 分析", icon: BarChart3 },
 ];
 
 const brandDealItems = [
@@ -75,7 +75,9 @@ export function SidebarNav() {
         href={href}
         prefetch={prefetch}
         className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-          active ? "bg-zinc-950 text-white" : "text-zinc-600 hover:bg-white hover:text-zinc-950"
+          active
+            ? "bg-zinc-950 text-white"
+            : "text-zinc-600 hover:bg-white hover:text-zinc-950"
         }`}
       >
         <Icon className="h-4 w-4" aria-hidden />
@@ -87,13 +89,25 @@ export function SidebarNav() {
   return (
     <nav className="mt-6 space-y-1">
       {items.map((item) => (
-        <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+        <SidebarItem
+          key={item.href}
+          href={item.href}
+          icon={item.icon}
+          label={item.label}
+          prefetch={false}
+        />
       ))}
 
       <div className="pt-5">
         <SidebarSection label="品牌合作" defaultOpen={true}>
           {brandDealItems.map((item) => (
-            <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+            <SidebarItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              prefetch={false}
+            />
           ))}
         </SidebarSection>
       </div>
@@ -101,13 +115,25 @@ export function SidebarNav() {
       <div className="pt-2">
         <SidebarSection label="創作工具" defaultOpen={true}>
           {creatorToolItems.map((item) => (
-            <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+            <SidebarItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              prefetch={false}
+            />
           ))}
         </SidebarSection>
 
         <SidebarSection label="制片工具" defaultOpen={true} small={true}>
           {productionToolItems.map((item) => (
-            <SidebarItem key={item.href} href={item.href} icon={item.icon} label={item.label} prefetch={false} />
+            <SidebarItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              label={item.label}
+              prefetch={false}
+            />
           ))}
         </SidebarSection>
       </div>
@@ -135,10 +161,15 @@ function SidebarSection({
         onClick={() => setOpen(!open)}
         className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 hover:bg-white"
       >
-        <span className={`font-medium uppercase tracking-wider text-gray-400 ${small ? "text-[10px]" : "text-xs"}`}>
+        <span
+          className={`font-medium uppercase tracking-wider text-gray-400 ${small ? "text-[10px]" : "text-xs"}`}
+        >
           {label}
         </span>
-        <ChevronDown size={12} className={`text-gray-500 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={12}
+          className={`text-gray-500 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && <div className="mt-0.5">{children}</div>}
     </div>

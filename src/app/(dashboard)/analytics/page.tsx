@@ -1,272 +1,331 @@
-import Link from "next/link";
+import { Activity, Eye, Heart, MessageCircle, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
-import { DollarSign, Gift, Handshake, Package, ShoppingBag, Users, type LucideIcon } from "lucide-react";
+import {
+  InstagramTrendChart,
+  type InstagramTrendPoint,
+} from "@/components/analytics/InstagramTrendChart";
+import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { SalesTrendChart, type SalesTrendPoint } from "@/components/analytics/SalesTrendChart";
 
+type InstagramSyncData = {
+  synced_at?: string;
+  engagement_sample_size?: number;
+  reach_7d?: number | null;
+  accounts_engaged_7d?: number | null;
+  total_interactions_7d?: number | null;
+};
 type Profile = {
   id: string;
-  username: string;
-  display_name: string | null;
+  instagram_handle: string | null;
   instagram_followers: number | null;
+  instagram_engagement_rate: number | null;
+  audience_demographics: Record<string, unknown> | null;
 };
-
-type Invitation = {
+type Snapshot = {
+  snapshot_date: string;
+  followers: number;
+  engagement_rate: number | null;
+  reach_7d: number | null;
+};
+type InstagramMedia = {
   id: string;
-  brand_name: string | null;
-  campaign_name: string | null;
-  collab_formats: string[] | null;
-  budget_range: string | null;
-  responded_at: string | null;
-  status: string | null;
+  media_type: string | null;
+  caption: string | null;
+  permalink: string | null;
+  media_url: string | null;
+  thumbnail_url: string | null;
+  views: number | null;
+  reach: number | null;
+  plays: number | null;
+  total_interactions: number | null;
+  like_count: number | null;
+  comments_count: number | null;
+  published_at: string | null;
 };
-
-type Order = {
-  id: string;
-  product_title: string | null;
-  amount: number | null;
-  currency: string | null;
-  buyer_name: string | null;
-  status: string | null;
-  created_at: string;
-};
-
-type PerkClaim = {
-  id: string;
-  status: string | null;
-  perk_id: string | null;
-};
-
-const paidStatuses = new Set(["paid", "processing", "shipped", "delivered"]);
-const activePerkStatuses = new Set(["confirmed", "in_progress"]);
 
 export default async function AnalyticsPage() {
   const serverSupabase = await createServerClient();
   if (!serverSupabase) redirect("/login");
-
   const {
     data: { user },
   } = await serverSupabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const supabaseAdmin = createSupabaseAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!) as any;
-
-  const { data: profileData } = await supabaseAdmin
+  const admin = createSupabaseAdmin(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } },
+  );
+  const { data: profileData } = await admin
     .from("egg_creator_profiles")
-    .select("id, username, display_name, instagram_followers")
+    .select(
+      "id,instagram_handle,instagram_followers,instagram_engagement_rate,audience_demographics",
+    )
     .eq("user_id", user.id)
     .single();
-
   const profile = profileData as Profile | null;
   if (!profile) redirect("/login");
 
-  const [{ data: invitationData }, { data: orderData }, { data: perkClaimData }] = await Promise.all([
-    supabaseAdmin
-      .from("egg_brand_invitations")
-      .select("id, brand_name, campaign_name, collab_formats, budget_range, responded_at, status")
+  const [{ data: snapshotData }, { data: mediaData }] = await Promise.all([
+    admin
+      .from("egg_instagram_metric_snapshots")
+      .select("snapshot_date,followers,engagement_rate,reach_7d")
       .eq("creator_id", profile.id)
-      .eq("status", "accepted")
-      .order("responded_at", { ascending: false }),
-    supabaseAdmin
-      .from("egg_product_orders")
-      .select("id, product_title, amount, currency, buyer_name, status, created_at")
+      .order("snapshot_date", { ascending: true })
+      .limit(30),
+    admin
+      .from("egg_instagram_media")
+      .select(
+        "id,media_type,caption,permalink,media_url,thumbnail_url,views,reach,plays,total_interactions,like_count,comments_count,published_at",
+      )
       .eq("creator_id", profile.id)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false }),
-    supabaseAdmin.from("perk_claims").select("id, status, perk_id").eq("creator_username", profile.username),
+      .order("published_at", { ascending: false })
+      .limit(50),
   ]);
 
-  const invitations = (invitationData ?? []) as Invitation[];
-  const orders = (orderData ?? []) as Order[];
-  const perkClaims = (perkClaimData ?? []) as PerkClaim[];
-  const paidOrders = orders.filter((order) => paidStatuses.has(order.status ?? ""));
-
-  const brandDealRevenue = invitations.reduce((sum, invitation) => sum + budgetEstimate(invitation.budget_range), 0);
-  const productRevenue = orders.reduce((sum, order) => sum + Number(order.amount ?? 0), 0);
-  const activePerks = perkClaims.filter((claim) => activePerkStatuses.has(claim.status ?? "")).length;
-  const perkStats = {
-    pending: perkClaims.filter((claim) => claim.status === "pending").length,
-    confirmed: perkClaims.filter((claim) => claim.status === "confirmed").length,
-    in_progress: perkClaims.filter((claim) => claim.status === "in_progress").length,
-    completed: perkClaims.filter((claim) => claim.status === "completed").length,
-  };
-  const chartData = buildMonthlySalesData(orders);
+  const sync = readInstagramSync(profile.audience_demographics);
+  const topMedia = ((mediaData ?? []) as InstagramMedia[])
+    .toSorted((a, b) => performanceValue(b) - performanceValue(a))
+    .slice(0, 5);
+  const trendData: InstagramTrendPoint[] = (
+    (snapshotData ?? []) as Snapshot[]
+  ).map((item) => ({
+    date: new Intl.DateTimeFormat("zh-HK", {
+      month: "short",
+      day: "numeric",
+      timeZone: "Asia/Hong_Kong",
+    }).format(new Date(`${item.snapshot_date}T00:00:00Z`)),
+    followers: Number(item.followers ?? 0),
+    reach: item.reach_7d,
+    engagementRate: item.engagement_rate,
+  }));
 
   return (
     <div className="space-y-6 bg-[#f7f7f8] pt-[10vh]">
-      <div>
-        <h1 className="text-3xl font-black text-zinc-950">數據分析</h1>
-        <p className="mt-2 text-zinc-500">追蹤品牌合作、貨品銷售和公關宣傳表現。</p>
-      </div>
+      <header className="lg:ml-[10%]">
+        <h1 className="text-3xl font-black text-zinc-950">
+          Instagram 數據分析
+        </h1>
+        <p className="mt-2 text-zinc-500">
+          直接讀取 Meta API，追蹤受眾、觸及、互動及內容表現。
+        </p>
+        <p className="mt-1 text-xs text-zinc-400">
+          @{profile.instagram_handle ?? "尚未連接 Instagram"}
+        </p>
+      </header>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <KpiCard label="品牌合作收入" value={money(brandDealRevenue)} sub="以邀請預算範圍估算" icon={DollarSign} color="bg-purple-500" />
-        <KpiCard label="貨品銷售收入" value={money(productRevenue)} sub={`${orders.length} 筆非取消訂單`} icon={ShoppingBag} color="bg-blue-500" />
-        <KpiCard label="已完成合作" value={String(invitations.length)} sub="已接受品牌邀請" icon={Handshake} color="bg-green-500" />
-        <KpiCard label="訂單總數" value={String(paidOrders.length)} sub="已付款或處理中訂單" icon={Package} color="bg-orange-500" />
-        <KpiCard label="IG 追蹤人數" value={Number(profile.instagram_followers ?? 0).toLocaleString()} sub="@Instagram" icon={Users} color="bg-pink-500" />
-        <KpiCard label="公關宣傳進行中" value={String(activePerks)} sub="已確認 / 進行中" icon={Gift} color="bg-yellow-500" />
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiCard
+          label="Instagram 粉絲"
+          value={formatNumber(profile.instagram_followers)}
+          sub="目前追蹤人數"
+          icon={Users}
+          color="bg-pink-500"
+        />
+        <KpiCard
+          label="平均互動率"
+          value={
+            profile.instagram_engagement_rate == null
+              ? "—"
+              : `${Number(profile.instagram_engagement_rate).toFixed(2)}%`
+          }
+          sub={`最近 ${sync.engagement_sample_size ?? 0} 篇內容`}
+          icon={Heart}
+          color="bg-rose-500"
+        />
+        <KpiCard
+          label="7 日觸及"
+          value={formatNumber(sync.reach_7d)}
+          sub="Meta 官方 Reach"
+          icon={Eye}
+          color="bg-violet-500"
+        />
+        <KpiCard
+          label="7 日互動帳戶"
+          value={formatNumber(sync.accounts_engaged_7d)}
+          sub="Accounts engaged"
+          icon={Activity}
+          color="bg-blue-500"
+        />
+        <KpiCard
+          label="7 日總互動"
+          value={formatNumber(sync.total_interactions_7d)}
+          sub="Meta 官方互動"
+          icon={MessageCircle}
+          color="bg-emerald-500"
+        />
       </section>
 
-      <SalesTrendChart data={chartData} />
-
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <RecordPanel title="品牌合作記錄" href="/brand-deals">
-          {invitations.slice(0, 5).length === 0 ? (
-            <EmptyLine text="暫未有已接受品牌合作" />
-          ) : (
-            invitations.slice(0, 5).map((invitation) => <BrandDealRow key={invitation.id} invitation={invitation} />)
-          )}
-        </RecordPanel>
-
-        <RecordPanel title="貨品銷售記錄" href="/products">
-          {orders.slice(0, 5).length === 0 ? (
-            <EmptyLine text="暫未有銷售訂單" />
-          ) : (
-            orders.slice(0, 5).map((order) => <OrderRow key={order.id} order={order} />)
-          )}
-        </RecordPanel>
-      </section>
+      <InstagramTrendChart data={trendData} />
 
       <section className="rounded-2xl border bg-white p-5">
-        <h2 className="mb-4 text-sm font-semibold">公關宣傳總覽</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <MiniStat label="待確認" value={perkStats.pending} />
-          <MiniStat label="已確認" value={perkStats.confirmed} />
-          <MiniStat label="進行中" value={perkStats.in_progress} />
-          <MiniStat label="已完成" value={perkStats.completed} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-zinc-900">
+              表現最佳內容
+            </h2>
+            <p className="mt-1 text-xs text-zinc-400">
+              按觀看／播放／觸及排序，最多顯示 5 篇。
+            </p>
+          </div>
+          <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+            真實 Meta 數據
+          </span>
+        </div>
+        <div className="mt-4 divide-y">
+          {topMedia.length ? (
+            topMedia.map((media, index) => (
+              <MediaRow key={media.id} media={media} rank={index + 1} />
+            ))
+          ) : (
+            <p className="py-12 text-center text-sm text-zinc-400">
+              尚未有 Instagram 內容數據
+            </p>
+          )}
         </div>
       </section>
+
+      <InstagramSyncButton lastSyncedAt={sync.synced_at ?? null} />
+      <p className="text-xs leading-5 text-zinc-400">
+        數據來源：已授權嘅 Instagram Professional 帳戶及 Meta Graph
+        API。每日同步一次；手動更新會即時刷新。趨勢需要至少兩日快照先會顯示升跌。
+      </p>
     </div>
   );
 }
 
-function KpiCard({ label, value, sub, icon: Icon, color }: { label: string; value: string; sub?: string; icon: LucideIcon; color: string }) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  color,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  icon: typeof Users;
+  color: string;
+}) {
   return (
     <div className="rounded-2xl border bg-white p-5">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-medium text-gray-400">{label}</p>
+          <p className="text-xs font-medium text-zinc-400">{label}</p>
           <p className="mt-1 text-2xl font-bold text-zinc-900">{value}</p>
-          {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+          <p className="mt-1 text-xs text-zinc-400">{sub}</p>
         </div>
         <div className={`rounded-xl p-2.5 ${color}`}>
-          <Icon size={18} className="text-white" />
+          <Icon size={18} className="text-white" aria-hidden />
         </div>
       </div>
     </div>
   );
 }
 
-function RecordPanel({ title, href, children }: { title: string; href: string; children: React.ReactNode }) {
+function MediaRow({ media, rank }: { media: InstagramMedia; rank: number }) {
+  const interactions =
+    media.total_interactions ??
+    Number(media.like_count ?? 0) + Number(media.comments_count ?? 0);
+  const primary = media.views ?? media.plays ?? media.reach;
+  const primaryLabel =
+    media.views != null
+      ? "觀看"
+      : media.plays != null
+        ? "播放"
+        : media.reach != null
+          ? "觸及"
+          : "互動";
+  const image = media.thumbnail_url || media.media_url;
   return (
-    <div className="rounded-2xl border bg-white p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <Link href={href} className="text-xs font-medium text-purple-600 hover:underline">
-          查看全部
-        </Link>
-      </div>
-      <div className="divide-y">{children}</div>
-    </div>
-  );
-}
-
-function BrandDealRow({ invitation }: { invitation: Invitation }) {
-  return (
-    <div className="py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{invitation.brand_name ?? "未命名品牌"}</p>
-          <p className="mt-0.5 truncate text-xs text-gray-400">{invitation.campaign_name ?? "未命名 Campaign"}</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">已合作</span>
-      </div>
-      {invitation.collab_formats && invitation.collab_formats.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {invitation.collab_formats.map((format) => (
-            <span key={format} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-              {format}
-            </span>
-          ))}
-        </div>
+    <div className="flex items-center gap-3 py-4">
+      <span className="w-5 shrink-0 text-center text-xs font-bold text-zinc-300">
+        {rank}
+      </span>
+      {image ? (
+        <>
+          {/* Instagram CDN URLs are dynamic and cannot be allow-listed safely. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={image}
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-xl bg-zinc-100 object-cover"
+          />
+        </>
+      ) : (
+        <div className="h-14 w-14 shrink-0 rounded-xl bg-zinc-100" />
       )}
-      {invitation.responded_at && <p className="mt-2 text-xs text-gray-300">{new Date(invitation.responded_at).toLocaleDateString("zh-HK")}</p>}
-    </div>
-  );
-}
-
-function OrderRow({ order }: { order: Order }) {
-  const badge = orderStatusBadge(order.status);
-  return (
-    <div className="py-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{order.product_title ?? "未命名貨品"}</p>
-          <p className="mt-0.5 truncate text-xs text-gray-400">{order.buyer_name ?? "未提供姓名"}</p>
-          <p className="mt-1 text-sm font-semibold">
-            {order.currency ?? "HKD"} {Number(order.amount ?? 0).toLocaleString()}
+      <div className="min-w-0 flex-1">
+        {media.permalink ? (
+          <a
+            href={media.permalink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="line-clamp-2 text-sm font-medium text-zinc-800 hover:underline"
+          >
+            {media.caption || "查看 Instagram 內容"}
+          </a>
+        ) : (
+          <p className="line-clamp-2 text-sm font-medium text-zinc-800">
+            {media.caption || "Instagram 內容"}
           </p>
-        </div>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${badge.color}`}>{badge.label}</span>
+        )}
+        <p className="mt-1 text-xs text-zinc-400">
+          {mediaTypeLabel(media.media_type)} · {formatDate(media.published_at)}
+        </p>
       </div>
-      <p className="mt-2 text-xs text-gray-300">{new Date(order.created_at).toLocaleString("zh-HK")}</p>
+      <div className="hidden shrink-0 grid-cols-3 gap-5 text-right sm:grid">
+        <Metric label={primaryLabel} value={primary} />
+        <Metric label="觸及" value={media.reach} />
+        <Metric label="互動" value={interactions} />
+      </div>
     </div>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-4 text-center">
-      <p className="text-xs text-gray-400">{label}</p>
-      <p className="mt-1 text-xl font-bold text-zinc-900">{value}</p>
+    <div>
+      <p className="text-xs text-zinc-400">{label}</p>
+      <p className="mt-0.5 text-sm font-semibold text-zinc-800">
+        {formatNumber(value)}
+      </p>
     </div>
   );
 }
-
-function EmptyLine({ text }: { text: string }) {
-  return <p className="py-8 text-center text-sm text-gray-400">{text}</p>;
+function readInstagramSync(
+  value: Record<string, unknown> | null,
+): InstagramSyncData {
+  if (!value || Array.isArray(value)) return {};
+  const sync = value.instagram_sync;
+  return sync && typeof sync === "object" && !Array.isArray(sync)
+    ? (sync as InstagramSyncData)
+    : {};
 }
-
-function money(value: number) {
-  return `HK$${Math.round(value).toLocaleString()}`;
+function performanceValue(media: InstagramMedia) {
+  return Number(
+    media.views ??
+      media.plays ??
+      media.reach ??
+      media.total_interactions ??
+      (media.like_count ?? 0) + (media.comments_count ?? 0),
+  );
 }
-
-function budgetEstimate(value: string | null) {
-  if (!value) return 0;
-  const numbers = value.match(/\d[\d,]*/g)?.map((num) => Number(num.replace(/,/g, ""))) ?? [];
-  if (numbers.length >= 2) return (numbers[0] + numbers[1]) / 2;
-  if (numbers.length === 1) return numbers[0];
-  return 0;
+function formatNumber(value: number | null | undefined) {
+  return value == null ? "—" : Number(value).toLocaleString("zh-HK");
 }
-
-function orderStatusBadge(status: string | null) {
-  if (status === "paid") return { label: "已付款", color: "bg-yellow-50 text-yellow-700" };
-  if (status === "processing") return { label: "處理中", color: "bg-blue-50 text-blue-700" };
-  if (status === "shipped") return { label: "已寄出", color: "bg-purple-50 text-purple-700" };
-  if (status === "delivered") return { label: "已完成", color: "bg-green-50 text-green-700" };
-  return { label: "待付款", color: "bg-gray-100 text-gray-500" };
+function formatDate(value: string | null) {
+  return value
+    ? new Intl.DateTimeFormat("zh-HK", {
+        dateStyle: "medium",
+        timeZone: "Asia/Hong_Kong",
+      }).format(new Date(value))
+    : "日期不詳";
 }
-
-function buildMonthlySalesData(orders: Order[]): SalesTrendPoint[] {
-  const now = new Date();
-  const months = Array.from({ length: 6 }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
-    return {
-      key: `${date.getFullYear()}-${date.getMonth()}`,
-      month: date.toLocaleDateString("zh-HK", { month: "short" }),
-      amount: 0,
-    };
-  });
-  const byKey = new Map(months.map((month) => [month.key, month]));
-
-  for (const order of orders) {
-    const date = new Date(order.created_at);
-    const key = `${date.getFullYear()}-${date.getMonth()}`;
-    const target = byKey.get(key);
-    if (target) target.amount += Number(order.amount ?? 0);
-  }
-
-  return months.map(({ month, amount }) => ({ month, amount }));
+function mediaTypeLabel(type: string | null) {
+  if (type === "VIDEO") return "Reel／影片";
+  if (type === "CAROUSEL_ALBUM") return "輪播貼文";
+  if (type === "IMAGE") return "圖片貼文";
+  return "Instagram 內容";
 }

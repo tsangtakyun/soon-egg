@@ -3,6 +3,8 @@ import { LogOut, Settings, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCreditBalance } from "@/lib/credits";
 import { CreditBadge } from "./CreditBadge";
+import { CreatorAvatar } from "./CreatorAvatar";
+import { EggBrandMark } from "./EggBrandMark";
 import { SidebarNav } from "./SidebarNav";
 
 export async function Sidebar() {
@@ -27,22 +29,14 @@ export async function Sidebar() {
     <aside className="hidden h-screen w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:flex">
       <div className="shrink-0">
         <Link href="/dashboard" className="flex items-center gap-3 px-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/soon-egg.png" alt="SOON-EGG" className="h-7 w-auto object-contain" />
+          <EggBrandMark compact />
         </Link>
 
         <Link href="/settings" className="mt-5 flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 transition hover:border-zinc-300">
-          {profile?.avatar_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profile.avatar_url} alt="" className="h-10 w-10 rounded-full bg-zinc-100 object-cover" />
-          ) : (
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
-              {creatorName.slice(0, 2).toUpperCase()}
-            </span>
-          )}
+          <CreatorAvatar avatarUrl={profile?.avatar_url} creatorName={creatorName} />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold text-zinc-900">{creatorName}</span>
-            <span className="block text-xs text-zinc-400">創作者帳戶</span>
+            <span className="block text-xs text-zinc-400">Creator 空間 · 管理檔案</span>
           </span>
         </Link>
 

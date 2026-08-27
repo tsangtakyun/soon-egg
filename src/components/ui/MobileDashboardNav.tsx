@@ -1,11 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, Settings, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { SidebarNav } from "./SidebarNav";
+import { CreatorAvatar } from "./CreatorAvatar";
+import { EggBrandMark } from "./EggBrandMark";
 
 export function MobileDashboardNav({
   avatarUrl,
@@ -22,10 +23,10 @@ export function MobileDashboardNav({
     <>
       <header className="z-40 flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 lg:hidden">
         <Link href="/dashboard" className="flex items-center gap-2" aria-label="返回 SOON-EGG 主頁">
-          <Image src="/soon-egg.png" alt="SOON-EGG" width={104} height={32} className="h-7 w-auto object-contain" priority />
+          <EggBrandMark compact />
         </Link>
         <div className="flex min-w-0 items-center gap-2">
-          <CreatorAvatar avatarUrl={avatarUrl} creatorName={creatorName} />
+          <CreatorAvatar avatarUrl={avatarUrl} creatorName={creatorName} className="h-9 w-9" />
           <span className="max-w-28 truncate text-sm font-semibold text-zinc-800">{creatorName}</span>
           <button
             type="button"
@@ -50,7 +51,7 @@ export function MobileDashboardNav({
           <aside className="absolute inset-y-0 right-0 flex w-[min(88vw,360px)] flex-col bg-zinc-50 px-4 py-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-zinc-200 px-2 pb-4">
               <div className="flex min-w-0 items-center gap-3">
-                <CreatorAvatar avatarUrl={avatarUrl} creatorName={creatorName} />
+                <CreatorAvatar avatarUrl={avatarUrl} creatorName={creatorName} className="h-9 w-9" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-zinc-900">{creatorName}</p>
                   <p className="text-xs text-zinc-400">創作者帳戶</p>
@@ -84,22 +85,6 @@ export function MobileDashboardNav({
         </div>
       ) : null}
     </>
-  );
-}
-
-function CreatorAvatar({ avatarUrl, creatorName }: { avatarUrl?: string | null; creatorName: string }) {
-  if (avatarUrl) {
-    return (
-      // Remote creator images can come from connected platforms or storage.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={avatarUrl} alt="" className="h-9 w-9 shrink-0 rounded-full bg-zinc-100 object-cover" />
-    );
-  }
-
-  return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
-      {creatorName.slice(0, 2).toUpperCase()}
-    </span>
   );
 }
 

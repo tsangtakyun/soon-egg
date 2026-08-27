@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { EggBrandMark } from "@/components/ui/EggBrandMark";
 
 function getAuthRedirectUrl(next: string) {
   const origin = window.location.hostname === "localhost" ? window.location.origin : "https://egg.sooncreator.network";
@@ -86,7 +86,7 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#f7f7f5] px-4 py-12">
       <section className="w-full max-w-md rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="mb-6 flex justify-center">
-          <Image src="/soon-egg.png" alt="SOON-EGG" width={160} height={48} className="h-12 w-auto object-contain" priority />
+          <EggBrandMark />
         </div>
 
         {confirmationEmail ? (

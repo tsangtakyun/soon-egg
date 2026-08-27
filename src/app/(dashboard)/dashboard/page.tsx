@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, DollarSign, Sparkles, UserRound } from "lucide-react";
 import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
+import { CreatorAvatar } from "@/components/ui/CreatorAvatar";
 import { createClient } from "@/lib/supabase/server";
 import { demoBrandMatches } from "@/lib/mock-data";
 
@@ -144,8 +145,7 @@ export default async function DashboardHome() {
           <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
             <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-400">你的 Creator 空間</p>
             <div className="flex items-center gap-4">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={avatarUrl} alt={displayName} className="h-16 w-16 rounded-full bg-zinc-100 object-cover" />
+              <CreatorAvatar avatarUrl={avatarUrl} creatorName={displayName} className="h-16 w-16" />
               <div className="min-w-0">
                 <h2 className="truncate text-xl font-bold text-zinc-950">{displayName}</h2>
                 <p className="text-sm text-zinc-500">@{creator.username}</p>

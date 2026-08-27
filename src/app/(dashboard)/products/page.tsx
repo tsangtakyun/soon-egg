@@ -16,8 +16,9 @@ type Product = {
   product_type: ProductType | string | null;
   thumbnail_url: string | null;
   external_url?: string | null;
-  stock_quantity?: number | null;
-  stock_unlimited?: boolean | null;
+  stock?: number | null;
+  is_unlimited_stock?: boolean | null;
+  is_archived?: boolean | null;
   is_active: boolean | null;
 };
 
@@ -110,7 +111,12 @@ export default function ProductsPage() {
       }
 
       const [{ data: productData }, { data: orderData }] = await Promise.all([
-        supabase.from("egg_digital_products").select("*").eq("creator_id", profile.id).order("created_at", { ascending: false }),
+        supabase
+          .from("egg_digital_products")
+          .select("*")
+          .eq("creator_id", profile.id)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false }),
         supabase.from("egg_product_orders").select("*").eq("creator_id", profile.id).order("created_at", { ascending: false }),
       ]);
 
@@ -175,7 +181,15 @@ export default function ProductsPage() {
   }
 
   async function updateProduct(id: string, updates: Partial<Product>) {
-    const { data, error } = await supabase.from("egg_digital_products").update(updates).eq("id", id).select("*").single();
+    if (!profileId) return;
+    const { data, error } = await supabase
+      .from("egg_digital_products")
+      .update(updates)
+      .eq("id", id)
+      .eq("creator_id", profileId)
+      .eq("is_archived", false)
+      .select("*")
+      .single();
     if (error) {
       alert(error.message);
       return;
@@ -184,10 +198,21 @@ export default function ProductsPage() {
   }
 
   async function deleteProduct(id: string) {
-    if (!confirm("確定刪除此貨品？")) return;
-    const { error } = await supabase.from("egg_digital_products").delete().eq("id", id);
+    if (!profileId || !confirm("確定移除此貨品？已建立的訂單紀錄會保留。")) return;
+    const { data, error } = await supabase
+      .from("egg_digital_products")
+      .update({ is_archived: true, is_active: false })
+      .eq("id", id)
+      .eq("creator_id", profileId)
+      .eq("is_archived", false)
+      .select("id")
+      .single();
     if (error) {
-      alert(error.message);
+      alert(`移除失敗：${error.message}`);
+      return;
+    }
+    if (!data) {
+      alert("移除失敗：找不到可移除的貨品，請重新整理後再試。");
       return;
     }
     setProducts((current) => current.filter((product) => product.id !== id));
@@ -406,8 +431,8 @@ function ProductModal({
           currency: Number(product.price ?? 0) > 0 ? product.currency || "HKD" : "FREE",
           external_url: product.external_url || "",
           thumbnail_url: product.thumbnail_url || "",
-          stock_unlimited: product.stock_unlimited ?? true,
-          stock_quantity: product.stock_quantity ? String(product.stock_quantity) : "",
+          stock_unlimited: product.is_unlimited_stock ?? true,
+          stock_quantity: product.stock ? String(product.stock) : "",
           is_active: product.is_active ?? true,
         }
       : emptyForm
@@ -434,9 +459,10 @@ function ProductModal({
       product_type: form.product_type,
       external_url: form.external_url.trim() || null,
       thumbnail_url: form.thumbnail_url.trim() || null,
-      stock_unlimited: form.stock_unlimited,
-      stock_quantity: form.stock_unlimited ? null : Number(form.stock_quantity || 0),
+      is_unlimited_stock: form.stock_unlimited,
+      stock: form.stock_unlimited ? null : Number(form.stock_quantity || 0),
       is_active: form.is_active,
+      is_archived: false,
     };
 
     const query = product

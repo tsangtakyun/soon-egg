@@ -15,6 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ usernam
     .select("id, title, description, price, currency, product_type, thumbnail_url, external_url")
     .eq("creator_id", profile.id)
     .eq("is_active", true)
+    .eq("is_archived", false)
     .order("created_at", { ascending: false });
 
   return Response.json({ products: products ?? [] });

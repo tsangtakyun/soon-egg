@@ -26,8 +26,17 @@ export async function POST(req: Request) {
   if (!product_id) return NextResponse.json({ error: "Missing product_id" }, { status: 400 });
 
   const supabaseAdmin = getSupabaseAdmin() as any;
-  const { data: product } = await supabaseAdmin.from("egg_digital_products").select("*").eq("id", product_id).eq("is_active", true).single();
+  const { data: product } = await supabaseAdmin
+    .from("egg_digital_products")
+    .select("*")
+    .eq("id", product_id)
+    .eq("is_active", true)
+    .eq("is_archived", false)
+    .single();
   if (!product) return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  if (!product.is_unlimited_stock && Number(product.stock ?? 0) < 1) {
+    return NextResponse.json({ error: "Product is out of stock" }, { status: 409 });
+  }
 
   const { data: creator } = await supabaseAdmin
     .from("egg_creator_profiles")

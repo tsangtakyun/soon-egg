@@ -74,6 +74,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
       .select("*")
       .eq("creator_id", profile.id)
       .eq("is_active", true)
+      .eq("is_archived", false)
       .order("created_at", { ascending: false }),
     supabase
       .from("egg_rate_cards")

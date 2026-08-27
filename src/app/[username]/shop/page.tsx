@@ -44,6 +44,7 @@ export default async function PublicShopPage({ params }: { params: Promise<{ use
     .select("id, title, description, price, currency, product_type, thumbnail_url, external_url")
     .eq("creator_id", profile.id)
     .eq("is_active", true)
+    .eq("is_archived", false)
     .order("created_at", { ascending: false });
 
   const products = (data ?? []) as Product[];

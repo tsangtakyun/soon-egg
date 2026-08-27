@@ -311,7 +311,6 @@ export function PublicPageClient({
         items: cartItems.map((item) => ({
           productId: item.productId,
           qty: item.qty,
-          price: Number(products.find((product) => product.id === item.productId)?.price ?? 0),
         })),
         buyer_name: name,
         buyer_email: email,

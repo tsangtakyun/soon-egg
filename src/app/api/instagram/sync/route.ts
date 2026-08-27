@@ -23,11 +23,26 @@ type InstagramMediaResponse = {
   };
 };
 
+type InstagramInsightRow = {
+  name?: string;
+  values?: Array<{ value?: number }>;
+  total_value?: { value?: number };
+};
+
+type InstagramInsightsResponse = {
+  data?: InstagramInsightRow[];
+  error?: {
+    message?: string;
+  };
+};
+
+const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
+
 async function fetchInstagramProfile(instagramUserId: string | null, accessToken: string): Promise<InstagramProfile> {
   const fields = "id,username,followers_count,media_count";
 
   if (instagramUserId) {
-    const facebookUrl = new URL(`https://graph.facebook.com/v21.0/${encodeURIComponent(instagramUserId)}`);
+    const facebookUrl = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}`);
     facebookUrl.searchParams.set("fields", fields);
     facebookUrl.searchParams.set("access_token", accessToken);
 
@@ -48,13 +63,76 @@ async function fetchInstagramProfile(instagramUserId: string | null, accessToken
 }
 
 async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: string): Promise<InstagramMediaResponse> {
-  const url = new URL(`https://graph.facebook.com/v21.0/${encodeURIComponent(instagramUserId)}/media`);
+  const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}/media`);
   url.searchParams.set("fields", "id,like_count,comments_count,timestamp");
   url.searchParams.set("limit", "12");
   url.searchParams.set("access_token", accessToken);
 
   const response = await fetch(url.toString(), { next: { revalidate: 0 } });
   return (await response.json()) as InstagramMediaResponse;
+}
+
+function insightValue(row: InstagramInsightRow) {
+  const total = row.total_value?.value;
+  if (typeof total === "number" && Number.isFinite(total)) return total;
+
+  return (row.values ?? []).reduce((sum, item) => {
+    const value = item.value;
+    return sum + (typeof value === "number" && Number.isFinite(value) ? value : 0);
+  }, 0);
+}
+
+async function fetchOfficialInsights(instagramUserId: string, accessToken: string) {
+  const until = new Date();
+  until.setUTCHours(0, 0, 0, 0);
+  const since = new Date(until);
+  since.setUTCDate(since.getUTCDate() - 7);
+  const baseParams = {
+    since: String(Math.floor(since.getTime() / 1000)),
+    until: String(Math.floor(until.getTime() / 1000)),
+    period: "day",
+  };
+  const metrics: Record<string, number> = {};
+  const errors: string[] = [];
+  const attempts = [
+    { metric: "reach" },
+    { metric: "accounts_engaged,total_interactions", metric_type: "total_value" },
+  ];
+
+  for (const attempt of attempts) {
+    const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}/insights`);
+    url.searchParams.set("access_token", accessToken);
+    url.searchParams.set("metric", attempt.metric);
+    url.searchParams.set("period", baseParams.period);
+    url.searchParams.set("since", baseParams.since);
+    url.searchParams.set("until", baseParams.until);
+    if (attempt.metric_type) url.searchParams.set("metric_type", attempt.metric_type);
+
+    try {
+      const response = await fetch(url.toString(), { next: { revalidate: 0 } });
+      const payload = (await response.json()) as InstagramInsightsResponse;
+      if (!response.ok || payload.error) {
+        errors.push(payload.error?.message || `Meta insights request failed (${response.status})`);
+        continue;
+      }
+
+      for (const row of payload.data ?? []) {
+        if (row.name) metrics[row.name] = insightValue(row);
+      }
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  return {
+    available: Object.keys(metrics).length > 0,
+    metrics,
+    unavailableReason: errors.length ? errors.join(" | ") : null,
+    window: {
+      since: since.toISOString(),
+      until: until.toISOString(),
+    },
+  };
 }
 
 export async function POST() {
@@ -69,7 +147,7 @@ export async function POST() {
 
   const { data: profile } = await supabase
     .from("egg_creator_profiles")
-    .select("instagram_access_token, instagram_user_id, audience_demographics")
+    .select("id, instagram_access_token, instagram_user_id, audience_demographics")
     .eq("user_id", user.id)
     .single();
 
@@ -116,6 +194,14 @@ export async function POST() {
   }
 
   const syncedAt = new Date().toISOString();
+  const officialInsights = instagramUserId
+    ? await fetchOfficialInsights(instagramUserId, profile.instagram_access_token)
+    : {
+        available: false,
+        metrics: {} as Record<string, number>,
+        unavailableReason: "缺少 Instagram account id",
+        window: null,
+      };
   const currentAudience = (
     typeof profile.audience_demographics === "object" &&
     profile.audience_demographics !== null &&
@@ -132,6 +218,11 @@ export async function POST() {
         synced_at: syncedAt,
         engagement_sample_size: engagementSampleSize,
         engagement_method: "recent_media_interactions_by_followers",
+        official_insights_available: officialInsights.available,
+        official_insights_window: officialInsights.window,
+        reach_7d: officialInsights.metrics.reach ?? null,
+        accounts_engaged_7d: officialInsights.metrics.accounts_engaged ?? null,
+        total_interactions_7d: officialInsights.metrics.total_interactions ?? null,
       },
     },
   };
@@ -149,6 +240,24 @@ export async function POST() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const { error: snapshotError } = await supabase
+    .from("egg_instagram_metric_snapshots")
+    .upsert({
+      creator_id: profile.id,
+      snapshot_date: syncedAt.slice(0, 10),
+      followers,
+      engagement_rate: engagementRate,
+      engagement_sample_size: engagementSampleSize,
+      reach_7d: officialInsights.metrics.reach ?? null,
+      accounts_engaged_7d: officialInsights.metrics.accounts_engaged ?? null,
+      total_interactions_7d: officialInsights.metrics.total_interactions ?? null,
+      captured_at: syncedAt,
+    }, { onConflict: "creator_id,snapshot_date" });
+
+  if (snapshotError) {
+    console.error("Instagram metric snapshot error:", snapshotError);
+  }
+
   return NextResponse.json({
     success: true,
     followers,
@@ -156,6 +265,8 @@ export async function POST() {
     engagement_rate: engagementRate,
     engagement_sample_size: engagementSampleSize,
     engagement_unavailable_reason: engagementUnavailableReason,
+    official_insights: officialInsights.available ? officialInsights.metrics : null,
+    insights_unavailable_reason: officialInsights.unavailableReason,
     synced_at: syncedAt,
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -10,6 +11,8 @@ type SyncResponse = {
   engagement_rate?: number | null;
   engagement_sample_size?: number;
   engagement_unavailable_reason?: string | null;
+  official_insights?: Record<string, number> | null;
+  insights_unavailable_reason?: string | null;
   synced_at?: string;
   error?: string;
   needs_reconnect?: boolean;
@@ -36,7 +39,10 @@ export function InstagramSyncButton({ lastSyncedAt }: { lastSyncedAt?: string | 
       const engagementMessage = data.engagement_rate !== null && data.engagement_rate !== undefined
         ? `，已按最近 ${data.engagement_sample_size ?? 0} 篇貼文更新互動率`
         : `；${data.engagement_unavailable_reason || "暫時未能計算互動率"}`;
-      setMessage(`已更新至 ${Number(data.followers ?? 0).toLocaleString()} 位粉絲${engagementMessage}。`);
+      const insightsMessage = data.official_insights
+        ? "，官方 Reach insights 已更新"
+        : "；官方 Reach 需要重新授權 Insights 權限";
+      setMessage(`已更新至 ${Number(data.followers ?? 0).toLocaleString()} 位粉絲${engagementMessage}${insightsMessage}。`);
       router.refresh();
     } catch {
       setMessage("網絡連線失敗，請稍後再試。");
@@ -64,8 +70,15 @@ export function InstagramSyncButton({ lastSyncedAt }: { lastSyncedAt?: string | 
           {syncing ? "更新中…" : "更新 Instagram 數據"}
         </button>
       </div>
-      <p className="mt-2 text-[11px] leading-4 text-zinc-400">互動率按最近最多 12 篇貼文嘅平均讚好及留言，相對粉絲數計算。</p>
+      <p className="mt-2 text-[11px] leading-4 text-zinc-400">
+        互動率按最近最多 12 篇貼文嘅平均讚好及留言，相對粉絲數計算。每日保留快照，累積至少兩日後顯示升跌趨勢。
+      </p>
       {message ? <p className="mt-2 text-xs leading-5 text-zinc-600" role="status">{message}</p> : null}
+      {message?.includes("重新授權 Insights") ? (
+        <Link href="/api/auth/instagram" className="mt-2 inline-flex text-xs font-semibold text-blue-600 hover:text-blue-700">
+          重新連接 Instagram 並授權 Insights →
+        </Link>
+      ) : null}
     </div>
   );
 }

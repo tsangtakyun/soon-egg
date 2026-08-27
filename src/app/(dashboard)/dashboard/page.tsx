@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Link2, UserRound } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Link2, Minus, TrendingDown, TrendingUp, UserRound } from "lucide-react";
 import { BrandCard } from "@/components/brand-deals/BrandCard";
 import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
@@ -25,6 +25,18 @@ type CreatorProfile = {
   audience_demographics: Record<string, unknown> | null;
 };
 
+type InstagramSnapshot = {
+  followers: number;
+  engagement_rate: number | null;
+  reach_7d: number | null;
+  captured_at: string;
+};
+
+type MetricTrend = {
+  direction: "up" | "down" | "flat";
+  label: string;
+};
+
 const fallbackProfile: CreatorProfile = {
   id: "fallback",
   username: "soon_egg",
@@ -48,6 +60,7 @@ export default async function DashboardHome() {
   let creator = fallbackProfile;
   let dealsCount = 0;
   let pendingInvitations = 0;
+  let instagramSnapshots: InstagramSnapshot[] = [];
 
   if (supabase) {
     const { data: { user } } = await supabase.auth.getUser();
@@ -78,17 +91,24 @@ export default async function DashboardHome() {
       if (profile) {
         creator = profile as CreatorProfile;
 
-        const [{ count: dealTotal }, { count: invitationTotal }] = await Promise.all([
+        const [{ count: dealTotal }, { count: invitationTotal }, { data: snapshotRows }] = await Promise.all([
           supabase.from("egg_brand_deals").select("id", { count: "exact", head: true }).eq("creator_id", profile.id),
           supabase
             .from("egg_brand_invitations")
             .select("id", { count: "exact", head: true })
             .eq("creator_id", profile.id)
             .eq("status", "pending"),
+          supabase
+            .from("egg_instagram_metric_snapshots")
+            .select("followers,engagement_rate,reach_7d,captured_at")
+            .eq("creator_id", profile.id)
+            .order("captured_at", { ascending: false })
+            .limit(8),
         ]);
 
         dealsCount = dealTotal ?? 0;
         pendingInvitations = invitationTotal ?? 0;
+        instagramSnapshots = (snapshotRows ?? []) as InstagramSnapshot[];
       }
     }
   }
@@ -112,6 +132,14 @@ export default async function DashboardHome() {
   const summary = creator.ai_profile_summary || creator.bio || "完成 onboarding 後，這裡會顯示您的創作者定位。";
   const hasSocialProfile = connectedPlatforms > 0;
   const instagramSync = getInstagramSync(creator.audience_demographics);
+  const previousSnapshot = instagramSnapshots.length > 1 ? instagramSnapshots[instagramSnapshots.length - 1] : null;
+  const followerTrend = previousSnapshot ? countTrend(creator.instagram_followers ?? 0, previousSnapshot.followers) : null;
+  const engagementTrend = previousSnapshot && creator.instagram_engagement_rate !== null && previousSnapshot.engagement_rate !== null
+    ? percentagePointTrend(creator.instagram_engagement_rate, previousSnapshot.engagement_rate)
+    : null;
+  const reachTrend = previousSnapshot && instagramSync.reach7d !== null && previousSnapshot.reach_7d !== null
+    ? countTrend(instagramSync.reach7d, previousSnapshot.reach_7d)
+    : null;
   const setupSteps = [
     { done: Boolean(creator.onboarding_completed), label: "完成基本創作者設定", href: "/onboarding" },
     { done: hasSocialProfile, label: "連接或填寫社交平台", href: "/onboarding" },
@@ -174,12 +202,15 @@ export default async function DashboardHome() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Metric icon={UserRound} label="總粉絲數" value={formatCompact(reach)} />
+              <Metric icon={UserRound} label="總粉絲數" value={formatCompact(reach)} trend={followerTrend} />
               <Metric
                 icon={ChartNoAxesCombined}
                 label={instagramSync.sampleSize ? `IG 近 ${instagramSync.sampleSize} 篇互動率` : "Instagram 互動率"}
                 value={engagement}
+                trend={engagementTrend}
               />
+              <Metric icon={UserRound} label="Meta 7 日觸及" value={instagramSync.reach7d === null ? "待授權" : formatCompact(instagramSync.reach7d)} trend={reachTrend} />
+              <Metric icon={ChartNoAxesCombined} label="Meta 7 日互動帳戶" value={instagramSync.accountsEngaged7d === null ? "待授權" : formatCompact(instagramSync.accountsEngaged7d)} />
               <Metric icon={BriefcaseBusiness} label="合作項目" value={String(dealsCount)} />
               <Metric icon={Link2} label="已連接平台" value={String(connectedPlatforms)} />
             </div>
@@ -217,22 +248,54 @@ function formatCompact(value: number) {
 function getInstagramSync(value: Record<string, unknown> | null) {
   const sync = value?.instagram_sync;
   if (!sync || typeof sync !== "object" || Array.isArray(sync)) {
-    return { syncedAt: null, sampleSize: 0 };
+    return { syncedAt: null, sampleSize: 0, reach7d: null, accountsEngaged7d: null };
   }
 
   const record = sync as Record<string, unknown>;
   return {
     syncedAt: typeof record.synced_at === "string" ? record.synced_at : null,
     sampleSize: typeof record.engagement_sample_size === "number" ? record.engagement_sample_size : 0,
+    reach7d: typeof record.reach_7d === "number" ? record.reach_7d : null,
+    accountsEngaged7d: typeof record.accounts_engaged_7d === "number" ? record.accounts_engaged_7d : null,
   };
 }
 
-function Metric({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+function countTrend(current: number, previous: number): MetricTrend {
+  const difference = current - previous;
+  const percentage = previous > 0 ? Math.abs((difference / previous) * 100).toFixed(1) : "0.0";
+  return {
+    direction: difference > 0 ? "up" : difference < 0 ? "down" : "flat",
+    label: `${difference > 0 ? "+" : difference < 0 ? "−" : ""}${formatCompact(Math.abs(difference))} (${percentage}%)`,
+  };
+}
+
+function percentagePointTrend(current: number, previous: number): MetricTrend {
+  const difference = Number((current - previous).toFixed(2));
+  return {
+    direction: difference > 0 ? "up" : difference < 0 ? "down" : "flat",
+    label: `${difference > 0 ? "+" : difference < 0 ? "−" : ""}${Math.abs(difference).toFixed(2)}pp`,
+  };
+}
+
+function Metric({ icon: Icon, label, value, trend }: { icon: React.ElementType; label: string; value: string; trend?: MetricTrend | null }) {
+  const TrendIcon = trend?.direction === "up" ? TrendingUp : trend?.direction === "down" ? TrendingDown : Minus;
+  const trendClass = trend?.direction === "up"
+    ? "text-emerald-600"
+    : trend?.direction === "down"
+      ? "text-rose-600"
+      : "text-zinc-400";
+
   return (
     <div className="rounded-lg bg-zinc-50 p-3">
       <Icon className="h-4 w-4 text-zinc-500" aria-hidden />
       <div className="mt-3 text-xs text-zinc-500">{label}</div>
       <div className="font-mono text-xl font-semibold text-zinc-950">{value}</div>
+      {trend ? (
+        <div className={`mt-1 flex items-center gap-1 text-[11px] font-semibold ${trendClass}`}>
+          <TrendIcon className="h-3 w-3" aria-hidden />
+          {trend.label}
+        </div>
+      ) : null}
     </div>
   );
 }

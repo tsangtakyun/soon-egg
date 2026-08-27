@@ -63,7 +63,7 @@ export function FeaturedMediaEditor({ profileId, onPreviewChange }: { profileId:
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "同步失敗");
       await load();
-      setMessage("Instagram 內容已更新。你可以揀最多 3 個公開展示。 ");
+      setMessage("Instagram 內容已更新。你可以揀最多 5 個公開展示。 ");
       onPreviewChange();
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : "同步失敗，請稍後重試。");
@@ -74,8 +74,8 @@ export function FeaturedMediaEditor({ profileId, onPreviewChange }: { profileId:
 
   async function toggleFeatured(item: InstagramMedia) {
     const featured = items.filter((candidate) => candidate.is_featured);
-    if (!item.is_featured && featured.length >= 3) {
-      setError("最多只可以展示 3 個 Instagram 作品；請先取消其中一個。");
+    if (!item.is_featured && featured.length >= 5) {
+      setError("最多只可以展示 5 個 Instagram 作品；請先取消其中一個。");
       return;
     }
     setSavingId(item.id);
@@ -128,7 +128,7 @@ export function FeaturedMediaEditor({ profileId, onPreviewChange }: { profileId:
       <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-blue-950">精選 Instagram 內容（{featured.length}/3）</p>
+            <p className="text-sm font-semibold text-blue-950">精選 Instagram 內容（{featured.length}/5）</p>
             <p className="mt-1 text-xs leading-relaxed text-blue-700">系統會按觀看、播放、觸及或互動推薦；你可以自行揀選及排序。</p>
           </div>
           <button type="button" onClick={sync} disabled={syncing} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">

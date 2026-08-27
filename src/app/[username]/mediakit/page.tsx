@@ -224,7 +224,7 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
       .eq("creator_id", profile.id)
       .eq("is_featured", true)
       .order("sort_order", { ascending: true })
-      .limit(3),
+      .limit(5),
   ]);
 
   const bgColor = profile.mediakit_bg_color ?? "#FFF5E6";

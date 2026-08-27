@@ -947,7 +947,7 @@ export default function MediaKitPage() {
                         onPreviewChange={() => setPreviewKey((current) => current + 1)}
                       />
                       <div className="overflow-hidden rounded-xl border border-zinc-100 bg-zinc-50">
-                        <CollapsibleSection title="精選 Instagram 內容（最多 3 個）">
+                        <CollapsibleSection title="精選 Instagram 內容（最多 5 個）">
                           <FeaturedMediaEditor profileId={profile.id} onPreviewChange={() => setPreviewKey((current) => current + 1)} />
                         </CollapsibleSection>
                       </div>

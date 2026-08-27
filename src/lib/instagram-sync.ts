@@ -235,11 +235,11 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
       .eq("is_featured", true)
       .limit(1);
     if (!featured?.length) {
-      const topThreeIds = enriched
+      const topFiveIds = enriched
         .toSorted((a, b) => mediaScore(b.media, b.insights) - mediaScore(a.media, a.insights))
-        .slice(0, 3)
+        .slice(0, 5)
         .map(({ media }) => media.id);
-      for (const [sortOrder, instagramMediaId] of topThreeIds.entries()) {
+      for (const [sortOrder, instagramMediaId] of topFiveIds.entries()) {
         const { error } = await supabase
           .from("egg_instagram_media")
           .update({ is_featured: true, sort_order: sortOrder })

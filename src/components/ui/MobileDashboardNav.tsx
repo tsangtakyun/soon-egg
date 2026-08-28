@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, Settings, X } from "lucide-react";
+import { LogOut, Menu, Settings, Users, X } from "lucide-react";
 import { useState } from "react";
 import { SidebarNav } from "./SidebarNav";
 import { CreatorAvatar } from "./CreatorAvatar";
@@ -86,6 +86,7 @@ export function MobileDashboardNav({
             </div>
 
             <div className="space-y-1 border-t border-zinc-200 pt-4">
+              <MobileAccountLink href="/team" icon={<Users size={17} />} label="邀請團隊成員" />
               <MobileAccountLink href="/settings" icon={<Settings size={17} />} label="設定" />
               <form action="/api/auth/signout" method="POST">
                 <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 hover:bg-white">

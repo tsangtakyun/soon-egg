@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CreditBadge } from "./CreditBadge";
 import { canCreateCreatorWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
@@ -33,6 +33,10 @@ export async function Sidebar() {
       </div>
 
       <div className="shrink-0 border-t border-zinc-200 pt-4">
+        <Link href="/team" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
+          <Users className="h-4 w-4" aria-hidden />
+          邀請團隊成員
+        </Link>
         <Link href="/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
           <Settings className="h-4 w-4" aria-hidden />
           設定

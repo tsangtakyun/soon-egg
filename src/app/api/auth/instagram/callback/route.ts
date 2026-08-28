@@ -5,6 +5,7 @@ import { createEggAdmin, getCreatorWorkspaceContext } from "@/lib/creator-worksp
 
 const OAUTH_STATE_COOKIE = "egg-instagram-oauth-state";
 const OAUTH_WORKSPACE_COOKIE = "egg-instagram-oauth-workspace";
+const OAUTH_NEXT_COOKIE = "egg-instagram-oauth-next";
 
 type FacebookPage = {
   id: string;
@@ -69,16 +70,17 @@ async function findInstagramProfile(userAccessToken: string): Promise<{
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url);
   const { searchParams } = requestUrl;
-  const onboardingUrl = `${requestUrl.origin}/onboarding`;
   const redirectUri = `${requestUrl.origin}/api/auth/instagram/callback`;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
   const state = searchParams.get("state");
   const expectedState = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
   const requestedWorkspaceId = req.cookies.get(OAUTH_WORKSPACE_COOKIE)?.value;
+  const requestedNext = req.cookies.get(OAUTH_NEXT_COOKIE)?.value === "/meta-ads" ? "/meta-ads" : "/onboarding";
+  const destinationUrl = `${requestUrl.origin}${requestedNext}`;
 
   if (error || !code || !state || !expectedState || state !== expectedState || !requestedWorkspaceId) {
-    return NextResponse.redirect(`${onboardingUrl}?instagram_error=true`);
+    return NextResponse.redirect(`${destinationUrl}?instagram_error=true`);
   }
 
   // This flow uses Facebook Login to access Instagram Business data via linked Pages.
@@ -86,7 +88,7 @@ export async function GET(req: NextRequest) {
   const appSecret = process.env.FACEBOOK_APP_SECRET || process.env.INSTAGRAM_APP_SECRET;
 
   if (!appId || !appSecret) {
-    return NextResponse.redirect(`${onboardingUrl}?instagram_error=missing_credentials`);
+    return NextResponse.redirect(`${destinationUrl}?instagram_error=missing_credentials`);
   }
 
   try {
@@ -104,11 +106,27 @@ export async function GET(req: NextRequest) {
       throw new Error("No Facebook access token received");
     }
 
-    const userAccessToken = tokenData.access_token as string;
+    let userAccessToken = tokenData.access_token as string;
+    let tokenExpiresIn = typeof tokenData.expires_in === "number" ? tokenData.expires_in : null;
+    try {
+      const longLivedUrl = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
+      longLivedUrl.searchParams.set("grant_type", "fb_exchange_token");
+      longLivedUrl.searchParams.set("client_id", appId);
+      longLivedUrl.searchParams.set("client_secret", appSecret);
+      longLivedUrl.searchParams.set("fb_exchange_token", userAccessToken);
+      const longLivedResponse = await fetch(longLivedUrl.toString(), { cache: "no-store" });
+      const longLivedData = await longLivedResponse.json().catch(() => ({}));
+      if (longLivedResponse.ok && longLivedData.access_token) {
+        userAccessToken = longLivedData.access_token;
+        tokenExpiresIn = typeof longLivedData.expires_in === "number" ? longLivedData.expires_in : tokenExpiresIn;
+      }
+    } catch (exchangeError) {
+      console.warn("Long-lived Meta token exchange failed; using initial token", exchangeError);
+    }
     const match = await findInstagramProfile(userAccessToken);
 
     if (!match) {
-      return NextResponse.redirect(`${onboardingUrl}?instagram_error=no_connected_ig`);
+      return NextResponse.redirect(`${destinationUrl}?instagram_error=no_connected_ig`);
     }
 
     const { profile, page, pageAccessToken } = match;
@@ -118,15 +136,18 @@ export async function GET(req: NextRequest) {
 
     if (supabase && user) {
       const { workspaces } = await getCreatorWorkspaceContext();
-      if (!workspaces.some((workspace) => workspace.id === requestedWorkspaceId)) {
-        return NextResponse.redirect(`${onboardingUrl}?instagram_error=invalid_workspace`);
+      const requestedWorkspace = workspaces.find((workspace) => workspace.id === requestedWorkspaceId);
+      if (!requestedWorkspace) {
+        return NextResponse.redirect(`${destinationUrl}?instagram_error=invalid_workspace`);
+      }
+      if (requestedNext === "/meta-ads" && requestedWorkspace.role !== "owner" && requestedWorkspace.role !== "admin") {
+        return NextResponse.redirect(`${destinationUrl}?instagram_error=forbidden`);
       }
       const admin = createEggAdmin();
       const { data: existingProfile } = await admin
         .from("egg_creator_profiles")
         .select("audience_demographics")
         .eq("id", requestedWorkspaceId)
-        .eq("user_id", user.id)
         .maybeSingle();
       const currentAudience = (
         typeof existingProfile?.audience_demographics === "object" &&
@@ -153,7 +174,6 @@ export async function GET(req: NextRequest) {
         .from("egg_creator_profiles")
         .update(payloadWithToken)
         .eq("id", requestedWorkspaceId)
-        .eq("user_id", user.id)
         .select("id");
 
       if (updateError && /column|schema|instagram_access_token|instagram_user_id/i.test(updateError.message)) {
@@ -165,8 +185,7 @@ export async function GET(req: NextRequest) {
             facebook_handle: page.name || null,
             avatar_url: profile.profile_picture_url || null,
           })
-          .eq("id", requestedWorkspaceId)
-          .eq("user_id", user.id);
+          .eq("id", requestedWorkspaceId);
 
         if (fallbackError) console.error("Instagram profile fallback save error:", fallbackError);
       } else if (updateError) {
@@ -174,6 +193,17 @@ export async function GET(req: NextRequest) {
       } else if (!updatedRows || updatedRows.length === 0) {
         throw new Error("Selected creator workspace no longer exists");
       } else if (!existingProfile) onboardedNewKol = true;
+
+      if (requestedWorkspace.role === "owner" || requestedWorkspace.role === "admin") {
+        const { error: metaConnectionError } = await admin.from("egg_meta_connections").upsert({
+          workspace_id: requestedWorkspaceId,
+          user_access_token: userAccessToken,
+          token_expires_at: tokenExpiresIn ? new Date(Date.now() + tokenExpiresIn * 1000).toISOString() : null,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "workspace_id" });
+        if (metaConnectionError) throw metaConnectionError;
+      }
     }
 
     if (onboardedNewKol) {
@@ -200,12 +230,13 @@ export async function GET(req: NextRequest) {
       threads_username: profile.username || "",
     });
 
-    const response = NextResponse.redirect(`${onboardingUrl}?${params.toString()}`);
+    const response = NextResponse.redirect(`${destinationUrl}?${params.toString()}`);
     response.cookies.delete(OAUTH_STATE_COOKIE);
     response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
+    response.cookies.delete(OAUTH_NEXT_COOKIE);
     return response;
   } catch (err) {
     console.error("Instagram OAuth error:", err);
-    return NextResponse.redirect(`${onboardingUrl}?instagram_error=true`);
+    return NextResponse.redirect(`${destinationUrl}?instagram_error=true`);
   }
 }

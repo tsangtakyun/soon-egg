@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Package,
   UserRound,
+  Users,
   WandSparkles,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ const creatorToolItems = [
 
 const utilityToolItems = [
   { href: "/tools/reply", label: "回覆中心", icon: MessageSquare },
+  { href: "/team", label: "邀請團隊成員", icon: Users },
 ];
 
 export function SidebarNav() {

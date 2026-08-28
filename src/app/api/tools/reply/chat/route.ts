@@ -1,69 +1,100 @@
 import { NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { masterSupabase } from "@/lib/supabase/master";
+import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
 
-type HistoryMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+type HistoryMessage = { role: "user" | "assistant"; content: string };
+const modes = new Set(["brand", "negotiation", "follow_up", "decline", "fan"]);
+const tones = new Set(["friendly", "professional", "concise", "firm"]);
+const languages = new Set(["zh-HK", "zh-TW", "en"]);
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+const modeLabels: Record<string, string> = { brand: "回覆品牌合作邀請", negotiation: "報價及議價", follow_up: "合作跟進", decline: "婉拒合作", fan: "回覆粉絲留言或私訊" };
+const toneLabels: Record<string, string> = { friendly: "親切", professional: "專業", concise: "簡潔", firm: "堅定" };
+const languageLabels: Record<string, string> = { "zh-HK": "香港繁體中文", "zh-TW": "台灣繁體中文", en: "英文" };
 
 export async function POST(req: Request) {
   const serverSupabase = await createServerClient();
-  if (!serverSupabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const {
-    data: { user },
-  } = await serverSupabase.auth.getUser();
+  const { data: { user } } = serverSupabase ? await serverSupabase.auth.getUser() : { data: { user: null } };
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { message, history } = (await req.json().catch(() => ({}))) as {
-    message?: string;
-    history?: HistoryMessage[];
-  };
-  const cleanMessage = message?.trim();
-  if (!cleanMessage) return NextResponse.json({ error: "請輸入想回覆的訊息" }, { status: 400 });
-  if (cleanMessage.length > 8000) return NextResponse.json({ error: "訊息太長，請縮短後再試" }, { status: 400 });
+  const body = (await req.json().catch(() => ({}))) as { message?: string; history?: HistoryMessage[]; mode?: string; tone?: string; language?: string; goal?: string; saveHistory?: boolean };
+  const cleanMessage = body.message?.trim();
+  if (!cleanMessage) return NextResponse.json({ error: "請貼上對方訊息或輸入想回覆嘅內容。" }, { status: 400 });
+  if (cleanMessage.length > 8000) return NextResponse.json({ error: "訊息太長，請縮短至 8,000 字內。" }, { status: 400 });
 
+  const mode = modes.has(body.mode ?? "") ? body.mode! : "brand";
+  const tone = tones.has(body.tone ?? "") ? body.tone! : "friendly";
+  const language = languages.has(body.language ?? "") ? body.language! : "zh-HK";
+  const goal = typeof body.goal === "string" ? body.goal.trim().slice(0, 500) : "";
+  const saveHistory = body.saveHistory !== false;
+  const { profile } = await getActiveCreatorProfile("id,display_name,username,bio,content_categories,instagram_handle,content_language");
+  if (!profile) return NextResponse.json({ error: "找不到目前工作空間。" }, { status: 404 });
+
+  const admin = createEggAdmin();
+  const now = Date.now();
+  const [minuteUsage, dayUsage] = await Promise.all([
+    admin.from("egg_reply_usage").select("id", { count: "exact", head: true }).eq("creator_id", profile.id).gte("created_at", new Date(now - 60_000).toISOString()),
+    admin.from("egg_reply_usage").select("id", { count: "exact", head: true }).eq("creator_id", profile.id).gte("created_at", new Date(now - 86_400_000).toISOString()),
+  ]);
+  if (minuteUsage.error || dayUsage.error) {
+    console.error("[reply centre] rate-limit lookup failed", minuteUsage.error?.message ?? dayUsage.error?.message);
+    return NextResponse.json({ error: "AI 服務暫時未能確認使用限額，請稍後再試。" }, { status: 503 });
+  }
+  const minuteCount = minuteUsage.count;
+  const dayCount = dayUsage.count;
+  if ((minuteCount ?? 0) >= 10 || (dayCount ?? 0) >= 100) {
+    return NextResponse.json({ error: "使用次數太頻密，請稍後再試。" }, { status: 429, headers: { "Retry-After": "60" } });
+  }
+  const { error: usageInsertError } = await admin.from("egg_reply_usage").insert({ creator_id: profile.id });
+  if (usageInsertError) {
+    console.error("[reply centre] usage record failed", usageInsertError.message);
+    return NextResponse.json({ error: "AI 服務暫時未能記錄使用次數，請稍後再試。" }, { status: 503 });
+  }
+
+  const history = Array.isArray(body.history) ? body.history.slice(-10).filter((item) => item?.role === "user" || item?.role === "assistant").map((item) => ({ role: item.role, content: String(item.content).slice(0, 8000) })) : [];
+  const categories = Array.isArray(profile.content_categories) ? profile.content_categories.join("、") : "未設定";
   const anthropic = getAnthropic();
-  if (!anthropic) return NextResponse.json({ error: "Anthropic API key missing" }, { status: 500 });
-
-  const apiMessages = [
-    ...(history ?? []).slice(-10).filter((item) => item.role === "user" || item.role === "assistant").map((item) => ({ role: item.role, content: String(item.content).slice(0, 8000) })),
-    { role: "user" as const, content: cleanMessage },
-  ];
+  if (!anthropic) return NextResponse.json({ error: "AI 服務暫時未設定。" }, { status: 503 });
 
   try {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system: `你係 Mayan，一個專為亞洲 KOL 設計的創作夥伴。
-你擅長：
-- 幫 KOL 回覆品牌合作邀請（專業但友善）
-- 寫吸引人的 IG / 小紅書 / YouTube caption
-- 回覆粉絲留言（親切、有個性）
-- 優化文案（更口語、更有力）
-- 提供創作靈感和建議
+      model: MODEL,
+      max_tokens: 1200,
+      system: `你係 SOON-EGG 回覆助手，專門協助亞洲創作者處理品牌合作及社交訊息。
 
-語言：默認用繁體中文（香港廣東話風格），如果用戶用其他語言提問就跟著用。
-風格：親切、專業、有創意，唔會太正式。`,
-      messages: apiMessages,
+目前創作者資料：
+- 名稱：${profile.display_name || profile.username || "未設定"}
+- 公開用戶名：${profile.username || "未設定"}
+- 簡介：${profile.bio || "未設定"}
+- 內容類型：${categories}
+- Instagram：${profile.instagram_handle || "未連接"}
+
+今次任務：${modeLabels[mode]}
+語氣：${toneLabels[tone]}
+輸出語言：${languageLabels[language]}
+回覆目的：${goal || "根據訊息作出自然、合適並可直接發送嘅回覆"}
+
+規則：
+- 只根據用戶提供及創作者資料撰寫，不可虛構報價、日期、合作承諾或成績。
+- 資料不足時用 [請填寫] 標示，唔好自行猜測。
+- 直接輸出可發送嘅回覆，唔好先解釋寫作思路。
+- 避免過度奉承、官腔及不自然 emoji。`,
+      messages: [...history, { role: "user" as const, content: cleanMessage }],
     });
+    const reply = response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
+    if (!reply) throw new Error("Empty AI response");
 
-    const reply = response.content[0]?.type === "text" ? response.content[0].text : "";
-
-    const { error: persistenceError } = await masterSupabase.from("mayan_messages").insert([
-      { user_id: user.id, role: "user", content: cleanMessage },
-      { user_id: user.id, role: "assistant", content: reply },
-    ]);
-    if (persistenceError) console.error("[mayan chat] history persistence failed:", persistenceError.message);
-
-    return NextResponse.json({
-      reply,
-      warning: persistenceError ? "回覆已生成，但暫時未能儲存到對話記錄。" : undefined,
-    });
+    let warning: string | undefined;
+    if (saveHistory) {
+      const { error } = await admin.from("egg_reply_messages").insert([
+        { creator_id: profile.id, role: "user", content: cleanMessage },
+        { creator_id: profile.id, role: "assistant", content: reply },
+      ]);
+      if (error) { console.error("[reply centre] history persistence failed", error.message); warning = "回覆已生成，但暫時未能儲存對話。"; }
+    }
+    return NextResponse.json({ reply, warning });
   } catch (error) {
-    console.error("[mayan chat] error:", error);
-    return NextResponse.json({ error: "Mayan chat failed" }, { status: 500 });
+    console.error("[reply centre] generation failed", error);
+    return NextResponse.json({ error: "AI 暫時未能生成回覆，請稍後再試。" }, { status: 502 });
   }
 }

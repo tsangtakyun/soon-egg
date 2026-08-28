@@ -39,18 +39,6 @@ const categories = [
   "其他",
 ];
 
-const notificationOptions = [
-  { key: "notify_brand_invite", label: "品牌合作邀請", desc: "收到品牌邀請時通知我" },
-  { key: "notify_order", label: "貨品訂單", desc: "有新訂單時通知我" },
-  { key: "notify_perk_update", label: "公關宣傳更新", desc: "申請狀態更新時通知我" },
-];
-
-const defaultNotifications = {
-  notify_brand_invite: true,
-  notify_order: true,
-  notify_perk_update: true,
-};
-
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-purple-400 focus:ring-2 focus:ring-purple-100";
 const primaryButtonClass =
@@ -84,15 +72,13 @@ export function SettingsClient({
     facebook_handle: profile?.facebook_handle ?? "",
     threads_handle: profile?.threads_handle ?? "",
   });
-  const [notifications, setNotifications] = useState<Record<string, boolean>>({
-    ...defaultNotifications,
-    ...(profile?.notification_prefs ?? {}),
-  });
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
   const [socialSaveStatus, setSocialSaveStatus] = useState<SaveStatus>("idle");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
-  const [notificationStatus, setNotificationStatus] = useState<SaveStatus>("idle");
+  const [stripeStatus, setStripeStatus] = useState<"checking" | "connected" | "incomplete" | "error">(
+    stripeConnected ? "checking" : "incomplete",
+  );
 
   const initials = (displayName || profile?.username || userEmail).slice(0, 2).toUpperCase();
 
@@ -116,6 +102,21 @@ export function SettingsClient({
       window.clearTimeout(timer);
     };
   }, [profile?.username, username]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function verifyStripe() {
+      try {
+        const response = await fetch("/api/stripe/connect/status", { cache: "no-store" });
+        const result = await response.json();
+        if (!cancelled) setStripeStatus(response.ok && result.complete ? "connected" : "incomplete");
+      } catch {
+        if (!cancelled) setStripeStatus("error");
+      }
+    }
+    void verifyStripe();
+    return () => { cancelled = true; };
+  }, []);
 
   function toggleCategory(category: string) {
     setSelectedCategories((current) =>
@@ -164,26 +165,6 @@ export function SettingsClient({
     });
     setSocialSaveStatus(res.ok ? "success" : "error");
     setTimeout(() => setSocialSaveStatus("idle"), 3000);
-  }
-
-  async function handleToggle(key: string, value: boolean) {
-    const previous = notifications;
-    const next = { ...notifications, [key]: value };
-    setNotifications(next);
-    setNotificationStatus("saving");
-    try {
-      const response = await fetch("/api/settings/notifications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prefs: next }),
-      });
-      if (!response.ok) throw new Error("Save failed");
-      setNotificationStatus("success");
-    } catch {
-      setNotifications(previous);
-      setNotificationStatus("error");
-    }
-    window.setTimeout(() => setNotificationStatus("idle"), 3000);
   }
 
   async function handleStripeConnect() {
@@ -329,9 +310,9 @@ export function SettingsClient({
                 </Link>
               </div>
             </SocialRow>
-            <SocialInput icon={<Play size={16} />} label="YouTube" value={socials.youtube_handle} onChange={(value) => setSocials({ ...socials, youtube_handle: value })} />
-            <SocialInput label="TikTok" value={socials.tiktok_handle} onChange={(value) => setSocials({ ...socials, tiktok_handle: value })} />
-            <SocialInput label="小紅書" value={socials.xiaohongshu_handle} onChange={(value) => setSocials({ ...socials, xiaohongshu_handle: value })} />
+            <SocialInput icon={<Play size={16} />} label="YouTube" value={socials.youtube_handle} onChange={(value) => setSocials({ ...socials, youtube_handle: value })} comingSoon />
+            <SocialInput label="TikTok" value={socials.tiktok_handle} onChange={(value) => setSocials({ ...socials, tiktok_handle: value })} comingSoon />
+            <SocialInput label="小紅書" value={socials.xiaohongshu_handle} onChange={(value) => setSocials({ ...socials, xiaohongshu_handle: value })} comingSoon />
             <SocialInput label="Facebook" value={socials.facebook_handle} onChange={(value) => setSocials({ ...socials, facebook_handle: value })} />
             <SocialInput label="Threads" value={socials.threads_handle} onChange={(value) => setSocials({ ...socials, threads_handle: value })} />
           </div>
@@ -345,59 +326,34 @@ export function SettingsClient({
 
         <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-700">收款設定</h2>
-          {stripeConnected ? (
+          {stripeStatus === "connected" ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
                   <Check size={16} className="text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Stripe 已連結</p>
-                  <p className="text-xs text-gray-400">帳號尾號 ...{stripeAccountMasked}</p>
+                  <p className="text-sm font-medium">Stripe 已連接並可收款</p>
+                  <p className="text-xs text-gray-400">Stripe Connect 帳戶 ...{stripeAccountMasked}</p>
                 </div>
               </div>
               <button onClick={handleStripeConnect} className="rounded-lg border px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600">
                 重新連結
               </button>
             </div>
+          ) : stripeStatus === "checking" ? (
+            <p className="text-sm text-gray-400">正在向 Stripe 核實收款狀態…</p>
           ) : (
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-700">尚未連結 Stripe</p>
-                <p className="mt-0.5 text-xs text-gray-400">連結後買家可直接付款，款項直接入帳</p>
+                <p className="text-sm font-medium text-gray-700">{stripeStatus === "error" ? "暫時未能核實 Stripe 狀態" : "Stripe 尚未完成設定"}</p>
+                <p className="mt-0.5 text-xs text-gray-400">完成 Stripe Connect 驗證後，買家付款先可以直接轉入你的帳戶。</p>
               </div>
               <button onClick={handleStripeConnect} className="rounded-xl bg-black px-4 py-2 text-sm text-white hover:bg-gray-800">
                 立即連結
               </button>
             </div>
           )}
-        </section>
-
-        <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold text-gray-700">通知設定</h2>
-          <div className="mb-2 h-5"><SaveStatusText status={notificationStatus} /></div>
-          <div className="divide-y">
-            {notificationOptions.map((option) => (
-              <div key={option.key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">{option.label}</p>
-                  <p className="text-xs text-gray-400">{option.desc}</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={notificationStatus === "saving"}
-                  onClick={() => handleToggle(option.key, !notifications[option.key])}
-                  className={`relative h-6 w-11 rounded-full transition ${notifications[option.key] ? "bg-purple-600" : "bg-gray-200"}`}
-                >
-                  <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                      notifications[option.key] ? "translate-x-6" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
-            ))}
-          </div>
         </section>
 
         <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
@@ -455,15 +411,17 @@ function SocialInput({
   label,
   value,
   onChange,
+  comingSoon = false,
 }: {
   icon?: React.ReactNode;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  comingSoon?: boolean;
 }) {
   return (
     <SocialRow icon={icon} label={label}>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder="@username" />
+      {comingSoon ? <div className="flex h-10 items-center justify-between rounded-xl border border-gray-100 bg-zinc-50 px-3"><span className="text-sm text-zinc-400">暫時未開放</span><span className="rounded-full bg-zinc-200 px-2 py-1 text-[10px] font-semibold text-zinc-500">未開放</span></div> : <input value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder="@username" />}
     </SocialRow>
   );
 }

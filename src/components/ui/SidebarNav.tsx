@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BriefcaseBusiness,
-  Calendar,
   Captions,
   FileText,
   Home,
@@ -29,7 +28,6 @@ const creatorToolItems = [
 ];
 
 const utilityToolItems = [
-  { href: "/tools/schedule", label: "行程中心", icon: Calendar },
   { href: "/tools/reply", label: "回覆中心", icon: MessageSquare },
 ];
 

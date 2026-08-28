@@ -74,7 +74,7 @@ export function ReplyClient({ messages: initialMessages, projects: initialProjec
   }
 
   return <main className="flex min-h-[calc(100dvh-4rem)] flex-col bg-zinc-100 p-3 sm:p-5 lg:h-screen lg:min-h-0">
-    <header className="mb-3 flex items-center justify-between rounded-2xl border bg-white px-4 py-3"><div><h1 className="text-xl font-black text-zinc-950">Renee 合作查詢工作台</h1><p className="text-xs text-zinc-500">選擇 Project，貼上查詢截圖，自動整理 Brief 及草擬第一輪回覆。</p></div><span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700">固定 Renee 商務規則</span></header>
+    <header className="mb-3 flex items-center justify-between rounded-2xl border bg-white px-4 py-3"><div><h1 className="text-xl font-black text-zinc-950">合作查詢工作台</h1><p className="text-xs text-zinc-500">選擇 Project，貼上查詢截圖，自動整理 Brief 及草擬第一輪回覆。</p></div><span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700">專屬商務規則</span></header>
     {error ? <p role="alert" className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p> : null}
     <div className="mb-3 grid grid-cols-3 rounded-xl border bg-white p-1 lg:hidden">{([["projects", "Projects"], ["brief", "Brief"], ["chat", "AI 回覆"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setMobilePanel(value)} className={`rounded-lg px-2 py-2 text-xs font-medium ${mobilePanel === value ? "bg-black text-white" : "text-zinc-500"}`}>{label}</button>)}</div>
     <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[220px_minmax(320px,0.9fr)_minmax(380px,1.1fr)]">

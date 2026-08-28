@@ -6,8 +6,23 @@ import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace
 export default async function ReplyPage() {
   const { user } = await enterTool("reply", "進入回覆中心");
   const { profile } = await getActiveCreatorProfile("id");
-  if (!profile) return <ReplyClient messages={[]} />;
+  if (!profile) return <ReplyClient messages={[]} projects={[]} />;
   const admin = createEggAdmin();
+
+  let { data: projects } = await admin
+    .from("egg_reply_projects")
+    .select("id,name,notes,tone,language,updated_at")
+    .eq("creator_id", profile.id)
+    .order("updated_at", { ascending: false });
+  if (!projects?.length) {
+    const { data: defaultProject } = await admin
+      .from("egg_reply_projects")
+      .insert({ creator_id: profile.id, name: "一般回覆" })
+      .select("id,name,notes,tone,language,updated_at")
+      .single();
+    projects = defaultProject ? [defaultProject] : [];
+  }
+  const activeProject = projects[0] ?? null;
 
   const { data: migration, error: migrationLookupError } = await admin
     .from("egg_reply_history_migrations")
@@ -41,12 +56,18 @@ export default async function ReplyPage() {
     }
   }
 
+  if (activeProject) {
+    const { error: assignmentError } = await admin.from("egg_reply_messages").update({ project_id: activeProject.id }).eq("creator_id", profile.id).is("project_id", null);
+    if (assignmentError) console.error("[reply centre] project assignment failed", assignmentError.message);
+  }
+
   const { data: messages } = await admin
     .from("egg_reply_messages")
     .select("id, role, content, created_at")
     .eq("creator_id", profile.id)
+    .eq("project_id", activeProject?.id ?? "00000000-0000-0000-0000-000000000000")
     .order("created_at", { ascending: true })
     .limit(50);
 
-  return <ReplyClient messages={(messages ?? []) as MayanMessage[]} />;
+  return <ReplyClient messages={(messages ?? []) as MayanMessage[]} projects={projects ?? []} />;
 }

@@ -1,13 +1,13 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- local screenshot previews use transient data URLs */
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, Folder, ImagePlus, Loader2, Plus, RotateCcw, Send, Settings2, X } from "lucide-react";
+import { AlertTriangle, Check, ClipboardList, Copy, Folder, ImagePlus, Loader2, Plus, Send, X } from "lucide-react";
 
 export type MayanMessage = { id?: string; role: "user" | "assistant"; content: string; created_at: string };
-type ReplyProject = { id: string; name: string; notes: string; tone: string; language: string; updated_at: string };
+type EnquiryBrief = { summary?: string; brand?: string; contact?: string; collaborationType?: string; deliverables?: string[]; timeline?: string; usageRights?: string; exclusivity?: string; budget?: string; missing?: string[]; risks?: string[]; nextSteps?: string[] };
+type ReplyProject = { id: string; name: string; brief: EnquiryBrief; updated_at: string };
 type ImageAttachment = { dataUrl: string; mediaType: "image/jpeg"; name: string };
-const tones = [["friendly", "親切"], ["professional", "專業"], ["concise", "簡潔"], ["firm", "堅定"]];
-const languages = [["zh-HK", "香港繁中"], ["zh-TW", "台灣繁中"], ["en", "English"]];
 
 export function ReplyClient({ messages: initialMessages, projects: initialProjects }: { messages: MayanMessage[]; projects: ReplyProject[] }) {
   const [projects, setProjects] = useState(initialProjects);
@@ -19,10 +19,9 @@ export function ReplyClient({ messages: initialMessages, projects: initialProjec
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [lastSubmitted, setLastSubmitted] = useState("");
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
-  const [mobilePanel, setMobilePanel] = useState<"projects" | "messages" | "ai">("messages");
+  const [mobilePanel, setMobilePanel] = useState<"projects" | "brief" | "chat">("chat");
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeProject = projects.find((project) => project.id === activeId) ?? projects[0];
@@ -36,27 +35,17 @@ export function ReplyClient({ messages: initialMessages, projects: initialProjec
       const response = await fetch(`/api/tools/reply/projects?projectId=${encodeURIComponent(projectId)}`);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error ?? "讀取失敗");
-      setActiveId(projectId); setMessages(data.messages ?? []); setMobilePanel("messages");
+      setActiveId(projectId); setMessages(data.messages ?? []); setMobilePanel("chat");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "讀取 Project 失敗。"); }
     finally { setSwitching(false); }
   }
 
   async function createProject() {
-    const name = newProjectName.trim();
-    if (!name) return;
-    setError("");
+    const name = newProjectName.trim(); if (!name) return;
     const response = await fetch("/api/tools/reply/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.project) { setError(data.error ?? "建立 Project 失敗。"); return; }
-    setProjects((current) => [data.project, ...current]); setActiveId(data.project.id); setMessages([]); setNewProjectName(""); setShowNewProject(false); setMobilePanel("messages");
-  }
-
-  async function saveProject(update: Partial<ReplyProject>) {
-    if (!activeProject) return;
-    const next = { ...activeProject, ...update };
-    setProjects((current) => current.map((project) => project.id === activeProject.id ? next : project));
-    const response = await fetch("/api/tools/reply/projects", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: next.id, notes: next.notes, tone: next.tone, language: next.language }) });
-    if (!response.ok) setError("Project 設定暫時未能儲存。");
+    setProjects((current) => [data.project, ...current]); setActiveId(data.project.id); setMessages([]); setNewProjectName(""); setShowNewProject(false); setMobilePanel("chat");
   }
 
   async function prepareImage(file: File) {
@@ -65,63 +54,49 @@ export function ReplyClient({ messages: initialMessages, projects: initialProjec
     try { setImage(await compressImage(file)); setError(""); } catch { setError("圖片太大或暫時未能讀取，請重新選擇。"); }
   }
 
-  async function sendMessage(nextInput = input) {
-    const cleanInput = nextInput.trim() || (image ? "請閱讀截圖內容，幫我草擬合適回覆。" : "");
+  async function generateReply() {
+    const cleanInput = input.trim() || (image ? "請閱讀截圖，整理查詢並草擬第一輪回覆。" : "");
     if (!cleanInput || loading || !activeProject) return;
-    const userMsg: MayanMessage = { role: "user", content: image ? `${cleanInput}\n\n[已附上截圖]` : cleanInput, created_at: new Date().toISOString() };
-    const history = messages.slice(-10); const sentImage = image;
-    setMessages((current) => [...current, userMsg]); setInput(""); setImage(null); setLoading(true); setLastSubmitted(cleanInput); setError("");
+    const sentImage = image;
+    const userMessage: MayanMessage = { role: "user", content: sentImage ? `${cleanInput}\n\n[已附上截圖]` : cleanInput, created_at: new Date().toISOString() };
+    setMessages((current) => [...current, userMessage]); setInput(""); setImage(null); setLoading(true); setError("");
     try {
-      const response = await fetch("/api/tools/reply/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: cleanInput, history, projectId: activeProject.id, tone: activeProject.tone, language: activeProject.language, projectNotes: activeProject.notes, image: sentImage ? { data: sentImage.dataUrl.split(",")[1], mediaType: sentImage.mediaType } : undefined }) });
+      const response = await fetch("/api/tools/reply/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: cleanInput, history: messages.slice(-6), projectId: activeProject.id, image: sentImage ? { data: sentImage.dataUrl.split(",")[1], mediaType: sentImage.mediaType } : undefined }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.reply) throw new Error(data.error ?? "請稍後再試");
       setMessages((current) => [...current, { role: "assistant", content: data.reply, created_at: new Date().toISOString() }]);
+      if (data.brief) setProjects((current) => current.map((project) => project.id === activeProject.id ? { ...project, brief: data.brief, updated_at: new Date().toISOString() } : project));
       if (data.warning) setError(data.warning);
     } catch (cause) {
-      setMessages((current) => current.filter((message) => message !== userMsg)); setInput(cleanInput); setImage(sentImage);
-      setError(`AI 暫時回覆唔到：${cause instanceof Error ? cause.message : "請稍後再試"}`);
+      setMessages((current) => current.filter((message) => message !== userMessage)); setInput(cleanInput); setImage(sentImage);
+      setError(`AI 暫時處理唔到：${cause instanceof Error ? cause.message : "請稍後再試"}`);
     } finally { setLoading(false); }
   }
 
-  async function clearHistory() {
-    if (!messages.length || !activeProject || !window.confirm(`確定清空「${activeProject.name}」對話記錄？`)) return;
-    const response = await fetch("/api/tools/reply/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: activeProject.id }) });
-    if (response.ok) setMessages([]); else setError("清空失敗，請稍後再試。");
-  }
-
   return <main className="flex min-h-[calc(100dvh-4rem)] flex-col bg-zinc-100 p-3 sm:p-5 lg:h-screen lg:min-h-0">
-    <header className="mb-3 flex items-center justify-between rounded-2xl border bg-white px-4 py-3"><div><h1 className="text-xl font-black text-zinc-950">AI 回覆工作台</h1><p className="text-xs text-zinc-500">按 Project 整理對話，貼上截圖即時生成回覆。</p></div><span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700">暫時免費</span></header>
+    <header className="mb-3 flex items-center justify-between rounded-2xl border bg-white px-4 py-3"><div><h1 className="text-xl font-black text-zinc-950">Renee 合作查詢工作台</h1><p className="text-xs text-zinc-500">選擇 Project，貼上查詢截圖，自動整理 Brief 及草擬第一輪回覆。</p></div><span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700">固定 Renee 商務規則</span></header>
     {error ? <p role="alert" className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p> : null}
-    <div className="mb-3 grid grid-cols-3 rounded-xl border bg-white p-1 lg:hidden">{([["projects", "Projects"], ["messages", "對話"], ["ai", "AI 設定"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setMobilePanel(value)} className={`rounded-lg px-2 py-2 text-xs font-medium ${mobilePanel === value ? "bg-black text-white" : "text-zinc-500"}`}>{label}</button>)}</div>
-    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[220px_minmax(360px,1fr)_300px]">
-      <aside className={`${mobilePanel === "projects" ? "flex" : "hidden"} min-h-0 flex-col rounded-2xl border bg-zinc-900 p-3 text-white lg:flex`}>
-        <div className="mb-3 flex items-center justify-between px-2"><span className="flex items-center gap-2 text-sm font-semibold"><Folder className="h-4 w-4" />Projects</span><button type="button" onClick={() => setShowNewProject((value) => !value)} aria-label="建立新 Project" className="rounded-lg p-1.5 hover:bg-white/10"><Plus className="h-4 w-4" /></button></div>
-        {showNewProject ? <form onSubmit={(event) => { event.preventDefault(); void createProject(); }} className="mb-2 flex gap-1"><input autoFocus value={newProjectName} onChange={(event) => setNewProjectName(event.target.value.slice(0, 80))} placeholder="Project／人名" className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-2 py-2 text-xs text-white outline-none placeholder:text-zinc-400" /><button type="submit" disabled={!newProjectName.trim()} className="rounded-lg bg-white px-2 text-xs font-semibold text-black disabled:opacity-40">加入</button></form> : null}
-        <div className="space-y-1 overflow-y-auto">{projects.map((project) => <button key={project.id} type="button" onClick={() => void selectProject(project.id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm transition ${project.id === activeProject?.id ? "bg-white/15 text-white" : "text-zinc-300 hover:bg-white/10"}`}>{project.name}</button>)}</div>
-        {!projects.length ? <p className="px-2 py-6 text-center text-xs text-zinc-400">建立第一個 Project 開始。</p> : null}
-      </aside>
-      <section className={`${mobilePanel === "messages" ? "flex" : "hidden"} min-h-[560px] min-w-0 flex-col overflow-hidden rounded-2xl border bg-white lg:flex lg:min-h-0`}>
-        <div className="flex items-center justify-between border-b px-4 py-3"><div><h2 className="font-semibold text-zinc-950">{activeProject?.name ?? "未選擇 Project"}</h2><p className="text-xs text-zinc-400">每個 Project 有獨立對話記錄</p></div><button type="button" onClick={() => void clearHistory()} className="text-xs text-zinc-400 hover:text-red-600">清空對話</button></div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{switching ? <div className="flex h-full items-center justify-center text-zinc-400"><Loader2 className="mr-2 h-4 w-4 animate-spin" />載入中</div> : messages.length ? <div className="space-y-4">{messages.map((message, index) => <ChatBubble key={message.id ?? `${message.role}-${index}-${message.created_at}`} message={message} copied={copiedIndex === index} onCopy={async () => { await navigator.clipboard.writeText(message.content); setCopiedIndex(index); window.setTimeout(() => setCopiedIndex(null), 1800); }} />)}{loading ? <div className="flex items-center gap-2 text-sm text-zinc-500"><Loader2 className="h-4 w-4 animate-spin" />AI 正在閱讀及起草…</div> : null}<div ref={scrollRef} /></div> : <EmptyState onTemplate={setInput} />}</div>
-        <div className="border-t bg-zinc-50 p-3" onPaste={(event) => { const file = Array.from(event.clipboardData.files).find((item) => item.type.startsWith("image/")); if (file) void prepareImage(file); }}>
-          {image ? <div className="mb-2 flex items-center gap-3 rounded-xl border bg-white p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element -- transient local data URL preview */}
-            <img src={image.dataUrl} alt="待分析截圖預覽" className="h-16 w-16 rounded-lg object-cover" />
-            <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{image.name}</p><p className="text-xs text-zinc-400">AI 會閱讀呢張截圖</p></div><button type="button" onClick={() => setImage(null)} aria-label="移除截圖"><X className="h-4 w-4" /></button>
-          </div> : null}
-          <div className="flex items-end gap-2"><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void prepareImage(file); event.currentTarget.value = ""; }} /><button type="button" onClick={() => fileRef.current?.click()} aria-label="上載訊息截圖" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-white hover:bg-zinc-100"><ImagePlus className="h-4 w-4" /></button><textarea value={input} onChange={(event) => setInput(event.target.value.slice(0, 8000))} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} placeholder="貼上對方訊息，或者直接貼入／上載截圖…" rows={2} className="min-h-11 flex-1 resize-none rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:border-purple-300" /><button type="button" onClick={() => void sendMessage()} disabled={(!input.trim() && !image) || loading || !activeProject} aria-label="生成回覆" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black text-white disabled:opacity-40"><Send className="h-4 w-4" /></button></div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-zinc-400"><span>避免上載密碼、身份證或付款資料</span>{lastSubmitted && !loading ? <button type="button" onClick={() => void sendMessage(lastSubmitted)} className="flex items-center gap-1 text-purple-600"><RotateCcw className="h-3 w-3" />重新生成</button> : null}</div>
-        </div>
+    <div className="mb-3 grid grid-cols-3 rounded-xl border bg-white p-1 lg:hidden">{([["projects", "Projects"], ["brief", "Brief"], ["chat", "AI 回覆"]] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setMobilePanel(value)} className={`rounded-lg px-2 py-2 text-xs font-medium ${mobilePanel === value ? "bg-black text-white" : "text-zinc-500"}`}>{label}</button>)}</div>
+    <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[220px_minmax(320px,0.9fr)_minmax(380px,1.1fr)]">
+      <ProjectList projects={projects} activeId={activeProject?.id} visible={mobilePanel === "projects"} showNew={showNewProject} newName={newProjectName} onToggleNew={() => setShowNewProject((value) => !value)} onNameChange={setNewProjectName} onCreate={() => void createProject()} onSelect={(id) => void selectProject(id)} />
+      <section className={`${mobilePanel === "brief" ? "flex" : "hidden"} min-h-[560px] flex-col overflow-hidden rounded-2xl border bg-white lg:flex lg:min-h-0`}><div className="border-b px-4 py-3"><h2 className="flex items-center gap-2 font-semibold"><ClipboardList className="h-4 w-4" />Enquiry Brief</h2><p className="mt-1 text-xs text-zinc-400">{activeProject?.name ?? "未選擇 Project"} · 每次生成後自動更新</p></div><div className="min-h-0 flex-1 overflow-y-auto p-4">{switching ? <Loading /> : <BriefPanel brief={activeProject?.brief} />}</div></section>
+      <section className={`${mobilePanel === "chat" ? "flex" : "hidden"} min-h-[560px] min-w-0 flex-col overflow-hidden rounded-2xl border bg-white lg:flex lg:min-h-0`}>
+        <div className="border-b px-4 py-3"><h2 className="font-semibold">AI 客戶回覆</h2><p className="mt-1 text-xs text-zinc-400">只會輸出可直接發送草稿；不會自動發訊息或接受合作</p></div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{messages.length ? <div className="space-y-4">{messages.map((message, index) => <ChatBubble key={message.id ?? `${message.role}-${index}`} message={message} copied={copiedIndex === index} onCopy={async () => { await navigator.clipboard.writeText(message.content); setCopiedIndex(index); window.setTimeout(() => setCopiedIndex(null), 1800); }} />)}{loading ? <Loading label="正在閱讀查詢、建立 Brief 及草擬回覆…" /> : null}<div ref={scrollRef} /></div> : <div className="flex h-full min-h-[320px] flex-col items-center justify-center text-center"><div className="mb-3 text-3xl">🪬</div><h3 className="font-semibold">放入品牌查詢截圖</h3><p className="mt-1 max-w-xs text-sm text-zinc-500">支援 WhatsApp、Instagram DM、Email 截圖或完整文字。</p></div>}</div>
+        <Composer input={input} image={image} loading={loading} enabled={Boolean(activeProject)} fileRef={fileRef} onInput={setInput} onImage={prepareImage} onRemoveImage={() => setImage(null)} onSend={() => void generateReply()} />
       </section>
-      <aside className={`${mobilePanel === "ai" ? "flex" : "hidden"} min-h-0 flex-col rounded-2xl border bg-white p-4 lg:flex`}>
-        <div className="mb-5 flex items-center gap-2"><Settings2 className="h-4 w-4" /><h2 className="font-semibold">AI 回覆設定</h2></div>
-        {activeProject ? <div className="space-y-4"><SelectField label="語氣" value={activeProject.tone} onChange={(value) => void saveProject({ tone: value })} options={tones} /><SelectField label="語言" value={activeProject.language} onChange={(value) => void saveProject({ language: value })} options={languages} /><label className="block"><span className="mb-1.5 block text-xs font-medium text-zinc-600">Project 背景／注意事項</span><textarea value={activeProject.notes} onChange={(event) => setProjects((current) => current.map((project) => project.id === activeProject.id ? { ...project, notes: event.target.value.slice(0, 2000) } : project))} onBlur={(event) => void saveProject({ notes: event.target.value })} rows={8} placeholder="例如：合作內容、報價原則、對方稱呼、唔可以承諾嘅事項…" className="w-full resize-none rounded-xl border px-3 py-2 text-sm leading-6 outline-none focus:border-purple-300" /></label><div className="rounded-xl bg-purple-50 p-3 text-xs leading-5 text-purple-800"><p className="font-semibold">截圖回覆流程</p><p className="mt-1">上載 WhatsApp、IG 或 Email 截圖，AI 會結合呢個 Project 背景草擬回覆。</p></div></div> : <p className="text-sm text-zinc-400">先建立或選擇 Project。</p>}
-      </aside>
     </div>
   </main>;
 }
 
-function EmptyState({ onTemplate }: { onTemplate: (value: string) => void }) { return <div className="flex h-full min-h-[360px] flex-col items-center justify-center text-center"><div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-purple-100 text-2xl">🪬</div><h3 className="font-semibold">貼入截圖，AI 幫你回覆</h3><p className="mt-1 max-w-sm text-sm text-zinc-500">可以直接貼 WhatsApp、Instagram 或 Email 截圖，亦可以先輸入文字。</p><div className="mt-5 flex flex-wrap justify-center gap-2">{["幫我回覆品牌合作邀請：", "禮貌提出合作報價：", "跟進未回覆嘅品牌："].map((item) => <button key={item} type="button" onClick={() => onTemplate(`${item}\n\n`)} className="rounded-full border px-3 py-2 text-xs text-zinc-600 hover:bg-zinc-50">{item.slice(0, -1)}</button>)}</div></div>; }
-function ChatBubble({ message, copied, onCopy }: { message: MayanMessage; copied: boolean; onCopy: () => void }) { const isUser = message.role === "user"; return <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${isUser ? "bg-black text-white" : "bg-zinc-100 text-zinc-800"}`}>{message.content}{!isUser ? <button type="button" onClick={onCopy} className="mt-2 flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "已複製" : "複製回覆"}</button> : null}</div></div>; }
-function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: string[][] }) { return <label className="block"><span className="mb-1.5 block text-xs font-medium text-zinc-600">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:border-purple-300">{options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}</select></label>; }
-async function compressImage(file: File): Promise<ImageAttachment> { const source = await createImageBitmap(file); const scale = Math.min(1, 1600 / Math.max(source.width, source.height)); const canvas = document.createElement("canvas"); canvas.width = Math.round(source.width * scale); canvas.height = Math.round(source.height * scale); canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height); source.close(); const dataUrl = canvas.toDataURL("image/jpeg", 0.82); if (dataUrl.length > 4_000_000) throw new Error("Compressed image too large"); return { dataUrl, mediaType: "image/jpeg", name: file.name || "訊息截圖.jpg" }; }
+function ProjectList({ projects, activeId, visible, showNew, newName, onToggleNew, onNameChange, onCreate, onSelect }: { projects: ReplyProject[]; activeId?: string; visible: boolean; showNew: boolean; newName: string; onToggleNew: () => void; onNameChange: (value: string) => void; onCreate: () => void; onSelect: (id: string) => void }) { return <aside className={`${visible ? "flex" : "hidden"} min-h-0 flex-col rounded-2xl border bg-zinc-900 p-3 text-white lg:flex`}><div className="mb-3 flex items-center justify-between px-2"><span className="flex items-center gap-2 text-sm font-semibold"><Folder className="h-4 w-4" />Projects</span><button type="button" onClick={onToggleNew} aria-label="建立新 Project" className="rounded-lg p-1.5 hover:bg-white/10"><Plus className="h-4 w-4" /></button></div>{showNew ? <form onSubmit={(event) => { event.preventDefault(); onCreate(); }} className="mb-2 flex gap-1"><input autoFocus value={newName} onChange={(event) => onNameChange(event.target.value.slice(0, 80))} placeholder="Project／人名" className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-2 py-2 text-xs text-white outline-none placeholder:text-zinc-400" /><button type="submit" disabled={!newName.trim()} className="rounded-lg bg-white px-2 text-xs font-semibold text-black disabled:opacity-40">加入</button></form> : null}<div className="space-y-1 overflow-y-auto">{projects.map((project) => <button key={project.id} type="button" onClick={() => onSelect(project.id)} className={`w-full rounded-xl px-3 py-2.5 text-left text-sm ${project.id === activeId ? "bg-white/15 text-white" : "text-zinc-300 hover:bg-white/10"}`}>{project.name}</button>)}</div></aside>; }
+
+function BriefPanel({ brief }: { brief?: EnquiryBrief }) { if (!brief || !Object.keys(brief).length) return <div className="flex h-full min-h-[320px] flex-col items-center justify-center text-center text-zinc-400"><ClipboardList className="mb-3 h-8 w-8" /><p className="text-sm">上載第一個查詢後，Brief 會自動出現。</p></div>; return <div className="space-y-4 text-sm"><BriefField label="查詢摘要" value={brief.summary} /><div className="grid gap-3 sm:grid-cols-2"><BriefField label="品牌／Agency" value={brief.brand} /><BriefField label="聯絡人" value={brief.contact} /><BriefField label="合作類型" value={brief.collaborationType} /><BriefField label="預算" value={brief.budget} /><BriefField label="Timeline" value={brief.timeline} /><BriefField label="Deliverables" value={brief.deliverables?.join("、")} /></div><BriefField label="廣告授權／使用權" value={brief.usageRights} /><BriefField label="排他條款" value={brief.exclusivity} /><BriefList title="缺失資料" items={brief.missing} /><BriefList title="商業風險" items={brief.risks} warning /><BriefList title="建議下一步" items={brief.nextSteps} /></div>; }
+function BriefField({ label, value }: { label: string; value?: string }) { return <div><p className="mb-1 text-xs font-semibold text-zinc-400">{label}</p><p className="leading-6 text-zinc-800">{value || "未提供"}</p></div>; }
+function BriefList({ title, items, warning = false }: { title: string; items?: string[]; warning?: boolean }) { return <div className={`rounded-xl p-3 ${warning ? "bg-amber-50 text-amber-900" : "bg-zinc-50 text-zinc-700"}`}><p className="mb-2 flex items-center gap-1.5 text-xs font-semibold">{warning ? <AlertTriangle className="h-3.5 w-3.5" /> : null}{title}</p>{items?.length ? <ul className="space-y-1.5 text-xs leading-5">{items.map((item) => <li key={item}>• {item}</li>)}</ul> : <p className="text-xs opacity-60">暫未發現</p>}</div>; }
+function ChatBubble({ message, copied, onCopy }: { message: MayanMessage; copied: boolean; onCopy: () => void }) { const user = message.role === "user"; return <div className={`flex ${user ? "justify-end" : "justify-start"}`}><div className={`max-w-[90%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${user ? "bg-black text-white" : "bg-zinc-100 text-zinc-800"}`}>{message.content}{!user ? <button type="button" onClick={onCopy} className="mt-2 flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "已複製" : "複製草稿"}</button> : null}</div></div>; }
+function Loading({ label = "載入中…" }: { label?: string }) { return <div className="flex h-full min-h-24 items-center justify-center text-sm text-zinc-400"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{label}</div>; }
+
+function Composer({ input, image, loading, enabled, fileRef, onInput, onImage, onRemoveImage, onSend }: { input: string; image: ImageAttachment | null; loading: boolean; enabled: boolean; fileRef: React.RefObject<HTMLInputElement | null>; onInput: (value: string) => void; onImage: (file: File) => Promise<void>; onRemoveImage: () => void; onSend: () => void }) { return <div className="border-t bg-zinc-50 p-3" onPaste={(event) => { const file = Array.from(event.clipboardData.files).find((item) => item.type.startsWith("image/")); if (file) void onImage(file); }}>{image ? <div className="mb-2 flex items-center gap-3 rounded-xl border bg-white p-2"><img src={image.dataUrl} alt="查詢截圖預覽" className="h-16 w-16 rounded-lg object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{image.name}</p><p className="text-xs text-zinc-400">AI 會閱讀呢張截圖</p></div><button type="button" onClick={onRemoveImage} aria-label="移除截圖"><X className="h-4 w-4" /></button></div> : null}<div className="flex items-end gap-2"><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onImage(file); event.currentTarget.value = ""; }} /><button type="button" onClick={() => fileRef.current?.click()} aria-label="上載查詢截圖" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-white"><ImagePlus className="h-4 w-4" /></button><textarea value={input} onChange={(event) => onInput(event.target.value.slice(0, 8000))} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); onSend(); } }} placeholder="貼上完整 Email／DM／WhatsApp，或直接貼入截圖…" rows={3} className="min-h-11 flex-1 resize-none rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:border-purple-300" /><button type="button" onClick={onSend} disabled={(!input.trim() && !image) || loading || !enabled} aria-label="整理查詢並生成回覆" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-black text-white disabled:opacity-40"><Send className="h-4 w-4" /></button></div><p className="mt-2 text-[11px] text-zinc-400">AI 只會草擬回覆，不會自動傳送、報價、接受合作或承諾檔期。</p></div>; }
+
+async function compressImage(file: File): Promise<ImageAttachment> { const source = await createImageBitmap(file); const scale = Math.min(1, 1600 / Math.max(source.width, source.height)); const canvas = document.createElement("canvas"); canvas.width = Math.round(source.width * scale); canvas.height = Math.round(source.height * scale); canvas.getContext("2d")?.drawImage(source, 0, 0, canvas.width, canvas.height); source.close(); const dataUrl = canvas.toDataURL("image/jpeg", 0.82); if (dataUrl.length > 4_000_000) throw new Error("Compressed image too large"); return { dataUrl, mediaType: "image/jpeg", name: file.name || "查詢截圖.jpg" }; }

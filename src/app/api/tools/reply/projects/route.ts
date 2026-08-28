@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { name?: string };
   const name = body.name?.trim().slice(0, 80);
   if (!name) return NextResponse.json({ error: "請輸入 Project 或聯絡人名稱。" }, { status: 400 });
-  const { data, error } = await context.admin.from("egg_reply_projects").insert({ creator_id: context.profile.id, name }).select("id,name,notes,tone,language,updated_at").single();
+  const { data, error } = await context.admin.from("egg_reply_projects").insert({ creator_id: context.profile.id, name }).select("id,name,brief,updated_at").single();
   if (error) return NextResponse.json({ error: "建立 Project 失敗。" }, { status: 500 });
   return NextResponse.json({ project: data });
 }
@@ -47,7 +47,7 @@ export async function PATCH(request: Request) {
     language: languages.has(body.language ?? "") ? body.language : "zh-HK",
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = await context.admin.from("egg_reply_projects").update(update).eq("id", body.projectId).eq("creator_id", context.profile.id).select("id,name,notes,tone,language,updated_at").maybeSingle();
+  const { data, error } = await context.admin.from("egg_reply_projects").update(update).eq("id", body.projectId).eq("creator_id", context.profile.id).select("id,name,brief,updated_at").maybeSingle();
   if (error || !data) return NextResponse.json({ error: "儲存 Project 設定失敗。" }, { status: 500 });
   return NextResponse.json({ project: data });
 }

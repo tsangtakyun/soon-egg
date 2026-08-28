@@ -11,14 +11,14 @@ export default async function ReplyPage() {
 
   let { data: projects } = await admin
     .from("egg_reply_projects")
-    .select("id,name,notes,tone,language,updated_at")
+    .select("id,name,brief,updated_at")
     .eq("creator_id", profile.id)
     .order("updated_at", { ascending: false });
   if (!projects?.length) {
     const { data: defaultProject } = await admin
       .from("egg_reply_projects")
       .insert({ creator_id: profile.id, name: "一般回覆" })
-      .select("id,name,notes,tone,language,updated_at")
+      .select("id,name,brief,updated_at")
       .single();
     projects = defaultProject ? [defaultProject] : [];
   }

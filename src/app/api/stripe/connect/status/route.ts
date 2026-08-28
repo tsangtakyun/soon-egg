@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 let stripeClient: Stripe | null = null;
 let supabaseAdminClient: ReturnType<typeof createSupabaseClient> | null = null;
@@ -29,11 +30,7 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const supabaseAdmin = getSupabaseAdmin() as any;
-    const { data: profile } = await supabaseAdmin
-      .from("egg_creator_profiles")
-      .select("stripe_account_id, stripe_onboarding_complete")
-      .eq("user_id", user.id)
-      .single();
+    const { profile } = await getActiveCreatorProfile("id, stripe_account_id, stripe_onboarding_complete");
 
     if (!profile?.stripe_account_id) {
       return NextResponse.json({ connected: false, complete: false });
@@ -43,7 +40,7 @@ export async function GET() {
     const complete = Boolean(account.details_submitted && account.charges_enabled);
 
     if (complete && !profile.stripe_onboarding_complete) {
-      await supabaseAdmin.from("egg_creator_profiles").update({ stripe_onboarding_complete: true }).eq("user_id", user.id);
+      await supabaseAdmin.from("egg_creator_profiles").update({ stripe_onboarding_complete: true }).eq("id", profile.id).eq("user_id", user.id);
     }
 
     return NextResponse.json({

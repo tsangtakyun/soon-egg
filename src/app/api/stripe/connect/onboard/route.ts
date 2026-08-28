@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 let stripeClient: Stripe | null = null;
 let supabaseAdminClient: ReturnType<typeof createSupabaseClient> | null = null;
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const supabaseAdmin = getSupabaseAdmin() as any;
-    const { data: profile } = await supabaseAdmin.from("egg_creator_profiles").select("id, username, stripe_account_id").eq("user_id", user.id).single();
+    const { profile } = await getActiveCreatorProfile("id, username, stripe_account_id");
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
     let accountId = profile.stripe_account_id as string | null;

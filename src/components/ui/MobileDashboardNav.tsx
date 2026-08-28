@@ -7,13 +7,21 @@ import { useState } from "react";
 import { SidebarNav } from "./SidebarNav";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { EggBrandMark } from "./EggBrandMark";
+import { CreatorWorkspaceSwitcher } from "./CreatorWorkspaceSwitcher";
+import type { CreatorWorkspace } from "@/lib/creator-workspace";
 
 export function MobileDashboardNav({
   avatarUrl,
   creatorName,
+  workspaces,
+  activeWorkspaceId,
+  canCreateWorkspace,
 }: {
   avatarUrl?: string | null;
   creatorName: string;
+  workspaces: CreatorWorkspace[];
+  activeWorkspaceId: string | null;
+  canCreateWorkspace: boolean;
 }) {
   const pathname = usePathname();
   const [openAtPath, setOpenAtPath] = useState<string | null>(null);
@@ -66,6 +74,12 @@ export function MobileDashboardNav({
                 <X size={20} />
               </button>
             </div>
+
+            <CreatorWorkspaceSwitcher
+              initialWorkspaces={workspaces}
+              initialActiveId={activeWorkspaceId}
+              canCreate={canCreateWorkspace}
+            />
 
             <div className="min-h-0 flex-1 overflow-y-auto">
               <SidebarNav />

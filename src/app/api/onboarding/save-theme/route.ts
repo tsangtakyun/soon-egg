@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 import { NextRequest, NextResponse } from "next/server";
 
 const THEMES: Record<string, {
@@ -79,11 +80,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("egg_creator_profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .single();
+  const { profile } = await getActiveCreatorProfile("id");
 
   if (!profile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
@@ -107,6 +104,7 @@ export async function POST(req: NextRequest) {
   await supabase
     .from("egg_creator_profiles")
     .update({ onboarding_completed: true })
+    .eq("id", profile.id)
     .eq("user_id", user.id);
 
   return NextResponse.json({ success: true });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { logDealActivity } from "@/lib/deals-activity";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 type ApplyBody = {
   campaign_id: string;
@@ -40,9 +41,9 @@ export async function POST(req: Request) {
     auth: { persistSession: false },
   });
 
-  const { data: profile, error: profileError } = await supabase.from("egg_creator_profiles").select("*").eq("user_id", user.id).single();
+  const { profile } = await getActiveCreatorProfile("*");
 
-  if (profileError || !profile) {
+  if (!profile) {
     return NextResponse.json({ error: "Creator profile not found" }, { status: 404 });
   }
 

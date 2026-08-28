@@ -1,6 +1,7 @@
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
@@ -31,13 +32,9 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: profile, error: profileError } = await supabase
-    .from("egg_creator_profiles")
-    .select("display_name, username, bio, content_categories, instagram_handle, instagram_followers, instagram_access_token, instagram_user_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { profile } = await getActiveCreatorProfile("display_name, username, bio, content_categories, instagram_handle, instagram_followers, instagram_access_token, instagram_user_id");
 
-  if (profileError || !profile) {
+  if (!profile) {
     return NextResponse.json({ error: "未能讀取創作者資料。" }, { status: 404 });
   }
 

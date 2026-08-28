@@ -1,6 +1,7 @@
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -72,13 +73,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("egg_creator_profiles")
-    .select("id, username, display_name")
-    .eq("user_id", user.id)
-    .single();
+  const { profile } = await getActiveCreatorProfile("id, username, display_name");
 
-  if (profileError || !profile) {
+  if (!profile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 

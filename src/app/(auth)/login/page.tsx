@@ -65,6 +65,7 @@ export default function LoginPage() {
       .from("egg_creator_profiles")
       .select("onboarding_completed")
       .eq("user_id", data.user.id)
+      .limit(1)
       .maybeSingle();
 
     router.push(profile?.onboarding_completed ? "/dashboard" : "/onboarding");

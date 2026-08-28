@@ -658,16 +658,15 @@ export default function MediaKitPage() {
 
     async function load() {
       setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      const workspaceResponse = await fetch("/api/creator-workspaces", { cache: "no-store" });
+      const workspaceData = await workspaceResponse.json().catch(() => ({}));
+      const activeCreatorId = workspaceData.activeWorkspaceId as string | undefined;
+      if (!workspaceResponse.ok || !activeCreatorId) {
         if (!cancelled) setLoading(false);
         return;
       }
 
-      const { data: creator } = await supabase.from("egg_creator_profiles").select("*").eq("user_id", user.id).single();
+      const { data: creator } = await supabase.from("egg_creator_profiles").select("*").eq("id", activeCreatorId).single();
 
       if (!creator) {
         if (!cancelled) setLoading(false);

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
         .from("egg_creator_profiles")
         .select("onboarding_completed")
         .eq("user_id", user.id)
+        .limit(1)
         .maybeSingle();
 
       if (user.email) {

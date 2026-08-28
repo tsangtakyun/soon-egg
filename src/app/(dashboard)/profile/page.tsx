@@ -1,6 +1,7 @@
 import { LinkInBio } from "@/components/profile/LinkInBio";
 import type { ProfileBlock } from "@/components/profile/PhonePreview";
 import { createClient } from "@/lib/supabase/server";
+import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 type Profile = {
   id: string;
@@ -47,9 +48,11 @@ export default async function ProfilePage() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
+      const { activeWorkspace } = await getCreatorWorkspaceContext();
       const { data: creatorProfile } = await supabase
         .from("egg_creator_profiles")
         .select("*")
+        .eq("id", activeWorkspace?.id ?? "")
         .eq("user_id", user.id)
         .maybeSingle();
 

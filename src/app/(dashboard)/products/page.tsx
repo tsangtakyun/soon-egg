@@ -145,11 +145,10 @@ export default function ProductsPage() {
 
     async function load() {
       setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
+      const workspaceResponse = await fetch("/api/creator-workspaces", { cache: "no-store" });
+      const workspaceData = await workspaceResponse.json().catch(() => ({}));
+      const activeCreatorId = workspaceData.activeWorkspaceId as string | undefined;
+      if (!workspaceResponse.ok || !activeCreatorId) {
         if (!cancelled) setLoading(false);
         return;
       }
@@ -157,7 +156,7 @@ export default function ProductsPage() {
       const { data: profile } = await supabase
         .from("egg_creator_profiles")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("id", activeCreatorId)
         .single();
       if (!profile?.id) {
         if (!cancelled) setLoading(false);

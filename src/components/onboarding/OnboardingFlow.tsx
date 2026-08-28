@@ -181,9 +181,14 @@ export function OnboardingFlow() {
 
         if (!user) return;
 
+        const workspaceResponse = await fetch("/api/creator-workspaces", { cache: "no-store" });
+        const workspacePayload = workspaceResponse.ok ? await workspaceResponse.json() : null;
+        const activeWorkspaceId = workspacePayload?.activeWorkspaceId;
+        if (!activeWorkspaceId) return;
         const { data: profile } = await supabase
           .from("egg_creator_profiles")
           .select("username, display_name, bio, content_categories")
+          .eq("id", activeWorkspaceId)
           .eq("user_id", user.id)
           .maybeSingle();
 

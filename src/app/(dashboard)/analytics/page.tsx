@@ -7,6 +7,7 @@ import {
 } from "@/components/analytics/InstagramTrendChart";
 import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 type InstagramSyncData = {
   synced_at?: string;
@@ -57,11 +58,13 @@ export default async function AnalyticsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false } },
   );
+  const { activeWorkspace } = await getCreatorWorkspaceContext();
   const { data: profileData } = await admin
     .from("egg_creator_profiles")
     .select(
       "id,instagram_handle,instagram_followers,instagram_engagement_rate,audience_demographics",
     )
+    .eq("id", activeWorkspace?.id ?? "")
     .eq("user_id", user.id)
     .single();
   const profile = profileData as Profile | null;

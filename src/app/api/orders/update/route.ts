@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 let supabaseAdminClient: ReturnType<typeof createSupabaseClient> | null = null;
 
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   }
 
   const supabaseAdmin = getSupabaseAdmin() as any;
-  const { data: profile } = await supabaseAdmin.from("egg_creator_profiles").select("id").eq("user_id", user.id).single();
+  const { profile } = await getActiveCreatorProfile("id");
   if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
   const { data: updatedOrder, error } = await supabaseAdmin

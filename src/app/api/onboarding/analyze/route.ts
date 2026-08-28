@@ -1,5 +1,6 @@
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 import { NextRequest, NextResponse } from "next/server";
 
 type Handles = Record<string, string>;
@@ -167,13 +168,9 @@ async function fetchStoredInstagramData(): Promise<InstagramData | null> {
   if (!supabase || !user) return null;
 
   try {
-    const { data: profile, error } = await supabase
-      .from("egg_creator_profiles")
-      .select("instagram_access_token, instagram_user_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { profile } = await getActiveCreatorProfile("instagram_access_token, instagram_user_id");
 
-    if (error || !profile?.instagram_access_token || !profile?.instagram_user_id) {
+    if (!profile?.instagram_access_token || !profile?.instagram_user_id) {
       return null;
     }
 
@@ -255,11 +252,7 @@ async function saveCreatorProfile(
   };
 
   const savePayload = async (payload: Record<string, unknown>) => {
-    const { data: existing } = await supabase
-      .from("egg_creator_profiles")
-      .select("id, display_name, username, bio, content_categories")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const { profile: existing } = await getActiveCreatorProfile("id, display_name, username, bio, content_categories");
 
     if (existing) {
       return supabase.from("egg_creator_profiles").update(payload).eq("id", existing.id);
@@ -286,11 +279,7 @@ async function fetchStoredCreatorProfile() {
 
   if (!supabase || !user) return null;
 
-  const { data } = await supabase
-    .from("egg_creator_profiles")
-    .select("username, display_name, bio, content_categories")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { profile: data } = await getActiveCreatorProfile("username, display_name, bio, content_categories");
 
   return data;
 }

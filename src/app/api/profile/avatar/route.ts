@@ -1,6 +1,7 @@
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 const AVATAR_BUCKET = "avatars";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+  const { profile } = await getActiveCreatorProfile("id");
+  if (!profile) return NextResponse.json({ error: "Creator workspace not found" }, { status: 404 });
 
   const formData = await req.formData();
   const file = formData.get("file");
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
     if (!detectedType || detectedType.mimeType !== file.type) {
       return NextResponse.json({ error: "File content does not match a supported image type" }, { status: 400 });
     }
-    const path = `${user.id}/avatar.${detectedType.extension}`;
+    const path = `${user.id}/${profile.id}/avatar.${detectedType.extension}`;
 
     const { error: uploadError } = await serviceSupabase.storage.from(AVATAR_BUCKET).upload(path, buffer, {
       upsert: true,
@@ -108,6 +111,7 @@ export async function POST(req: NextRequest) {
     const { error: updateError } = await serviceSupabase
       .from("egg_creator_profiles")
       .update({ avatar_url: avatarUrl })
+      .eq("id", profile.id)
       .eq("user_id", user.id);
 
     if (updateError) throw updateError;

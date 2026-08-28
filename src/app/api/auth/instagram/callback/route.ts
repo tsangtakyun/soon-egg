@@ -1,6 +1,10 @@
 import { logDealActivity } from "@/lib/deals-activity";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { createEggAdmin, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
+
+const OAUTH_STATE_COOKIE = "egg-instagram-oauth-state";
+const OAUTH_WORKSPACE_COOKIE = "egg-instagram-oauth-workspace";
 
 type FacebookPage = {
   id: string;
@@ -69,8 +73,11 @@ export async function GET(req: NextRequest) {
   const redirectUri = `${requestUrl.origin}/api/auth/instagram/callback`;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const state = searchParams.get("state");
+  const expectedState = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
+  const requestedWorkspaceId = req.cookies.get(OAUTH_WORKSPACE_COOKIE)?.value;
 
-  if (error || !code) {
+  if (error || !code || !state || !expectedState || state !== expectedState || !requestedWorkspaceId) {
     return NextResponse.redirect(`${onboardingUrl}?instagram_error=true`);
   }
 
@@ -110,9 +117,15 @@ export async function GET(req: NextRequest) {
     let onboardedNewKol = false;
 
     if (supabase && user) {
-      const { data: existingProfile } = await supabase
+      const { workspaces } = await getCreatorWorkspaceContext();
+      if (!workspaces.some((workspace) => workspace.id === requestedWorkspaceId)) {
+        return NextResponse.redirect(`${onboardingUrl}?instagram_error=invalid_workspace`);
+      }
+      const admin = createEggAdmin();
+      const { data: existingProfile } = await admin
         .from("egg_creator_profiles")
         .select("audience_demographics")
+        .eq("id", requestedWorkspaceId)
         .eq("user_id", user.id)
         .maybeSingle();
       const currentAudience = (
@@ -136,14 +149,15 @@ export async function GET(req: NextRequest) {
         },
       };
 
-      const { data: updatedRows, error: updateError } = await supabase
+      const { data: updatedRows, error: updateError } = await admin
         .from("egg_creator_profiles")
         .update(payloadWithToken)
+        .eq("id", requestedWorkspaceId)
         .eq("user_id", user.id)
         .select("id");
 
       if (updateError && /column|schema|instagram_access_token|instagram_user_id/i.test(updateError.message)) {
-        const { error: fallbackError } = await supabase
+        const { error: fallbackError } = await admin
           .from("egg_creator_profiles")
           .update({
             instagram_handle: profile.username,
@@ -151,26 +165,15 @@ export async function GET(req: NextRequest) {
             facebook_handle: page.name || null,
             avatar_url: profile.profile_picture_url || null,
           })
+          .eq("id", requestedWorkspaceId)
           .eq("user_id", user.id);
 
         if (fallbackError) console.error("Instagram profile fallback save error:", fallbackError);
       } else if (updateError) {
         console.error("Instagram profile save error:", updateError);
       } else if (!updatedRows || updatedRows.length === 0) {
-        const username = (profile.username || `user_${user.id.slice(0, 8)}`).replace("@", "").toLowerCase();
-        const { error: upsertError } = await supabase
-          .from("egg_creator_profiles")
-          .upsert({
-            user_id: user.id,
-            username,
-            display_name: profile.name || profile.username || username,
-            bio: profile.biography || null,
-            ...payloadWithToken,
-          }, { onConflict: "user_id" });
-
-        if (upsertError) console.error("Instagram profile upsert save error:", upsertError);
-        else onboardedNewKol = true;
-      }
+        throw new Error("Selected creator workspace no longer exists");
+      } else if (!existingProfile) onboardedNewKol = true;
     }
 
     if (onboardedNewKol) {
@@ -197,7 +200,10 @@ export async function GET(req: NextRequest) {
       threads_username: profile.username || "",
     });
 
-    return NextResponse.redirect(`${onboardingUrl}?${params.toString()}`);
+    const response = NextResponse.redirect(`${onboardingUrl}?${params.toString()}`);
+    response.cookies.delete(OAUTH_STATE_COOKIE);
+    response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
+    return response;
   } catch (err) {
     console.error("Instagram OAuth error:", err);
     return NextResponse.redirect(`${onboardingUrl}?instagram_error=true`);

@@ -1,6 +1,7 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 export async function GET() {
   const server = await createServerClient();
@@ -14,11 +15,7 @@ export async function GET() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return NextResponse.json({ error: "Campaign service is not configured" }, { status: 503 });
   const admin = createServiceClient(url, key, { auth: { persistSession: false } });
-  const { data: profile } = await admin
-    .from("egg_creator_profiles")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { profile } = await getActiveCreatorProfile("id");
   if (!profile?.id) return NextResponse.json({ applications: [] });
 
   const { data, error } = await admin

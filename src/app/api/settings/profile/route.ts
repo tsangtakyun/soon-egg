@@ -2,6 +2,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { isValidProfileUsername, normalizeProfileUsername } from "@/lib/profile-username";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 function getSupabaseAdmin() {
   return createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -26,11 +27,7 @@ export async function POST(req: Request) {
   }
 
   const admin = getSupabaseAdmin();
-  const { data: existingProfile } = await admin
-    .from("egg_creator_profiles")
-    .select("id, username")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { profile: existingProfile } = await getActiveCreatorProfile("id,username");
   if (!existingProfile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
 
   const { data: duplicate } = await admin
@@ -52,6 +49,7 @@ export async function POST(req: Request) {
         : [],
       avatar_url: typeof avatar_url === "string" && avatar_url ? avatar_url : null,
     })
+    .eq("id", existingProfile.id)
     .eq("user_id", user.id);
 
   if (error?.code === "23505") return NextResponse.json({ error: "呢個用戶名已經有人使用。" }, { status: 409 });
@@ -79,9 +77,7 @@ export async function GET(req: Request) {
   if (!isValidProfileUsername(candidate)) return NextResponse.json({ available: false, reason: "invalid" });
 
   const admin = getSupabaseAdmin();
-  const [{ data: current }, { data: existing }] = await Promise.all([
-    admin.from("egg_creator_profiles").select("id, username").eq("user_id", user.id).maybeSingle(),
-    admin.from("egg_creator_profiles").select("id").eq("username", candidate).maybeSingle(),
-  ]);
+  const { profile: current } = await getActiveCreatorProfile("id,username");
+  const { data: existing } = await admin.from("egg_creator_profiles").select("id").eq("username", candidate).maybeSingle();
   return NextResponse.json({ available: !existing || existing.id === current?.id });
 }

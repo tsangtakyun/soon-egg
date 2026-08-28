@@ -1,6 +1,7 @@
 import { createClient as createServiceClient, type SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 const COVER_BUCKET = "covers";
 const MAX_FILE_SIZE = 8 * 1024 * 1024;
@@ -38,6 +39,8 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+  const { profile } = await getActiveCreatorProfile("id");
+  if (!profile) return NextResponse.json({ error: "Creator workspace not found" }, { status: 404 });
 
   const formData = await req.formData();
   const file = formData.get("file");
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
     const extensionFromType = file.type.split("/")[1]?.toLowerCase();
     const extension = extensionFromName || extensionFromType || "jpg";
     const safeExtension = extension === "jpeg" ? "jpg" : extension;
-    const path = `${user.id}/cover.${safeExtension}`;
+    const path = `${user.id}/${profile.id}/cover.${safeExtension}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await serviceSupabase.storage.from(COVER_BUCKET).upload(path, buffer, {
@@ -88,6 +91,7 @@ export async function POST(req: NextRequest) {
     const { error: updateError } = await serviceSupabase
       .from("egg_creator_profiles")
       .update({ cover_url: coverUrl })
+      .eq("id", profile.id)
       .eq("user_id", user.id);
 
     if (updateError) throw updateError;

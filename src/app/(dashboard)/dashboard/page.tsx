@@ -4,6 +4,7 @@ import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton"
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { CreatorAvatar } from "@/components/ui/CreatorAvatar";
 import { createClient } from "@/lib/supabase/server";
+import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 type CreatorProfile = {
   id: string;
@@ -64,6 +65,7 @@ export default async function DashboardHome() {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (user) {
+      const { activeWorkspace } = await getCreatorWorkspaceContext();
       const { data: profile } = await supabase
         .from("egg_creator_profiles")
         .select(`
@@ -83,6 +85,7 @@ export default async function DashboardHome() {
           onboarding_completed,
           audience_demographics
         `)
+        .eq("id", activeWorkspace?.id ?? "")
         .eq("user_id", user.id)
         .maybeSingle();
 

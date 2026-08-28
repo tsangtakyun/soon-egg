@@ -1,6 +1,7 @@
 import { createClient as createSupabaseAdminClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +29,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from("egg_creator_profiles")
-    .select("id,username")
-    .eq("user_id", user.id)
-    .single();
+  const { profile } = await getActiveCreatorProfile("id,username");
 
-  if (profileError || !profile) {
+  if (!profile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 

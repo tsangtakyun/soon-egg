@@ -1,6 +1,7 @@
 import { syncInstagramProfile, type InstagramSyncProfile } from "@/lib/instagram-sync";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 export async function POST() {
   const supabase = await createClient();
@@ -9,11 +10,7 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from("egg_creator_profiles")
-    .select("id,user_id,instagram_access_token,instagram_user_id,audience_demographics")
-    .eq("user_id", user.id)
-    .single();
+  const { profile } = await getActiveCreatorProfile("id,user_id,instagram_access_token,instagram_user_id,audience_demographics");
 
   if (!profile?.instagram_access_token) {
     return NextResponse.json({

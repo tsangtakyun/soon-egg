@@ -62,7 +62,7 @@ export async function getActiveCreatorProfile(select: string) {
   return { ...context, profile: data as Record<string, any> | null };
 }
 
-async function acceptPendingWorkspaceInvitations(admin: ReturnType<typeof createEggAdmin>, userId: string, email?: string) {
+export async function acceptPendingWorkspaceInvitations(admin: ReturnType<typeof createEggAdmin>, userId: string, email?: string) {
   if (!email) return;
   const normalizedEmail = email.trim().toLowerCase();
   const { data: invitations } = await admin.from("egg_creator_workspace_invitations")

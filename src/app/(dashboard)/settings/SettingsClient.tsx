@@ -91,6 +91,8 @@ export function SettingsClient({
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>("idle");
   const [socialSaveStatus, setSocialSaveStatus] = useState<SaveStatus>("idle");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [notificationStatus, setNotificationStatus] = useState<SaveStatus>("idle");
 
   const initials = (displayName || profile?.username || userEmail).slice(0, 2).toUpperCase();
 
@@ -123,11 +125,13 @@ export function SettingsClient({
 
   async function uploadAvatar(file: File) {
     setUploadingAvatar(true);
+    setAvatarError("");
     const formData = new FormData();
     formData.append("file", file);
     const res = await fetch("/api/profile/avatar", { method: "POST", body: formData });
-    const data = await res.json();
-    if (data.avatarUrl) setAvatarUrl(data.avatarUrl);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.avatarUrl) setAvatarUrl(data.avatarUrl);
+    else setAvatarError(data.error ?? "頭像上傳失敗，請重試。");
     setUploadingAvatar(false);
   }
 
@@ -163,13 +167,23 @@ export function SettingsClient({
   }
 
   async function handleToggle(key: string, value: boolean) {
+    const previous = notifications;
     const next = { ...notifications, [key]: value };
     setNotifications(next);
-    await fetch("/api/settings/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prefs: next }),
-    });
+    setNotificationStatus("saving");
+    try {
+      const response = await fetch("/api/settings/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prefs: next }),
+      });
+      if (!response.ok) throw new Error("Save failed");
+      setNotificationStatus("success");
+    } catch {
+      setNotifications(previous);
+      setNotificationStatus("error");
+    }
+    window.setTimeout(() => setNotificationStatus("idle"), 3000);
   }
 
   async function handleStripeConnect() {
@@ -207,6 +221,7 @@ export function SettingsClient({
             <div>
               <p className="text-sm font-medium text-zinc-900">頭像</p>
               <p className="text-xs text-gray-400">{uploadingAvatar ? "上傳中..." : "點擊頭像上傳新相片"}</p>
+              {avatarError ? <p role="alert" className="mt-1 text-xs text-red-500">{avatarError}</p> : null}
             </div>
             <input
               ref={fileInputRef}
@@ -297,19 +312,20 @@ export function SettingsClient({
               <input
                 value={socials.instagram_handle}
                 onChange={(e) => setSocials({ ...socials, instagram_handle: e.target.value })}
-                className={inputClass}
+                readOnly={Boolean(profile?.instagram_handle) && Number(profile?.instagram_followers ?? 0) > 0}
+                className={`${inputClass} read-only:bg-zinc-50 read-only:text-zinc-500`}
                 placeholder="@username"
               />
               <div className="mt-2 flex items-center justify-between">
                 {Number(profile?.instagram_followers ?? 0) > 0 ? (
                   <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-600">
-                    已連結 · {Number(profile?.instagram_followers).toLocaleString()} followers
+                    OAuth 已連接 · {Number(profile?.instagram_followers).toLocaleString()} followers
                   </span>
                 ) : (
                   <span className="text-xs text-gray-400">未連結</span>
                 )}
                 <Link href="/api/auth/instagram" prefetch={false} className="text-xs text-purple-600 hover:underline">
-                  重新連結 IG OAuth
+                  管理／重新連接
                 </Link>
               </div>
             </SocialRow>
@@ -359,6 +375,7 @@ export function SettingsClient({
 
         <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-700">通知設定</h2>
+          <div className="mb-2 h-5"><SaveStatusText status={notificationStatus} /></div>
           <div className="divide-y">
             {notificationOptions.map((option) => (
               <div key={option.key} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
@@ -368,6 +385,7 @@ export function SettingsClient({
                 </div>
                 <button
                   type="button"
+                  disabled={notificationStatus === "saving"}
                   onClick={() => handleToggle(option.key, !notifications[option.key])}
                   className={`relative h-6 w-11 rounded-full transition ${notifications[option.key] ? "bg-purple-600" : "bg-gray-200"}`}
                 >
@@ -395,12 +413,9 @@ export function SettingsClient({
           </form>
         </section>
 
-        <section className="rounded-2xl border border-red-100 bg-white p-6 shadow-sm">
-          <h3 className="mb-1 text-sm font-medium text-red-600">危險區域</h3>
-          <p className="mb-3 text-xs text-gray-400">刪除帳號後所有資料將永久消除，無法復原。</p>
-          <button className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-400 hover:text-red-600">
-            刪除帳號
-          </button>
+        <section className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h3 className="mb-1 text-sm font-medium text-zinc-700">工作空間管理</h3>
+          <p className="text-xs leading-5 text-gray-400">切換、建立或刪除創作者工作空間，請使用左上角工作空間選單。刪除前系統會要求再次確認。</p>
         </section>
       </div>
     </main>

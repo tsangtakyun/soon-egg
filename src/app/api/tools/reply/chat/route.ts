@@ -37,10 +37,10 @@ export async function POST(request: Request) {
   const admin = createEggAdmin();
   const [{ data: project }, { data: promptProfile }] = await Promise.all([
     body.projectId ? admin.from("egg_reply_projects").select("id,name,brief").eq("id", body.projectId).eq("creator_id", profile.id).maybeSingle() : Promise.resolve({ data: null }),
-    admin.from("egg_reply_prompt_profiles").select("system_prompt").eq("profile_key", "renee_talent_manager").maybeSingle(),
+    admin.from("egg_reply_prompt_profiles").select("system_prompt").eq("workspace_id", profile.id).maybeSingle(),
   ]);
   if (!project) return NextResponse.json({ error: "找不到目前 Project。" }, { status: 404 });
-  if (!promptProfile?.system_prompt) return NextResponse.json({ error: "Renee 回覆規則尚未設定。" }, { status: 503 });
+  if (!promptProfile?.system_prompt) return NextResponse.json({ error: "專屬商務規則尚未設定，請由工作空間擁有者先完成設定。" }, { status: 503 });
 
   const now = Date.now();
   const [minuteUsage, dayUsage] = await Promise.all([

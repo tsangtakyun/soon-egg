@@ -1,7 +1,7 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { getActiveCreatorProfile } from "@/lib/creator-workspace";
+import { canEditWorkspace, getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 function getSupabaseAdmin() {
   return createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -21,8 +21,9 @@ export async function POST(req: Request) {
     data: { user },
   } = await serverSupabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { profile } = await getActiveCreatorProfile("id");
+  const { profile, activeRole } = await getActiveCreatorProfile("id");
   if (!profile) return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+  if (!canEditWorkspace(activeRole)) return NextResponse.json({ error: "你無權修改工作空間資料" }, { status: 403 });
 
   const body = await req.json();
   const { error } = await getSupabaseAdmin()
@@ -35,8 +36,7 @@ export async function POST(req: Request) {
       facebook_handle: clean(body.facebook_handle),
       threads_handle: clean(body.threads_handle),
     })
-    .eq("id", profile.id)
-    .eq("user_id", user.id);
+    .eq("id", profile.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

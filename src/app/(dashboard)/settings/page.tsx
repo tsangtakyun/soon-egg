@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { SettingsClient } from "./SettingsClient";
 import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
+import { WorkspaceAccessSettings } from "./WorkspaceAccessSettings";
 
 export default async function SettingsPage() {
   const serverSupabase = await createServerClient();
@@ -18,12 +19,11 @@ export default async function SettingsPage() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  const { activeWorkspace } = await getCreatorWorkspaceContext();
+  const { activeWorkspace, activeRole } = await getCreatorWorkspaceContext();
   const { data: profile } = await supabaseAdmin
     .from("egg_creator_profiles")
     .select("*")
     .eq("id", activeWorkspace?.id ?? "")
-    .eq("user_id", user.id)
     .single();
 
   let stripeConnected = false;
@@ -40,6 +40,7 @@ export default async function SettingsPage() {
       userEmail={user.email!}
       stripeConnected={stripeConnected}
       stripeAccountMasked={stripeAccountMasked}
+      workspaceAccess={activeRole ? <WorkspaceAccessSettings role={activeRole} /> : null}
     />
   );
 }

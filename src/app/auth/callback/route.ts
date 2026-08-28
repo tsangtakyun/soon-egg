@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { syncUserCredits } from "@/lib/credits/syncCredits";
 import { NextRequest, NextResponse } from "next/server";
+import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -20,12 +21,7 @@ export async function GET(request: NextRequest) {
         await syncUserCredits(user.id, user.email);
       }
 
-      const { data: profile } = await supabase
-        .from("egg_creator_profiles")
-        .select("onboarding_completed")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
+      const { activeWorkspace: profile } = await getCreatorWorkspaceContext();
 
       if (user.email) {
         try {

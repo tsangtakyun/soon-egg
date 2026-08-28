@@ -49,11 +49,13 @@ export function SettingsClient({
   userEmail,
   stripeConnected,
   stripeAccountMasked,
+  workspaceAccess,
 }: {
   profile: Profile | null;
   userEmail: string;
   stripeConnected: boolean;
   stripeAccountMasked: string | null;
+  workspaceAccess: React.ReactNode;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? "");
@@ -368,6 +370,8 @@ export function SettingsClient({
             </button>
           </form>
         </section>
+
+        {workspaceAccess}
 
         <section className="rounded-2xl border bg-white p-6 shadow-sm">
           <h3 className="mb-1 text-sm font-medium text-zinc-700">工作空間管理</h3>

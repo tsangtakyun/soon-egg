@@ -1,7 +1,7 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getActiveCreatorProfile } from "@/lib/creator-workspace";
+import { canEditWorkspace, getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 export async function PATCH(req: NextRequest) {
   const authSupabase = await createClient();
@@ -75,9 +75,10 @@ export async function PATCH(req: NextRequest) {
 
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: "No valid changes" }, { status: 400 });
 
-  const { profile } = await getActiveCreatorProfile("id");
+  const { profile, activeRole } = await getActiveCreatorProfile("id");
   if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  const { error } = await serviceSupabase.from("egg_creator_profiles").update(updates).eq("id", profile.id).eq("user_id", user.id);
+  if (!canEditWorkspace(activeRole)) return NextResponse.json({ error: "你無權修改工作空間資料" }, { status: 403 });
+  const { error } = await serviceSupabase.from("egg_creator_profiles").update(updates).eq("id", profile.id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

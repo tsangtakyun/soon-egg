@@ -8,5 +8,5 @@ export const dynamic = "force-dynamic";
 export default async function TopicLibraryPage() {
   const { user, activeWorkspace } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace) redirect("/login");
-  return <TopicLibraryClient initialIdeas={await listTopicIdeas(activeWorkspace.id)} canImport={activeWorkspace.role === "owner" || activeWorkspace.role === "admin"} />;
+  return <TopicLibraryClient initialIdeas={await listTopicIdeas(activeWorkspace.id)} />;
 }

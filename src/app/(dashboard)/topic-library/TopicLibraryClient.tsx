@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Bookmark, ExternalLink, Search, ThumbsDown, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
@@ -16,25 +17,25 @@ function topicImage(idea: TopicIdea) {
   return idea.image_url || SEEDED_IMAGES[idea.title] || null;
 }
 
-export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: TopicIdea[]; canImport: boolean }) {
+export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[] }) {
+  const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
+  const [location, setLocation] = useState("全部地區");
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [context, setContext] = useState("");
-  const [showContext, setShowContext] = useState(false);
-  const [importMessage, setImportMessage] = useState("");
   const [masonryColumnCount, setMasonryColumnCount] = useState(4);
 
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
+  const locations = useMemo(() => ["全部地區", ...Array.from(new Set(ideas.flatMap((idea) => [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])])))], [ideas]);
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
     return ideas.filter((idea) =>
       (category === "全部" || idea.category === category) &&
+      (location === "全部地區" || [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])].includes(location)) &&
       (!value || [idea.title, idea.summary, idea.source_name, ...idea.tags].filter(Boolean).join(" ").toLowerCase().includes(value))
     );
-  }, [category, ideas, query]);
+  }, [category, ideas, location, query]);
   const masonryColumns = Array.from({ length: masonryColumnCount }, (_, columnIndex) =>
     filtered.filter((_, ideaIndex) => ideaIndex % masonryColumnCount === columnIndex)
   );
@@ -67,37 +68,10 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
           : item));
       }
       if (action === "create") {
-        window.location.href = `/tools/script?topic=${encodeURIComponent(idea.title)}&background=${encodeURIComponent(idea.summary ?? "")}`;
+        router.push(`/tools/script?topic=${encodeURIComponent(idea.title)}&background=${encodeURIComponent(idea.summary ?? "")}`);
       }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "操作失敗");
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function importIdea(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!sourceUrl.trim() || pendingId === "import") return;
-    setPendingId("import");
-    setImportMessage("正在讀取連結…");
-    try {
-      const response = await fetch("/api/topics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "import", sourceUrl, context }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || "匯入失敗");
-      setIdeas((current) => [result.idea, ...current]);
-      setSourceUrl("");
-      setContext("");
-      setShowContext(false);
-      setCategory("全部");
-      setImportMessage("已加入題材庫");
-    } catch (error) {
-      setImportMessage(error instanceof Error ? error.message : "匯入失敗");
-      setShowContext(true);
     } finally {
       setPendingId(null);
     }
@@ -108,21 +82,8 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
       <header className="flex min-h-16 flex-col gap-4 border-b border-zinc-200 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
         <div className="min-w-0">
           <h1 className="text-xl font-extrabold">題材靈感庫</h1>
-          <p className="mt-1 text-xs text-zinc-500">按你的內容方向整理最新 reference、題材方向和創作靈感</p>
+          <p className="mt-1 text-xs text-zinc-500">SOON 每日整理新題材，並按你的內容定位優先排列</p>
         </div>
-
-        {canImport ? (
-          <form className="relative w-full lg:w-[min(460px,46vw)]" onSubmit={importIdea}>
-            <label htmlFor="topic-source-url" className="mb-1 block text-[11px] font-bold text-zinc-600">加入新題材</label>
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
-              <input id="topic-source-url" type="url" inputMode="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="貼上 Instagram 或文章連結" required className="h-9 min-w-0 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-[13px] outline-none focus:border-zinc-900 focus:bg-white" />
-              <button type="submit" disabled={pendingId === "import"} className="h-9 rounded-lg bg-zinc-950 px-4 text-[13px] font-bold text-white disabled:opacity-50">{pendingId === "import" ? "讀取中…" : "加入"}</button>
-            </div>
-            <button type="button" onClick={() => setShowContext((current) => !current)} className="mt-1 text-[11px] font-semibold text-zinc-500 underline underline-offset-2">{showContext ? "收起補充資料" : "Instagram 無法讀取？加入 caption／補充資料"}</button>
-            {showContext ? <textarea value={context} onChange={(event) => setContext(event.target.value)} rows={3} placeholder="貼上 caption、內容重點或你想點拍…" className="mt-2 w-full resize-none rounded-lg border border-zinc-200 px-3 py-2 text-xs outline-none focus:border-zinc-900" /> : null}
-            {importMessage ? <span className="mt-1 block text-right text-[11px] text-zinc-500">{importMessage}</span> : null}
-          </form>
-        ) : null}
       </header>
 
       <section className="px-3 pb-10 pt-5 sm:px-5 lg:px-6">
@@ -134,6 +95,9 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
           <div className="mt-4 flex gap-2.5 overflow-x-auto pb-0.5" aria-label="題材分類">
             {categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-semibold ${category === item ? "bg-zinc-950 text-white" : "bg-zinc-100 text-zinc-600"}`}>{item}</button>)}
           </div>
+          {locations.length > 1 ? <div className="mt-2 flex gap-2 overflow-x-auto pb-0.5" aria-label="地區篩選">
+            {locations.map((item) => <button key={item} type="button" onClick={() => setLocation(item)} className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold ${location === item ? "border-amber-500 bg-amber-50 text-amber-800" : "border-zinc-200 text-zinc-500"}`}>{item}</button>)}
+          </div> : null}
         </div>
 
         {filtered.length ? (
@@ -145,11 +109,12 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
               return (
                 <article key={idea.id} className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-xl">
                   {image ? (
-                    <Link href={idea.source_url || "#"} target={idea.source_url ? "_blank" : undefined} rel={idea.source_url ? "noreferrer" : undefined} className="relative block overflow-hidden bg-zinc-100">
+                    <div className="relative block overflow-hidden bg-zinc-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={image} alt="" className="block h-auto w-full" />
                       <span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span>
-                    </Link>
+                      {idea.recommended ? <span className="absolute right-2.5 top-2.5 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-bold text-zinc-950">為你推薦</span> : null}
+                    </div>
                   ) : (
                     <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
                   )}
@@ -157,6 +122,8 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
                     <p className="text-[11px] font-semibold uppercase text-zinc-400">{idea.source_name || idea.platform}</p>
                     <h2 className="mt-1.5 text-[17px] font-extrabold leading-[1.15] text-zinc-900">{idea.title}</h2>
                     {idea.summary ? <p className="mt-2 text-xs leading-[1.45] text-zinc-600">{idea.summary}</p> : null}
+                    {idea.why_now ? <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-xs leading-relaxed text-amber-900"><strong>點解值得留意：</strong>{idea.why_now}</p> : null}
+                    {idea.hook ? <p className="mt-2 text-xs leading-relaxed text-zinc-700"><strong>開場 Hook：</strong>{idea.hook}</p> : null}
                     <div className="mt-2.5 flex flex-wrap gap-1.5">{idea.tags.map((tag) => <span key={tag} className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-500">{tag}</span>)}</div>
                     {idea.source_url ? <Link href={idea.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-zinc-700 hover:underline">查看原文 <ExternalLink className="h-3 w-3" /></Link> : null}
                     <div className="mt-3 grid grid-cols-3 gap-1.5">
@@ -172,7 +139,7 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
             ))}
           </div>
         ) : (
-          <div className="mt-4 rounded-xl border border-dashed border-zinc-300 py-16 text-center"><strong className="block text-sm">暫時未有相符題材</strong><span className="mt-2 block text-sm text-zinc-500">可以清除搜尋或切換分類。</span>{ideas.length ? <button type="button" onClick={() => { setQuery(""); setCategory("全部"); }} className="mt-4 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white">查看全部</button> : null}</div>
+          <div className="mt-4 rounded-xl border border-dashed border-zinc-300 py-16 text-center"><strong className="block text-sm">暫時未有相符題材</strong><span className="mt-2 block text-sm text-zinc-500">SOON 正在整理新一批靈感，你亦可以清除篩選查看全部。</span>{ideas.length ? <button type="button" onClick={() => { setQuery(""); setCategory("全部"); setLocation("全部地區"); }} className="mt-4 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white">查看全部</button> : null}</div>
         )}
       </section>
     </main>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bookmark, ExternalLink, Search, ThumbsDown, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
 
@@ -25,6 +25,7 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
   const [context, setContext] = useState("");
   const [showContext, setShowContext] = useState(false);
   const [importMessage, setImportMessage] = useState("");
+  const [masonryColumnCount, setMasonryColumnCount] = useState(4);
 
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
   const filtered = useMemo(() => {
@@ -34,6 +35,19 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
       (!value || [idea.title, idea.summary, idea.source_name, ...idea.tags].filter(Boolean).join(" ").toLowerCase().includes(value))
     );
   }, [category, ideas, query]);
+  const masonryColumns = Array.from({ length: masonryColumnCount }, (_, columnIndex) =>
+    filtered.filter((_, ideaIndex) => ideaIndex % masonryColumnCount === columnIndex)
+  );
+
+  useEffect(() => {
+    function updateColumnCount() {
+      const width = window.innerWidth;
+      setMasonryColumnCount(width <= 520 ? 1 : width <= 860 ? 2 : width <= 1180 ? 3 : 4);
+    }
+    updateColumnCount();
+    window.addEventListener("resize", updateColumnCount);
+    return () => window.removeEventListener("resize", updateColumnCount);
+  }, []);
 
   async function act(idea: TopicIdea, action: "save" | "create" | "dismiss") {
     setPendingId(idea.id);
@@ -123,11 +137,13 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
         </div>
 
         {filtered.length ? (
-          <div className="columns-1 gap-[18px] sm:columns-2 xl:columns-3 2xl:columns-4" aria-label="題材 reference">
-            {filtered.map((idea) => {
+          <div className="grid items-start gap-[18px]" style={{ gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))` }} aria-label="題材 reference">
+            {masonryColumns.map((column, columnIndex) => (
+              <div key={`topic-column-${columnIndex}`} className="flex min-w-0 flex-col gap-[18px]">
+              {column.map((idea) => {
               const image = topicImage(idea);
               return (
-                <article key={idea.id} className="mb-[18px] inline-block w-full break-inside-avoid overflow-hidden rounded-xl border border-zinc-200 bg-white align-top transition hover:-translate-y-0.5 hover:shadow-xl">
+                <article key={idea.id} className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-xl">
                   {image ? (
                     <Link href={idea.source_url || "#"} target={idea.source_url ? "_blank" : undefined} rel={idea.source_url ? "noreferrer" : undefined} className="relative block overflow-hidden bg-zinc-100">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -151,7 +167,9 @@ export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: 
                   </div>
                 </article>
               );
-            })}
+              })}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="mt-4 rounded-xl border border-dashed border-zinc-300 py-16 text-center"><strong className="block text-sm">暫時未有相符題材</strong><span className="mt-2 block text-sm text-zinc-500">可以清除搜尋或切換分類。</span>{ideas.length ? <button type="button" onClick={() => { setQuery(""); setCategory("全部"); }} className="mt-4 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white">查看全部</button> : null}</div>

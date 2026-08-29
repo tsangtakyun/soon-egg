@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { masterSupabase } from "@/lib/supabase/master";
-import { getOrCreateKolWorkspace } from "@/lib/workspace";
 import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 
 const model = process.env.ANTHROPIC_SCRIPT_MODEL?.trim() || "claude-sonnet-4-6";
@@ -12,25 +10,25 @@ export async function POST(req: Request) {
   const serverSupabase = await createServerClient();
   const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   let user = serverSupabase ? (await serverSupabase.auth.getUser()).data.user : null;
+  const admin = createEggAdmin();
 
   if (!user && bearer) {
-    const admin = createEggAdmin();
     user = (await admin.auth.getUser(bearer)).data.user;
-    if (user) {
-      await acceptPendingWorkspaceInvitations(admin, user.id, user.email);
-      const workspaceId = req.headers.get("x-egg-workspace-id");
-      if (workspaceId) {
-        const { data: membership } = await admin
-          .from("egg_creator_workspace_members")
-          .select("workspace_id")
-          .eq("workspace_id", workspaceId)
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (!membership) return NextResponse.json({ error: "你沒有此工作空間的權限" }, { status: 403 });
-      }
-    }
   }
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  await acceptPendingWorkspaceInvitations(admin, user.id, user.email);
+
+  const requestedWorkspaceId = req.headers.get("x-egg-workspace-id");
+  let membershipQuery = admin
+    .from("egg_creator_workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id);
+  if (requestedWorkspaceId) membershipQuery = membershipQuery.eq("workspace_id", requestedWorkspaceId);
+  const { data: memberships, error: membershipError } = await membershipQuery.limit(1);
+  const workspaceId = memberships?.[0]?.workspace_id;
+  if (membershipError || !workspaceId) {
+    return NextResponse.json({ error: "你沒有此工作空間的權限" }, { status: 403 });
+  }
 
   const result = await deductCredits({
     email: user.email,
@@ -85,13 +83,11 @@ Ending 風格：${ending.title}（${ending.example}）
     });
 
     const script = message.content[0]?.type === "text" ? message.content[0].text : "";
-    const workspaceId = await getOrCreateKolWorkspace(user.id, user.email, "");
-
-    const { data: saved, error } = await (masterSupabase as any)
-      .from("scripts")
+    const { data: saved, error } = await admin
+      .from("egg_creator_scripts")
       .insert({
-        user_id: user.id,
         workspace_id: workspaceId,
+        created_by: user.id,
         title: topic,
         topic,
         background: background ?? null,
@@ -115,6 +111,7 @@ Ending 風格：${ending.title}（${ending.example}）
 
     if (error) {
       console.error("[script generate] save error:", error);
+      return NextResponse.json({ error: "劇本已生成，但未能儲存，請再試一次" }, { status: 500 });
     }
 
     return NextResponse.json({

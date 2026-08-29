@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Link2, Minus, TrendingDown, TrendingUp, UserRound } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Lightbulb, Link2, Minus, TrendingDown, TrendingUp, UserRound } from "lucide-react";
 import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { CreatorAvatar } from "@/components/ui/CreatorAvatar";
@@ -151,6 +151,9 @@ export default async function DashboardHome() {
       <DashboardShareHeader username={creator.username} />
       <div className="space-y-6 px-4 py-6 sm:px-6">
         <section className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+          <Link href="/topic-library" className="group rounded-xl border border-amber-200 bg-amber-50 p-5 md:col-span-2">
+            <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold text-amber-700">每日更新</p><h2 className="mt-2 text-xl font-black text-zinc-950">題材靈感</h2><p className="mt-2 text-sm text-zinc-600">瀏覽 SOON 為你整理嘅新題材，收藏或者直接開始寫劇本。</p></div><Lightbulb className="h-6 w-6 text-amber-600 transition-transform group-hover:rotate-6" /></div>
+          </Link>
           <div className="rounded-xl border border-zinc-200 bg-white p-5">
             <div className="flex items-center justify-between gap-3">
               <div>

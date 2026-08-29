@@ -8,6 +8,7 @@ import {
   Captions,
   FileText,
   Home,
+  Lightbulb,
   MessageSquare,
   Megaphone,
   Package,
@@ -24,6 +25,7 @@ const items = [
 ];
 
 const creatorToolItems = [
+  { href: "/topic-library", label: "題材靈感庫", icon: Lightbulb },
   { href: "/tools/script", label: "劇本工作台", icon: FileText },
   { href: "/tools/subtitle", label: "字幕工作台", icon: Captions },
 ];

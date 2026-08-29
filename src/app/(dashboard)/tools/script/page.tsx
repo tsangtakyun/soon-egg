@@ -3,7 +3,7 @@ import { CREDIT_COSTS, deductCredits, getCreditBalance } from "@/lib/credits";
 import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 import { ScriptClient, type SavedScript } from "./ScriptClient";
 
-export default async function ScriptPage() {
+export default async function ScriptPage({ searchParams }: { searchParams: Promise<{ topic?: string; background?: string }> }) {
   const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
   if (!user?.email) redirect("/login");
   if (!activeWorkspace || !admin) redirect("/onboarding");
@@ -32,5 +32,6 @@ export default async function ScriptPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
-  return <ScriptClient scripts={(scripts ?? []) as SavedScript[]} balance={deduction.balance} />;
+  const params = await searchParams;
+  return <ScriptClient scripts={(scripts ?? []) as SavedScript[]} balance={deduction.balance} initialTopic={params.topic ?? ""} initialBackground={params.background ?? ""} />;
 }

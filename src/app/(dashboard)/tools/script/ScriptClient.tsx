@@ -61,14 +61,18 @@ const endingStyles: StyleOption[] = [
 export function ScriptClient({
   scripts,
   balance: initialBalance,
+  initialTopic = "",
+  initialBackground = "",
 }: {
   scripts: SavedScript[];
   balance: number;
+  initialTopic?: string;
+  initialBackground?: string;
 }) {
   const [brandName, setBrandName] = useState("");
   const [industry, setIndustry] = useState<string[]>([]);
-  const [topic, setTopic] = useState("");
-  const [background, setBackground] = useState("");
+  const [topic, setTopic] = useState(initialTopic);
+  const [background, setBackground] = useState(initialBackground);
   const [hookStyle, setHookStyle] = useState("H1");
   const [transitionStyle, setTransitionStyle] = useState("T1");
   const [endingStyle, setEndingStyle] = useState("E1");

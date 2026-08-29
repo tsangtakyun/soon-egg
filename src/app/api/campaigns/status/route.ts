@@ -42,12 +42,30 @@ export async function POST(req: Request) {
     .update({ status: body.status })
     .eq("creator_id", body.creator_id)
     .eq("cw_campaign_id", body.campaign_id)
-    .select("id,status")
+    .select("id,status,creator_id,brand_name")
     .maybeSingle();
   if (error || !data)
     return NextResponse.json(
       { error: "Application not found" },
       { status: 404 },
     );
+  if (body.status === "completed" && data.brand_name) {
+    const { data: existing } = await supabase
+      .from("egg_brand_partners")
+      .select("id")
+      .eq("creator_id", data.creator_id)
+      .eq("brand_name", data.brand_name)
+      .maybeSingle();
+    if (!existing) {
+      const { error: partnerError } = await supabase
+        .from("egg_brand_partners")
+        .insert({ creator_id: data.creator_id, brand_name: data.brand_name });
+      if (partnerError)
+        console.error(
+          "Completed deal partner sync failed",
+          partnerError.message,
+        );
+    }
+  }
   return NextResponse.json({ success: true, application: data });
 }

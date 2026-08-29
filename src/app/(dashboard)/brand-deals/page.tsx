@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 type ActiveTab = "campaigns" | "invitations" | "completed";
 
@@ -631,7 +630,6 @@ function CampaignFeed({ profile }: { profile: Profile }) {
 }
 
 export default function BrandDealsPage() {
-  const supabase = useMemo(() => createClient(), []);
   const [activeTab, setActiveTab] = useState<ActiveTab>("campaigns");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [invitations, setInvitations] = useState<BrandInvitation[]>([]);
@@ -641,20 +639,14 @@ export default function BrandDealsPage() {
   useEffect(() => {
     let cancelled = false;
     async function loadProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        if (!cancelled) setLoadingProfile(false);
-        return;
-      }
-      const { data } = await supabase
-        .from("egg_creator_profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+      const response = await fetch("/api/campaigns/overview", {
+        cache: "no-store",
+      });
+      const data = response.ok ? await response.json() : null;
       if (!cancelled) {
-        setProfile(data as Profile | null);
+        setProfile((data?.profile as Profile | null) ?? null);
+        setInvitations((data?.invitations ?? []) as BrandInvitation[]);
+        setApplications((data?.applications ?? []) as CampaignApplication[]);
         setLoadingProfile(false);
       }
     }
@@ -662,33 +654,7 @@ export default function BrandDealsPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
-
-  useEffect(() => {
-    if (!profile?.id) return;
-    let cancelled = false;
-    Promise.all([
-      supabase
-        .from("egg_brand_invitations")
-        .select("*")
-        .eq("creator_id", profile.id)
-        .order("sent_at", { ascending: false }),
-      fetch("/api/campaigns/mine", { cache: "no-store" }),
-    ]).then(async ([invitationResult, applicationResponse]) => {
-      const applicationResult = applicationResponse.ok
-        ? await applicationResponse.json()
-        : { applications: [] };
-      if (!cancelled) {
-        setInvitations((invitationResult.data ?? []) as BrandInvitation[]);
-        setApplications(
-          (applicationResult.applications ?? []) as CampaignApplication[],
-        );
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [profile?.id, supabase]);
+  }, []);
 
   const pendingInvitationCount = invitations.filter(
     (invitation) => invitation.status === "pending",

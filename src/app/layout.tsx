@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito, Nunito_Sans } from "next/font/google";
+import { Suspense } from "react";
+import { GlobalInteractionFeedback } from "@/components/ui/GlobalInteractionFeedback";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -34,7 +36,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-HK" className="h-full antialiased">
-      <body className={`${nunito.variable} ${nunitoSans.variable} flex min-h-full flex-col`}>{children}</body>
+      <body className={`${nunito.variable} ${nunitoSans.variable} flex min-h-full flex-col`}>
+        <Suspense fallback={null}><GlobalInteractionFeedback /></Suspense>
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,31 +1,12 @@
 import { redirect } from "next/navigation";
-import { createClient as createServerClient } from "@/lib/supabase/server";
 import { CREDIT_COSTS, deductCredits, getCreditBalance } from "@/lib/credits";
-import { masterSupabase } from "@/lib/supabase/master";
-import { getOrCreateKolWorkspace } from "@/lib/workspace";
+import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 import { ScriptClient, type SavedScript } from "./ScriptClient";
 
-type Profile = {
-  id: string;
-  username: string | null;
-  display_name: string | null;
-};
-
 export default async function ScriptPage() {
-  const serverSupabase = await createServerClient();
-  if (!serverSupabase) redirect("/login");
-
-  const {
-    data: { user },
-  } = await serverSupabase.auth.getUser();
+  const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
   if (!user?.email) redirect("/login");
-
-  const { data: profileData } = await serverSupabase
-    .from("egg_creator_profiles")
-    .select("id, username, display_name")
-    .eq("user_id", user.id)
-    .single();
-  const profile = profileData as Profile | null;
+  if (!activeWorkspace || !admin) redirect("/onboarding");
 
   const balance = await getCreditBalance(user.email);
   if (balance < CREDIT_COSTS.TOOL_ENTRY) {
@@ -44,14 +25,12 @@ export default async function ScriptPage() {
     redirect("/credits?insufficient=tools");
   }
 
-  const workspaceId = await getOrCreateKolWorkspace(user.id, user.email, profile?.display_name ?? "");
-
-  const { data: scripts } = await (masterSupabase as any)
-    .from("scripts")
+  const { data: scripts } = await admin
+    .from("egg_creator_scripts")
     .select("id, title, topic, background, tone, framework, hook_variant, ai_draft, parts, created_at")
-    .eq("user_id", user.id)
+    .eq("workspace_id", activeWorkspace.id)
     .order("created_at", { ascending: false })
     .limit(5);
 
-  return <ScriptClient scripts={(scripts ?? []) as SavedScript[]} workspaceId={workspaceId} userEmail={user.email} balance={deduction.balance} />;
+  return <ScriptClient scripts={(scripts ?? []) as SavedScript[]} balance={deduction.balance} />;
 }

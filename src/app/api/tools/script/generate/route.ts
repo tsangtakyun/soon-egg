@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
 import { createClient as createServerClient } from "@/lib/supabase/server";
-import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
+import { ACTIVE_CREATOR_COOKIE, acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 
 const model = process.env.ANTHROPIC_SCRIPT_MODEL?.trim() || "claude-sonnet-4-6";
 
@@ -18,7 +19,8 @@ export async function POST(req: Request) {
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await acceptPendingWorkspaceInvitations(admin, user.id, user.email);
 
-  const requestedWorkspaceId = req.headers.get("x-egg-workspace-id");
+  const requestedWorkspaceId = req.headers.get("x-egg-workspace-id")
+    ?? (await cookies()).get(ACTIVE_CREATOR_COOKIE)?.value;
   let membershipQuery = admin
     .from("egg_creator_workspace_members")
     .select("workspace_id")

@@ -63,8 +63,6 @@ export function ScriptClient({
   balance: initialBalance,
 }: {
   scripts: SavedScript[];
-  workspaceId: string;
-  userEmail: string;
   balance: number;
 }) {
   const [brandName, setBrandName] = useState("");

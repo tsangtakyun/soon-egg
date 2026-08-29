@@ -201,7 +201,7 @@ export async function PATCH(request: Request) {
           .maybeSingle()
       : await context.admin
           .from("egg_rate_cards")
-          .insert({ ...values, sort_order: Date.now() })
+          .insert({ ...values, sort_order: 999 })
           .select("id")
           .single();
     if (result.error || !result.data)
@@ -223,6 +223,7 @@ export async function PATCH(request: Request) {
   if (action === "toggle_featured") {
     const id = clean(body.id, 80);
     const featured = body.featured === true;
+    let nextSortOrder = 0;
     if (featured) {
       const { count } = await context.admin
         .from("egg_instagram_media")
@@ -234,10 +235,11 @@ export async function PATCH(request: Request) {
           { error: "最多只可以精選 5 個 Instagram 內容" },
           { status: 400 },
         );
+      nextSortOrder = count ?? 0;
     }
     const { data, error } = await context.admin
       .from("egg_instagram_media")
-      .update({ is_featured: featured, sort_order: featured ? Date.now() : 0 })
+      .update({ is_featured: featured, sort_order: nextSortOrder })
       .eq("id", id)
       .eq("creator_id", context.workspaceId)
       .select("id")

@@ -6,7 +6,7 @@ import { masterSupabase } from "@/lib/supabase/master";
 import { getOrCreateKolWorkspace } from "@/lib/workspace";
 import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 
-const model = "claude-sonnet-4-20250514";
+const model = process.env.ANTHROPIC_SCRIPT_MODEL?.trim() || "claude-sonnet-4-6";
 
 export async function POST(req: Request) {
   const serverSupabase = await createServerClient();
@@ -125,7 +125,15 @@ Ending 風格：${ending.title}（${ending.example}）
     });
   } catch (error) {
     console.error("[script generate] error:", error);
-    return NextResponse.json({ error: "Script generation failed" }, { status: 500 });
+    const status = typeof error === "object" && error && "status" in error
+      ? Number((error as { status?: unknown }).status)
+      : 500;
+    const message = status === 404
+      ? "AI 模型暫時不可用，請聯絡管理員更新模型設定"
+      : status === 429
+        ? "AI 服務暫時繁忙，請稍後再試"
+        : "暫時未能生成劇本，請稍後再試";
+    return NextResponse.json({ error: message }, { status: status === 429 ? 429 : 500 });
   }
 }
 

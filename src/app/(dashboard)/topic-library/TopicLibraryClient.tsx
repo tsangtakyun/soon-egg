@@ -2,63 +2,161 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Bookmark, ExternalLink, Plus, Search, Sparkles, ThumbsDown, Video, X } from "lucide-react";
+import { Bookmark, ExternalLink, Search, ThumbsDown, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
+
+const SEEDED_IMAGES: Record<string, string> = {
+  "阿姆斯特丹「社區警貓」有新搭檔": "/topic-library/police-cat-amsterdam.jpg",
+  "睡不着不是不夠累：睡前先讓身體慢慢關機": "/topic-library/sleep-wind-down.jpg",
+  "每年春天都會消失的瑞典 ICEHOTEL": "/topic-library/sweden-icehotel.jpg",
+  "食物跌落地，三秒內執起真的可以吃嗎？": "/topic-library/three-second-rule.jpg",
+};
+
+function topicImage(idea: TopicIdea) {
+  return idea.image_url || SEEDED_IMAGES[idea.title] || null;
+}
 
 export function TopicLibraryClient({ initialIdeas, canImport }: { initialIdeas: TopicIdea[]; canImport: boolean }) {
   const [ideas, setIdeas] = useState(initialIdeas);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
-  const [pending, setPending] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
   const [sourceUrl, setSourceUrl] = useState("");
   const [context, setContext] = useState("");
-  const [importError, setImportError] = useState("");
+  const [showContext, setShowContext] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
+
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
-    return ideas.filter((idea) => (category === "全部" || idea.category === category) && (!value || [idea.title, idea.summary, idea.source_name, ...idea.tags].filter(Boolean).join(" ").toLowerCase().includes(value)));
+    return ideas.filter((idea) =>
+      (category === "全部" || idea.category === category) &&
+      (!value || [idea.title, idea.summary, idea.source_name, ...idea.tags].filter(Boolean).join(" ").toLowerCase().includes(value))
+    );
   }, [category, ideas, query]);
 
   async function act(idea: TopicIdea, action: "save" | "create" | "dismiss") {
-    setPending(true);
+    setPendingId(idea.id);
     try {
-      const response = await fetch("/api/topics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ideaId: idea.id, action }) });
+      const response = await fetch("/api/topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ideaId: idea.id, action }),
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "操作失敗");
-      if (action === "dismiss") setIdeas((current) => current.filter((item) => item.id !== idea.id));
-      else setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, saved: true, want_to_create: action === "create" } : item));
-      if (action === "create") window.location.href = `/tools/script?topic=${encodeURIComponent(idea.title)}&background=${encodeURIComponent(idea.summary ?? "")}`;
+      if (action === "dismiss") {
+        setIdeas((current) => current.filter((item) => item.id !== idea.id));
+      } else {
+        setIdeas((current) => current.map((item) => item.id === idea.id
+          ? { ...item, saved: true, want_to_create: action === "create" }
+          : item));
+      }
+      if (action === "create") {
+        window.location.href = `/tools/script?topic=${encodeURIComponent(idea.title)}&background=${encodeURIComponent(idea.summary ?? "")}`;
+      }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "操作失敗");
-    } finally { setPending(false); }
+    } finally {
+      setPendingId(null);
+    }
   }
 
-  async function importIdea() {
-    if (!sourceUrl.trim()) return;
-    setPending(true);
-    setImportError("");
+  async function importIdea(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!sourceUrl.trim() || pendingId === "import") return;
+    setPendingId("import");
+    setImportMessage("正在讀取連結…");
     try {
-      const response = await fetch("/api/topics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "import", sourceUrl, context }) });
+      const response = await fetch("/api/topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "import", sourceUrl, context }),
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "匯入失敗");
       setIdeas((current) => [result.idea, ...current]);
-      setSourceUrl(""); setContext(""); setShowImport(false);
-    } catch (error) { setImportError(error instanceof Error ? error.message : "匯入失敗"); } finally { setPending(false); }
+      setSourceUrl("");
+      setContext("");
+      setShowContext(false);
+      setCategory("全部");
+      setImportMessage("已加入題材庫");
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : "匯入失敗");
+      setShowContext(true);
+    } finally {
+      setPendingId(null);
+    }
   }
 
   return (
-    <main className="space-y-6 px-4 py-6 sm:px-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-600">SOON Inspiration</p><h1 className="mt-2 text-3xl font-black text-zinc-950">題材靈感庫</h1><p className="mt-2 text-sm text-zinc-500">SOON 為你整理可靠來源同可拍角度；收藏、略過，或者直接開始寫劇本。</p></div>{canImport ? <button type="button" onClick={() => setShowImport(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 py-3 text-sm font-semibold text-white"><Plus className="h-4 w-4" />加入新題材</button> : null}</header>
-      <section className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-4">
-        <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋題材、來源或標籤" className="w-full rounded-xl border border-zinc-200 py-3 pl-10 pr-3 text-sm outline-none focus:border-amber-400" /></div>
-        <div className="flex gap-2 overflow-x-auto pb-1">{categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold ${category === item ? "bg-zinc-950 text-white" : "bg-zinc-100 text-zinc-600"}`}>{item}</button>)}</div>
+    <main className="min-h-screen bg-white text-zinc-900">
+      <header className="flex min-h-16 flex-col gap-4 border-b border-zinc-200 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+        <div className="min-w-0">
+          <h1 className="text-xl font-extrabold">題材靈感庫</h1>
+          <p className="mt-1 text-xs text-zinc-500">按你的內容方向整理最新 reference、題材方向和創作靈感</p>
+        </div>
+
+        {canImport ? (
+          <form className="relative w-full lg:w-[min(460px,46vw)]" onSubmit={importIdea}>
+            <label htmlFor="topic-source-url" className="mb-1 block text-[11px] font-bold text-zinc-600">加入新題材</label>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-1.5">
+              <input id="topic-source-url" type="url" inputMode="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="貼上 Instagram 或文章連結" required className="h-9 min-w-0 rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-[13px] outline-none focus:border-zinc-900 focus:bg-white" />
+              <button type="submit" disabled={pendingId === "import"} className="h-9 rounded-lg bg-zinc-950 px-4 text-[13px] font-bold text-white disabled:opacity-50">{pendingId === "import" ? "讀取中…" : "加入"}</button>
+            </div>
+            <button type="button" onClick={() => setShowContext((current) => !current)} className="mt-1 text-[11px] font-semibold text-zinc-500 underline underline-offset-2">{showContext ? "收起補充資料" : "Instagram 無法讀取？加入 caption／補充資料"}</button>
+            {showContext ? <textarea value={context} onChange={(event) => setContext(event.target.value)} rows={3} placeholder="貼上 caption、內容重點或你想點拍…" className="mt-2 w-full resize-none rounded-lg border border-zinc-200 px-3 py-2 text-xs outline-none focus:border-zinc-900" /> : null}
+            {importMessage ? <span className="mt-1 block text-right text-[11px] text-zinc-500">{importMessage}</span> : null}
+          </form>
+        ) : null}
+      </header>
+
+      <section className="px-3 pb-10 pt-5 sm:px-5 lg:px-6">
+        <div className="sticky top-0 z-10 bg-white/95 pb-4 backdrop-blur">
+          <label className="relative block">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋題材、reference、tag" className="h-12 w-full rounded-xl border border-zinc-200 bg-white pl-11 pr-4 text-sm outline-none focus:border-zinc-900" />
+          </label>
+          <div className="mt-4 flex gap-2.5 overflow-x-auto pb-0.5" aria-label="題材分類">
+            {categories.map((item) => <button key={item} type="button" onClick={() => setCategory(item)} className={`whitespace-nowrap rounded-full px-3.5 py-2 text-[13px] font-semibold ${category === item ? "bg-zinc-950 text-white" : "bg-zinc-100 text-zinc-600"}`}>{item}</button>)}
+          </div>
+        </div>
+
+        {filtered.length ? (
+          <div className="columns-1 gap-[18px] sm:columns-2 xl:columns-3 2xl:columns-4" aria-label="題材 reference">
+            {filtered.map((idea) => {
+              const image = topicImage(idea);
+              return (
+                <article key={idea.id} className="mb-[18px] inline-block w-full break-inside-avoid overflow-hidden rounded-xl border border-zinc-200 bg-white align-top transition hover:-translate-y-0.5 hover:shadow-xl">
+                  {image ? (
+                    <Link href={idea.source_url || "#"} target={idea.source_url ? "_blank" : undefined} rel={idea.source_url ? "noreferrer" : undefined} className="relative block overflow-hidden bg-zinc-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image} alt="" className="block h-auto w-full" />
+                      <span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span>
+                    </Link>
+                  ) : (
+                    <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
+                  )}
+                  <div className="p-3">
+                    <p className="text-[11px] font-semibold uppercase text-zinc-400">{idea.source_name || idea.platform}</p>
+                    <h2 className="mt-1.5 text-[17px] font-extrabold leading-[1.15] text-zinc-900">{idea.title}</h2>
+                    {idea.summary ? <p className="mt-2 text-xs leading-[1.45] text-zinc-600">{idea.summary}</p> : null}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">{idea.tags.map((tag) => <span key={tag} className="rounded-full bg-zinc-100 px-2 py-1 text-[11px] text-zinc-500">{tag}</span>)}</div>
+                    {idea.source_url ? <Link href={idea.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-zinc-700 hover:underline">查看原文 <ExternalLink className="h-3 w-3" /></Link> : null}
+                    <div className="mt-3 grid grid-cols-3 gap-1.5">
+                      <button type="button" disabled={pendingId === idea.id} onClick={() => void act(idea, "save")} className={`flex min-h-8 items-center justify-center gap-1 rounded-lg border text-xs font-semibold ${idea.saved ? "border-zinc-950 bg-zinc-950 text-white" : "border-zinc-200 text-zinc-700"}`}><Bookmark className="h-3.5 w-3.5" />{idea.saved ? "已收藏" : "收藏"}</button>
+                      <button type="button" disabled={pendingId === idea.id} onClick={() => void act(idea, "dismiss")} className="flex min-h-8 items-center justify-center gap-1 rounded-lg border border-zinc-200 text-xs font-semibold text-zinc-500 hover:border-red-500 hover:text-red-600"><ThumbsDown className="h-3.5 w-3.5" />不合適</button>
+                      <button type="button" disabled={pendingId === idea.id} onClick={() => void act(idea, "create")} className="flex min-h-8 items-center justify-center gap-1 rounded-lg bg-zinc-950 text-xs font-semibold text-white"><Video className="h-3.5 w-3.5" />想拍</button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-zinc-300 py-16 text-center"><strong className="block text-sm">暫時未有相符題材</strong><span className="mt-2 block text-sm text-zinc-500">可以清除搜尋或切換分類。</span>{ideas.length ? <button type="button" onClick={() => { setQuery(""); setCategory("全部"); }} className="mt-4 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white">查看全部</button> : null}</div>
+        )}
       </section>
-      {filtered.length ? <section className="columns-1 gap-4 md:columns-2 xl:columns-3">{filtered.map((idea) => <article key={idea.id} className="mb-4 break-inside-avoid overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><div className="flex items-center justify-between gap-3 text-xs text-zinc-500"><span>{idea.platform} · {idea.category}</span><Sparkles className="h-4 w-4 text-amber-600" /></div><h2 className="mt-5 text-xl font-black leading-snug text-zinc-950">{idea.title}</h2></div>
-        <div className="space-y-4 p-5">{idea.summary ? <p className="text-sm leading-6 text-zinc-600">{idea.summary}</p> : null}<div className="flex flex-wrap gap-1.5">{idea.tags.map((tag) => <span key={tag} className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs text-zinc-500">{tag}</span>)}</div>{idea.source_url ? <Link href={idea.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-600 underline underline-offset-4">{idea.source_name || "查看原文"}<ExternalLink className="h-3 w-3" /></Link> : null}<div className="grid grid-cols-3 gap-2 border-t border-zinc-100 pt-4"><button type="button" disabled={pending} onClick={() => void act(idea, "save")} className={`flex items-center justify-center gap-1 rounded-xl border px-2 py-2 text-xs font-semibold ${idea.saved ? "border-amber-300 bg-amber-50 text-amber-800" : "border-zinc-200 text-zinc-600"}`}><Bookmark className="h-3.5 w-3.5" />{idea.saved ? "已收藏" : "收藏"}</button><button type="button" disabled={pending} onClick={() => void act(idea, "dismiss")} className="flex items-center justify-center gap-1 rounded-xl border border-zinc-200 px-2 py-2 text-xs font-semibold text-zinc-500"><ThumbsDown className="h-3.5 w-3.5" />不合適</button><button type="button" disabled={pending} onClick={() => void act(idea, "create")} className="flex items-center justify-center gap-1 rounded-xl bg-zinc-950 px-2 py-2 text-xs font-semibold text-white"><Video className="h-3.5 w-3.5" />想拍</button></div></div>
-      </article>)}</section> : <div className="rounded-2xl border border-dashed border-zinc-300 py-20 text-center text-sm text-zinc-500">暫時未有符合條件嘅題材，稍後再刷新。</div>}
-      {showImport ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-black text-zinc-950">加入新題材</h2><p className="mt-1 text-sm text-zinc-500">貼上原文連結，AI 只會根據可讀內容同你提供嘅補充資料整理。</p></div><button type="button" onClick={() => setShowImport(false)} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-100" aria-label="關閉"><X className="h-5 w-5" /></button></div><div className="mt-5 space-y-4"><label className="block text-sm font-semibold text-zinc-800">原文連結<input type="url" value={sourceUrl} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://www.instagram.com/..." className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-3 font-normal outline-none focus:border-amber-400" /></label><label className="block text-sm font-semibold text-zinc-800">補充資料 <span className="font-normal text-zinc-400">（Instagram 無法讀取時必填）</span><textarea value={context} onChange={(event) => setContext(event.target.value)} rows={5} placeholder="貼上 caption、內容重點，或者你想點拍…" className="mt-2 w-full resize-none rounded-xl border border-zinc-200 px-3 py-3 font-normal outline-none focus:border-amber-400" /></label>{importError ? <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{importError}</p> : null}<button type="button" disabled={pending || !sourceUrl.trim()} onClick={() => void importIdea()} className="w-full rounded-xl bg-zinc-950 py-3 text-sm font-semibold text-white disabled:opacity-40">{pending ? "AI 整理中…" : "整理並加入題材庫"}</button></div></div></div> : null}
     </main>
   );
 }

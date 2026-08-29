@@ -220,6 +220,90 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === "save_partner") {
+    const brandName = clean(body.brandName, 120);
+    if (!brandName)
+      return NextResponse.json({ error: "請填寫品牌名稱" }, { status: 400 });
+    const values = {
+      creator_id: context.workspaceId,
+      brand_name: brandName,
+      brand_logo_url: clean(body.logoUrl, 1000) || null,
+    };
+    const id = clean(body.id, 80);
+    const result = id
+      ? await context.admin
+          .from("egg_brand_partners")
+          .update(values)
+          .eq("id", id)
+          .eq("creator_id", context.workspaceId)
+          .select("id")
+          .maybeSingle()
+      : await context.admin
+          .from("egg_brand_partners")
+          .insert({ ...values, sort_order: 999 })
+          .select("id")
+          .single();
+    if (result.error || !result.data)
+      return databaseError("儲存品牌合作", result.error);
+    return NextResponse.json({ success: true, id: result.data.id });
+  }
+
+  if (action === "delete_partner") {
+    const { data, error } = await context.admin
+      .from("egg_brand_partners")
+      .delete()
+      .eq("id", clean(body.id, 80))
+      .eq("creator_id", context.workspaceId)
+      .select("id")
+      .maybeSingle();
+    if (error || !data) return databaseError("刪除品牌合作", error);
+    return NextResponse.json({ success: true });
+  }
+
+  if (action === "save_case") {
+    const title = clean(body.title, 160);
+    if (!title)
+      return NextResponse.json({ error: "請填寫案例名稱" }, { status: 400 });
+    const values = {
+      creator_id: context.workspaceId,
+      title,
+      brand_name: clean(body.brandName, 120) || null,
+      description: clean(body.description, 1500) || null,
+      result: clean(body.result, 500) || null,
+      image_url: clean(body.imageUrl, 1000) || null,
+      link_url: clean(body.linkUrl, 1000) || null,
+    };
+    const id = clean(body.id, 80);
+    const result = id
+      ? await context.admin
+          .from("egg_case_studies")
+          .update(values)
+          .eq("id", id)
+          .eq("creator_id", context.workspaceId)
+          .select("id")
+          .maybeSingle()
+      : await context.admin
+          .from("egg_case_studies")
+          .insert({ ...values, sort_order: 999 })
+          .select("id")
+          .single();
+    if (result.error || !result.data)
+      return databaseError("儲存合作案例", result.error);
+    return NextResponse.json({ success: true, id: result.data.id });
+  }
+
+  if (action === "delete_case") {
+    const { data, error } = await context.admin
+      .from("egg_case_studies")
+      .delete()
+      .eq("id", clean(body.id, 80))
+      .eq("creator_id", context.workspaceId)
+      .select("id")
+      .maybeSingle();
+    if (error || !data) return databaseError("刪除合作案例", error);
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "toggle_featured") {
     const id = clean(body.id, 80);
     const featured = body.featured === true;

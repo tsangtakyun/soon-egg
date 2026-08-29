@@ -101,7 +101,7 @@ async function listLocalTopics(workspaceId: string) {
   const admin = createEggAdmin();
   const { data, error } = await admin.from("egg_topic_ideas")
     .select("id,title,summary,source_name,source_url,image_url,platform,category,tags,content_format,workspace_id,created_at")
-    .eq("status", "published").or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`).order("created_at", { ascending: false });
+    .eq("status", "published").eq("workspace_id", workspaceId).order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as TopicIdea[];
 }

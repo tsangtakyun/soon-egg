@@ -6,15 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Bookmark, ExternalLink, Search, ThumbsDown, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
 
-const SEEDED_IMAGES: Record<string, string> = {
-  "阿姆斯特丹「社區警貓」有新搭檔": "/topic-library/police-cat-amsterdam.jpg",
-  "睡不着不是不夠累：睡前先讓身體慢慢關機": "/topic-library/sleep-wind-down.jpg",
-  "每年春天都會消失的瑞典 ICEHOTEL": "/topic-library/sweden-icehotel.jpg",
-  "食物跌落地，三秒內執起真的可以吃嗎？": "/topic-library/three-second-rule.jpg",
-};
-
 function topicImage(idea: TopicIdea) {
-  return idea.image_url || SEEDED_IMAGES[idea.title] || null;
+  return idea.image_url || null;
 }
 
 export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[] }) {

@@ -4,16 +4,32 @@ import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { masterSupabase } from "@/lib/supabase/master";
 import { getOrCreateKolWorkspace } from "@/lib/workspace";
+import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 
 const model = "claude-sonnet-4-20250514";
 
 export async function POST(req: Request) {
   const serverSupabase = await createServerClient();
-  if (!serverSupabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const bearer = req.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  let user = serverSupabase ? (await serverSupabase.auth.getUser()).data.user : null;
 
-  const {
-    data: { user },
-  } = await serverSupabase.auth.getUser();
+  if (!user && bearer) {
+    const admin = createEggAdmin();
+    user = (await admin.auth.getUser(bearer)).data.user;
+    if (user) {
+      await acceptPendingWorkspaceInvitations(admin, user.id, user.email);
+      const workspaceId = req.headers.get("x-egg-workspace-id");
+      if (workspaceId) {
+        const { data: membership } = await admin
+          .from("egg_creator_workspace_members")
+          .select("workspace_id")
+          .eq("workspace_id", workspaceId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (!membership) return NextResponse.json({ error: "你沒有此工作空間的權限" }, { status: 403 });
+      }
+    }
+  }
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const result = await deductCredits({

@@ -63,15 +63,24 @@ export async function GET(request: Request) {
       available: !data || data.id === ctx.workspaceId,
     });
   }
-  const { data: profile, error } = await ctx.admin
-    .from("egg_creator_profiles")
-    .select(fields)
-    .eq("id", ctx.workspaceId)
-    .maybeSingle();
+  const [{ data: profile, error }, { data: links }] = await Promise.all([
+    ctx.admin
+      .from("egg_creator_profiles")
+      .select(fields)
+      .eq("id", ctx.workspaceId)
+      .maybeSingle(),
+    ctx.admin
+      .from("egg_profile_blocks")
+      .select("id,title,url,is_visible,sort_order")
+      .eq("creator_id", ctx.workspaceId)
+      .eq("block_type", "link")
+      .order("sort_order"),
+  ]);
   if (error || !profile)
     return NextResponse.json({ error: "未能讀取設定" }, { status: 500 });
   return NextResponse.json({
     profile,
+    links: links ?? [],
     email: ctx.user.email ?? null,
     role: ctx.role,
     canEdit: canEditWorkspace(ctx.role),
@@ -91,6 +100,58 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   const body = await request.json().catch(() => ({}));
+  if (body.action === "save_link") {
+    const title =
+      typeof body.title === "string" ? body.title.trim().slice(0, 80) : "";
+    const url = cleanUrl(body.url);
+    if (!title || !url)
+      return NextResponse.json(
+        { error: "請輸入有效標題及網址" },
+        { status: 400 },
+      );
+    if (typeof body.id === "string") {
+      const { error } = await ctx.admin
+        .from("egg_profile_blocks")
+        .update({ title, url, is_visible: body.is_visible !== false })
+        .eq("id", body.id)
+        .eq("creator_id", ctx.workspaceId);
+      return error
+        ? NextResponse.json({ error: "未能更新連結" }, { status: 500 })
+        : NextResponse.json({ success: true });
+    }
+    const { data: last } = await ctx.admin
+      .from("egg_profile_blocks")
+      .select("sort_order")
+      .eq("creator_id", ctx.workspaceId)
+      .order("sort_order", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { error } = await ctx.admin
+      .from("egg_profile_blocks")
+      .insert({
+        creator_id: ctx.workspaceId,
+        title,
+        url,
+        block_type: "link",
+        is_visible: body.is_visible !== false,
+        sort_order: (last?.sort_order ?? 0) + 1,
+        click_count: 0,
+      });
+    return error
+      ? NextResponse.json({ error: "未能新增連結" }, { status: 500 })
+      : NextResponse.json({ success: true });
+  }
+  if (body.action === "delete_link" && typeof body.id === "string") {
+    const { error } = await ctx.admin
+      .from("egg_profile_blocks")
+      .delete()
+      .eq("id", body.id)
+      .eq("creator_id", ctx.workspaceId)
+      .eq("block_type", "link");
+    return error
+      ? NextResponse.json({ error: "未能刪除連結" }, { status: 500 })
+      : NextResponse.json({ success: true });
+  }
   const username = normalizeProfileUsername(
     typeof body.username === "string" ? body.username : "",
   );
@@ -143,4 +204,16 @@ export async function POST(request: Request) {
   if (error)
     return NextResponse.json({ error: "未能儲存設定" }, { status: 500 });
   return NextResponse.json({ success: true });
+}
+
+function cleanUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = new URL(value.trim());
+    return ["https:", "http:"].includes(parsed.protocol)
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
+  }
 }

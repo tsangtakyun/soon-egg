@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type ActiveTab = "campaigns" | "invitations" | "completed";
+type ActiveTab = "campaigns" | "invitations" | "mine" | "completed";
 
 type Profile = {
   id: string;
@@ -40,6 +40,7 @@ type CampaignApplication = {
   brand_name: string | null;
   cover_image_url: string | null;
   status: string;
+  applied_at?: string | null;
 };
 
 type BrandInvitation = {
@@ -665,9 +666,13 @@ export default function BrandDealsPage() {
   const completedApplications = applications.filter(
     (application) => application.status === "completed",
   );
+  const activeApplications = applications.filter(
+    (application) => !["completed", "declined"].includes(application.status),
+  );
   const tabs: { id: ActiveTab; label: string }[] = [
     { id: "campaigns", label: "合作機會" },
     { id: "invitations", label: "品牌邀請" },
+    { id: "mine", label: "我的合作" },
     { id: "completed", label: "已合作品牌" },
   ];
 
@@ -732,6 +737,21 @@ export default function BrandDealsPage() {
             ))}
           </div>
         ))}
+      {activeTab === "mine" &&
+        (loadingProfile ? (
+          <Loading />
+        ) : activeApplications.length === 0 ? (
+          <Empty text="未有進行中合作；申請公開 Campaign 或接受品牌邀請後會顯示喺呢度。" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {activeApplications.map((application) => (
+              <ApplicationProgressCard
+                key={application.id}
+                application={application}
+              />
+            ))}
+          </div>
+        ))}
       {activeTab === "completed" &&
         (loadingProfile ? (
           <Loading />
@@ -767,6 +787,40 @@ export default function BrandDealsPage() {
           </div>
         ))}
     </div>
+  );
+}
+
+function ApplicationProgressCard({
+  application,
+}: {
+  application: CampaignApplication;
+}) {
+  const steps = ["applied", "accepted", "in_progress", "completed"];
+  const current = Math.max(0, steps.indexOf(application.status));
+  const labels = ["已申請", "已接受", "進行中", "已完成"];
+  return (
+    <article className="rounded-xl border border-zinc-200 bg-white p-5">
+      <p className="text-xs text-zinc-400">
+        {application.brand_name || "SOON Creator Network"}
+      </p>
+      <h3 className="mt-1 text-sm font-semibold text-zinc-950">
+        {application.campaign_name || "品牌合作"}
+      </h3>
+      <div className="mt-5 grid grid-cols-4 gap-1">
+        {labels.map((label, index) => (
+          <div key={label} className="text-center">
+            <div
+              className={`mx-auto h-2.5 w-2.5 rounded-full ${index <= current ? "bg-zinc-950" : "bg-zinc-200"}`}
+            />
+            <p
+              className={`mt-2 text-[11px] ${index <= current ? "font-medium text-zinc-800" : "text-zinc-300"}`}
+            >
+              {label}
+            </p>
+          </div>
+        ))}
+      </div>
+    </article>
   );
 }
 

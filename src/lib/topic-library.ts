@@ -108,14 +108,15 @@ async function listLocalTopics(workspaceId: string) {
 
 export async function listTopicIdeas(workspaceId: string, preferredCategories?: string[]) {
   const admin = createEggAdmin();
-  let ideas: TopicIdea[];
+  let centralIdeas: TopicIdea[] = [];
   try {
-    ideas = await fetchCentralTopics();
-    await syncCentralTopicShadows(ideas);
+    centralIdeas = await fetchCentralTopics();
+    await syncCentralTopicShadows(centralIdeas);
   } catch (error) {
     console.error("Central topic feed unavailable; using Egg fallback", error);
-    ideas = await listLocalTopics(workspaceId);
   }
+  const localIdeas = await listLocalTopics(workspaceId);
+  const ideas = [...localIdeas, ...centralIdeas.filter((central) => !localIdeas.some((local) => local.id === central.id))];
 
   let preferences = preferredCategories;
   if (!preferences) {

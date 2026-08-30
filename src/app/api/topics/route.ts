@@ -3,6 +3,42 @@ import { createClient } from "@/lib/supabase/server";
 import { canEditWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { listTopicIdeas } from "@/lib/topic-library";
+import { removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
+
+export async function DELETE(request: Request) {
+  const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
+  if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (activeWorkspace.role !== "owner") return NextResponse.json({ error: "只有擁有者可以刪除題材" }, { status: 403 });
+  const ideaId = new URL(request.url).searchParams.get("ideaId") ?? "";
+  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).maybeSingle();
+  if (!idea) return NextResponse.json({ error: "找不到可刪除題材" }, { status: 404 });
+  const { error } = await admin.from("egg_topic_ideas").delete().eq("id", idea.id).eq("workspace_id", activeWorkspace.id);
+  if (error) return NextResponse.json({ error: "未能刪除題材" }, { status: 500 });
+  await removeTopicMedia(admin, [idea.image_url, ...(idea.media_urls ?? [])]);
+  return NextResponse.json({ success: true });
+}
+
+export async function PATCH(request: Request) {
+  const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
+  if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (activeWorkspace.role !== "owner") return NextResponse.json({ error: "只有擁有者可以更換封面" }, { status: 403 });
+  const form = await request.formData();
+  const ideaId = String(form.get("ideaId") ?? "");
+  const cover = form.get("cover");
+  if (!(cover instanceof File)) return NextResponse.json({ error: "請選擇封面圖片" }, { status: 400 });
+  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).maybeSingle();
+  if (!idea) return NextResponse.json({ error: "找不到可修改題材" }, { status: 404 });
+  try {
+    const imageUrl = await uploadTopicImage(admin, activeWorkspace.id, cover);
+    const mediaUrls = [imageUrl, ...(idea.media_urls ?? []).filter((url: string) => url !== imageUrl)];
+    const { error } = await admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
+    if (error) throw error;
+    return NextResponse.json({ success: true, imageUrl, mediaUrls });
+  } catch (error) {
+    console.error("Topic cover update failed", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "未能更換封面" }, { status: 500 });
+  }
+}
 
 export async function GET() {
   const { user, activeWorkspace } = await getCreatorWorkspaceContext();

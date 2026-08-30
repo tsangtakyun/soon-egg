@@ -7,6 +7,7 @@ const DEFAULT_TOPIC_API = "https://soon-core.vercel.app/api/topics";
 export type TopicIdea = {
   id: string; title: string; summary: string | null; source_name: string | null; source_url: string | null;
   image_url: string | null; platform: string; category: string; tags: string[]; content_format: string;
+  media_urls?: string[];
   workspace_id: string | null; created_at: string; saved: boolean; want_to_create: boolean;
   why_now?: string; hook?: string; suggested_angles?: string[]; countries?: string[]; regions?: string[];
   localities?: string[]; directions?: string[]; recommended?: boolean;
@@ -110,7 +111,7 @@ async function syncCentralTopicShadows(topics: TopicIdea[]) {
 async function listLocalTopics(workspaceId: string) {
   const admin = createEggAdmin();
   const { data, error } = await admin.from("egg_topic_ideas")
-    .select("id,title,summary,source_name,source_url,image_url,platform,category,tags,content_format,workspace_id,created_at")
+    .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_at")
     .eq("status", "published").eq("workspace_id", workspaceId).order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as TopicIdea[];

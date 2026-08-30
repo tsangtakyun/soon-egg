@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createEggAdmin } from "@/lib/creator-workspace";
 import { getTopicMembership, listTopicIdeas } from "@/lib/topic-library";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
+import { removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
 
 function bearerToken(request: Request) {
   const value = request.headers.get("authorization") ?? "";
@@ -29,10 +30,101 @@ export async function GET(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  const auth = await context(request);
+  if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  try {
+    const form = await request.formData();
+    const file = form.get("file");
+    if (!(file instanceof File)) return NextResponse.json({ error: "未有收到圖片" }, { status: 400 });
+    return NextResponse.json({ success: true, imageUrl: await uploadTopicImage(auth.admin, auth.workspaceId, file) });
+  } catch (error) {
+    console.error("Mobile topic image upload failed", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "未能上載圖片" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const auth = await context(request);
+  if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (auth.role !== "owner") return NextResponse.json({ error: "只有擁有者可以刪除題材" }, { status: 403 });
+  const ideaId = new URL(request.url).searchParams.get("ideaId") ?? "";
+  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).maybeSingle();
+  if (!idea) return NextResponse.json({ error: "找不到可刪除題材" }, { status: 404 });
+  const { error } = await auth.admin.from("egg_topic_ideas").delete().eq("id", idea.id).eq("workspace_id", auth.workspaceId);
+  if (error) return NextResponse.json({ error: "未能刪除題材" }, { status: 500 });
+  await removeTopicMedia(auth.admin, [idea.image_url, ...(idea.media_urls ?? [])]);
+  return NextResponse.json({ success: true });
+}
+
+export async function PATCH(request: Request) {
+  const auth = await context(request);
+  if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (auth.role !== "owner") return NextResponse.json({ error: "只有擁有者可以更換封面" }, { status: 403 });
+  const body = await request.json().catch(() => ({}));
+  const ideaId = typeof body.ideaId === "string" ? body.ideaId : "";
+  const imageUrl = typeof body.imageUrl === "string" && body.imageUrl.startsWith("https://") ? body.imageUrl : "";
+  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).maybeSingle();
+  const ownedUploadMarker = `/storage/v1/object/public/egg-topic-media/${auth.workspaceId}/`;
+  if (!idea || !imageUrl || (!(idea.media_urls ?? []).includes(imageUrl) && !imageUrl.includes(ownedUploadMarker))) return NextResponse.json({ error: "封面圖片無效" }, { status: 400 });
+  const mediaUrls = [imageUrl, ...(idea.media_urls ?? []).filter((url: string) => url !== imageUrl)];
+  const { error } = await auth.admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
+  if (error) return NextResponse.json({ error: "未能更換封面" }, { status: 500 });
+  return NextResponse.json({ success: true, imageUrl });
+}
+
 export async function POST(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
+  if (body.mode === "import-media") {
+    const mediaUrls: string[] = Array.isArray(body.mediaUrls) ? body.mediaUrls.filter((value: unknown): value is string => typeof value === "string" && value.startsWith("https://")).slice(0, 20) : [];
+    if (!mediaUrls.length) return NextResponse.json({ error: "未有收到圖片" }, { status: 400 });
+    const contextText = typeof body.context === "string" ? body.context.trim().slice(0, 4000) : "";
+    const fallback = {
+      title: mediaUrls.length > 1 ? "相簿分享題材" : "圖片分享題材",
+      summary: contextText || `已從電話相簿儲存${mediaUrls.length}張圖片，可整理成拍攝靈感。`,
+      category: "其他",
+      tags: ["圖片靈感", mediaUrls.length > 1 ? "carousel" : "單圖"],
+      content_format: mediaUrls.length > 1 ? "carousel" : "single_image",
+    };
+    let enriched = fallback;
+    const anthropic = getAnthropic();
+    if (anthropic) {
+      try {
+        const images = await Promise.all(mediaUrls.slice(0, 6).map(async (url) => {
+          const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+          const contentType = response.headers.get("content-type")?.split(";")[0] ?? "image/jpeg";
+          const allowedType = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(contentType) ? contentType : "image/jpeg";
+          return { type: "image" as const, source: { type: "base64" as const, media_type: allowedType as "image/jpeg", data: Buffer.from(await response.arrayBuffer()).toString("base64") } };
+        }));
+        const message = await anthropic.messages.create({
+          model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+          max_tokens: 700,
+          messages: [{ role: "user", content: [...images, { type: "text" as const, text: `根據圖片可見內容整理一張繁體中文題材卡。多張圖片屬同一個 carousel，禁止拆散，禁止補作圖片沒有的事實。補充文字：${contextText || "沒有"}\n只輸出 JSON：{"title":"標題","summary":"80至140字內容方向","category":"分類","tags":["最多4個"],"content_format":"carousel或single_image"}` }] }],
+        });
+        const text = message.content.find((item) => item.type === "text")?.text ?? "";
+        enriched = parseJsonFromText(text, fallback);
+      } catch (error) { console.warn("Shared photo topic AI analysis failed", error instanceof Error ? error.message : error); }
+    }
+    const { data: idea, error } = await auth.admin.from("egg_topic_ideas").insert({
+      workspace_id: auth.workspaceId,
+      title: enriched.title?.trim().slice(0, 220) || fallback.title,
+      summary: enriched.summary?.trim().slice(0, 2000) || fallback.summary,
+      source_name: "電話相簿",
+      source_url: null,
+      image_url: mediaUrls[0],
+      media_urls: mediaUrls,
+      platform: "相簿",
+      category: enriched.category?.trim().slice(0, 80) || "其他",
+      tags: Array.isArray(enriched.tags) ? enriched.tags.slice(0, 4) : fallback.tags,
+      content_format: mediaUrls.length > 1 ? "carousel" : "single_image",
+      status: "published",
+      created_by: auth.user.id,
+    }).select("id").single();
+    if (error) { console.error("Shared photo topic save failed", error.message); return NextResponse.json({ error: "未能儲存相簿題材" }, { status: 500 }); }
+    return NextResponse.json({ success: true, ideaId: idea.id, existing: false });
+  }
   if (body.mode === "import") {
     const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
     const contextText = typeof body.context === "string" ? body.context.trim().slice(0, 4000) : "";

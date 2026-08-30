@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Bookmark, ExternalLink, Search, ThumbsDown, Video } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bookmark, ExternalLink, ImagePlus, Search, ThumbsDown, Trash2, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
 
 function topicImage(idea: TopicIdea) {
   return idea.image_url || null;
 }
 
-export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[] }) {
+export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: TopicIdea[]; isOwner: boolean }) {
   const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
   const [query, setQuery] = useState("");
@@ -18,6 +18,8 @@ export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[]
   const [location, setLocation] = useState("全部地區");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [masonryColumnCount, setMasonryColumnCount] = useState(4);
+  const coverInput = useRef<HTMLInputElement>(null);
+  const [coverIdeaId, setCoverIdeaId] = useState<string | null>(null);
 
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
   const locations = useMemo(() => ["全部地區", ...Array.from(new Set(ideas.flatMap((idea) => [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])])))], [ideas]);
@@ -70,6 +72,33 @@ export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[]
     }
   }
 
+  async function removeIdea(idea: TopicIdea) {
+    if (!window.confirm(`刪除「${idea.title}」？此操作無法復原。`)) return;
+    setPendingId(idea.id);
+    try {
+      const response = await fetch(`/api/topics?ideaId=${encodeURIComponent(idea.id)}`, { method: "DELETE" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "未能刪除題材");
+      setIdeas((current) => current.filter((item) => item.id !== idea.id));
+    } catch (error) { window.alert(error instanceof Error ? error.message : "未能刪除題材"); }
+    finally { setPendingId(null); }
+  }
+
+  async function replaceCover(file: File) {
+    if (!coverIdeaId) return;
+    setPendingId(coverIdeaId);
+    try {
+      const form = new FormData();
+      form.set("ideaId", coverIdeaId);
+      form.set("cover", file);
+      const response = await fetch("/api/topics", { method: "PATCH", body: form });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "未能更換封面");
+      setIdeas((current) => current.map((item) => item.id === coverIdeaId ? { ...item, image_url: result.imageUrl } : item));
+    } catch (error) { window.alert(error instanceof Error ? error.message : "未能更換封面"); }
+    finally { setPendingId(null); setCoverIdeaId(null); if (coverInput.current) coverInput.current.value = ""; }
+  }
+
   return (
     <main className="min-h-screen bg-white text-zinc-900">
       <header className="flex min-h-16 flex-col gap-4 border-b border-zinc-200 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
@@ -80,6 +109,7 @@ export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[]
       </header>
 
       <section className="px-3 pb-10 pt-5 sm:px-5 lg:px-6">
+        <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replaceCover(file); }} />
         <div className="sticky top-0 z-10 bg-white/95 pb-4 backdrop-blur">
           <label className="relative block">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
@@ -107,11 +137,16 @@ export function TopicLibraryClient({ initialIdeas }: { initialIdeas: TopicIdea[]
                       <img src={image} alt="" className="block h-auto w-full" />
                       <span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span>
                       {idea.recommended ? <span className="absolute right-2.5 top-2.5 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-bold text-zinc-950">為你推薦</span> : null}
+                      {idea.media_urls && idea.media_urls.length > 1 ? <span className="absolute bottom-2.5 right-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-bold text-white">1/{idea.media_urls.length}</span> : null}
                     </div>
                   ) : (
                     <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
                   )}
-                  <div className="p-3">
+                    <div className="p-3">
+                    {isOwner && idea.workspace_id ? <div className="mb-2 flex justify-end gap-1.5">
+                      <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button>
+                      <button type="button" disabled={pendingId !== null} onClick={() => void removeIdea(idea)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />刪除</button>
+                    </div> : null}
                     <p className="text-[11px] font-semibold uppercase text-zinc-400">{idea.source_name || idea.platform}</p>
                     <h2 className="mt-1.5 text-[17px] font-extrabold leading-[1.15] text-zinc-900">{idea.title}</h2>
                     {idea.summary ? <p className="mt-2 text-xs leading-[1.45] text-zinc-600">{idea.summary}</p> : null}

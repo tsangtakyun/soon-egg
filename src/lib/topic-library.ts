@@ -78,12 +78,22 @@ function mapCentralTopic(topic: CentralTopic): TopicIdea {
 async function fetchCentralTopics() {
   const endpoint = process.env.SOON_TOPIC_API_URL?.trim() || DEFAULT_TOPIC_API;
   const response = await fetch(`${endpoint}?language=zh-HK&limit=60`, {
-    headers: { accept: "application/json" }, next: { revalidate: 60 }, signal: AbortSignal.timeout(8_000),
+    headers: { accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`SOON Topic API ${response.status}`);
   const payload = await response.json() as { topics?: CentralTopic[] };
   if (!Array.isArray(payload.topics)) throw new Error("SOON Topic API response is invalid");
   return payload.topics.map(mapCentralTopic);
+}
+
+function hasUsableCover(topic: TopicIdea) {
+  if (!topic.image_url) return false;
+  try {
+    const url = new URL(topic.image_url);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 async function syncCentralTopicShadows(topics: TopicIdea[]) {
@@ -116,7 +126,8 @@ export async function listTopicIdeas(workspaceId: string, preferredCategories?: 
     console.error("Central topic feed unavailable; using Egg fallback", error);
   }
   const localIdeas = await listLocalTopics(workspaceId);
-  const ideas = [...localIdeas, ...centralIdeas.filter((central) => !localIdeas.some((local) => local.id === central.id))];
+  const ideas = [...localIdeas, ...centralIdeas.filter((central) => !localIdeas.some((local) => local.id === central.id))]
+    .filter(hasUsableCover);
 
   let preferences = preferredCategories;
   if (!preferences) {

@@ -3,11 +3,40 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bookmark, ExternalLink, ImagePlus, Search, ThumbsDown, Trash2, Video } from "lucide-react";
+import { Bookmark, ChevronLeft, ChevronRight, ExternalLink, ImagePlus, Search, ThumbsDown, Trash2, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
 
-function topicImage(idea: TopicIdea) {
-  return idea.image_url || null;
+function topicMedia(idea: TopicIdea) {
+  return Array.from(new Set([...(idea.media_urls ?? []), idea.image_url].filter((url): url is string => Boolean(url))));
+}
+
+function TopicMedia({ idea }: { idea: TopicIdea }) {
+  const media = topicMedia(idea);
+  const [index, setIndex] = useState(0);
+  const hasMultiple = media.length > 1;
+
+  if (!media.length) return null;
+
+  function move(direction: -1 | 1) {
+    setIndex((current) => (current + direction + media.length) % media.length);
+  }
+
+  return (
+    <div className="group relative block overflow-hidden bg-zinc-100">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={media[index]} alt={`${idea.title}－第 ${index + 1} 張圖片`} className="block h-auto w-full" />
+      <span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span>
+      {idea.recommended ? <span className="absolute right-2.5 top-2.5 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-bold text-zinc-950">為你推薦</span> : null}
+      {hasMultiple ? <>
+        <button type="button" onClick={() => move(-1)} aria-label={`查看「${idea.title}」上一張圖片`} className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-950 shadow-md transition hover:scale-105 hover:bg-white"><ChevronLeft className="h-5 w-5" /></button>
+        <button type="button" onClick={() => move(1)} aria-label={`查看「${idea.title}」下一張圖片`} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-zinc-950 shadow-md transition hover:scale-105 hover:bg-white"><ChevronRight className="h-5 w-5" /></button>
+        <span className="absolute bottom-2.5 right-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-bold text-white">{index + 1}/{media.length}</span>
+        <div className="absolute bottom-3 left-1/2 flex max-w-[55%] -translate-x-1/2 gap-1 overflow-hidden rounded-full bg-zinc-950/45 px-2 py-1.5" aria-hidden>
+          {media.slice(0, 10).map((url, dotIndex) => <span key={`${url}-${dotIndex}`} className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotIndex === index ? "bg-white" : "bg-white/45"}`} />)}
+        </div>
+      </> : null}
+    </div>
+  );
 }
 
 export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: TopicIdea[]; isOwner: boolean }) {
@@ -128,17 +157,11 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
             {masonryColumns.map((column, columnIndex) => (
               <div key={`topic-column-${columnIndex}`} className="flex min-w-0 flex-col gap-[18px]">
               {column.map((idea) => {
-              const image = topicImage(idea);
+              const media = topicMedia(idea);
               return (
                 <article key={idea.id} className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-xl">
-                  {image ? (
-                    <div className="relative block overflow-hidden bg-zinc-100">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image} alt="" className="block h-auto w-full" />
-                      <span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span>
-                      {idea.recommended ? <span className="absolute right-2.5 top-2.5 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-bold text-zinc-950">為你推薦</span> : null}
-                      {idea.media_urls && idea.media_urls.length > 1 ? <span className="absolute bottom-2.5 right-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-bold text-white">1/{idea.media_urls.length}</span> : null}
-                    </div>
+                  {media.length ? (
+                    <TopicMedia idea={idea} />
                   ) : (
                     <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
                   )}

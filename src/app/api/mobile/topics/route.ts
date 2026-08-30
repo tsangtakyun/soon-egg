@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createEggAdmin } from "@/lib/creator-workspace";
 import { getTopicMembership, listTopicIdeas } from "@/lib/topic-library";
+import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 
 function bearerToken(request: Request) {
   const value = request.headers.get("authorization") ?? "";
@@ -35,7 +36,6 @@ export async function POST(request: Request) {
   if (body.mode === "import") {
     const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
     const contextText = typeof body.context === "string" ? body.context.trim().slice(0, 4000) : "";
-    const requestedCategory = typeof body.category === "string" ? body.category.trim().slice(0, 80) : "";
     const requestedImage = typeof body.imageUrl === "string" ? body.imageUrl.trim().slice(0, 1500) : "";
     let parsedUrl: URL;
     try { parsedUrl = new URL(sourceUrl); } catch { return NextResponse.json({ error: "分享內容未包含有效連結" }, { status: 400 }); }
@@ -59,19 +59,42 @@ export async function POST(request: Request) {
     } catch (error) { console.warn("Mobile shared topic metadata unavailable", hostname, error instanceof Error ? error.message : error); }
 
     const platform = platformName(hostname);
-    const title = (pageTitle || `${platform} 分享題材`).slice(0, 220);
-    const summary = (contextText || pageDescription || "已由分享功能儲存，可稍後整理成拍攝方向。").slice(0, 2000);
+    const fallback = {
+      title: (pageTitle || `${platform} 分享題材`).slice(0, 220),
+      summary: (contextText || pageDescription || "已由分享功能儲存，可稍後整理成拍攝方向。").slice(0, 2000),
+      category: "其他",
+      tags: [platform.toLowerCase(), "分享收藏"],
+      content_format: "short_video",
+    };
+    let enriched = fallback;
+    const anthropic = getAnthropic();
+    if (anthropic && (pageTitle || pageDescription || contextText)) {
+      try {
+        const message = await anthropic.messages.create({
+          model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+          max_tokens: 700,
+          messages: [{
+            role: "user",
+            content: `只根據以下資料整理社交內容題材，禁止補作未提供事實。自動判斷最合適內容分類及地區關鍵字。輸出 JSON：{"title":"繁體中文標題","summary":"80至140字可拍角度","category":"分類","tags":["最多4個，地區可放入tag"],"content_format":"carousel或short_video或single_image"}\n來源：${hostname}\n網頁標題：${pageTitle}\n網頁描述：${pageDescription}\n用家補充：${contextText}`,
+          }],
+        });
+        const text = message.content.find((item) => item.type === "text")?.text ?? "";
+        enriched = parseJsonFromText(text, fallback);
+      } catch (error) {
+        console.warn("Mobile shared topic AI classification failed", error instanceof Error ? error.message : error);
+      }
+    }
     const { data: idea, error } = await auth.admin.from("egg_topic_ideas").insert({
       workspace_id: auth.workspaceId,
-      title,
-      summary,
+      title: enriched.title.trim().slice(0, 220),
+      summary: enriched.summary.trim().slice(0, 2000),
       source_name: hostname.replace(/^www\./, ""),
       source_url: parsedUrl.toString(),
       image_url: requestedImage.startsWith("https://") ? requestedImage : (pageImage.startsWith("https://") ? pageImage : null),
       platform,
-      category: requestedCategory || "私人收藏",
-      tags: [platform.toLowerCase(), "分享收藏"],
-      content_format: "short_video",
+      category: enriched.category?.trim().slice(0, 80) || "其他",
+      tags: Array.isArray(enriched.tags) ? enriched.tags.slice(0, 4) : fallback.tags,
+      content_format: ["carousel", "short_video", "single_image"].includes(enriched.content_format) ? enriched.content_format : "short_video",
       status: "published",
       created_by: auth.user.id,
     }).select("id").single();
@@ -100,7 +123,15 @@ function metaValue(html: string, name: string) {
 }
 
 function decodeHtml(value: string) {
-  return value.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+  return value
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#(\d+);?/g, (_, decimal: string) => String.fromCodePoint(Number.parseInt(decimal, 10)))
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+    .trim();
 }
 
 function platformName(hostname: string) {

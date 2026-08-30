@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
+import { EggLoader } from "@/components/ui/EggLoader";
 import { createClient } from "@/lib/supabase/client";
 import {
   ProductTypeIcon,
@@ -407,7 +408,7 @@ export default function ProductsPage() {
         <>
           {ordersLoading ? (
             <div className="py-12 text-center text-sm text-zinc-400">
-              載入中...
+              <EggLoader size="sm" label="正在載入訂單…" />
             </div>
           ) : orders.length === 0 ? (
             <div className="rounded-2xl border bg-white py-16 text-center">
@@ -437,7 +438,7 @@ export default function ProductsPage() {
           </div>
           {ordersLoading ? (
             <div className="py-12 text-center text-sm text-zinc-400">
-              載入中...
+              <EggLoader size="sm" label="正在載入訂單…" />
             </div>
           ) : (
             <>

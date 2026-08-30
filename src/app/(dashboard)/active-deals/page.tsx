@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { EggLoader } from "@/components/ui/EggLoader";
 import {
   BriefCard,
   type ProjectBrief,
@@ -143,7 +144,7 @@ export default function ActiveDealsPage() {
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+        <EggLoader label="正在載入我的合作…" />
       ) : !profile ||
         (briefs.length === 0 &&
           perkClaims.length === 0 &&

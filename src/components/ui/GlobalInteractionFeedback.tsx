@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -88,7 +89,7 @@ export function GlobalInteractionFeedback() {
   return (
     <div className={`global-interaction-feedback ${visible ? "is-visible" : ""}`} aria-live="polite" aria-hidden={!visible}>
       <div className="global-interaction-bar" />
-      <div className="global-interaction-pill"><span />{label}</div>
+      <div className="global-interaction-pill"><Image className="global-interaction-egg" src="/soon-egg.png" width={26} height={26} alt="" />{label}</div>
     </div>
   );
 }

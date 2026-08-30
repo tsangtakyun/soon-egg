@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EggLoader } from "@/components/ui/EggLoader";
 
 type ActiveTab = "campaigns" | "invitations" | "mine" | "completed";
 
@@ -825,9 +826,7 @@ function ApplicationProgressCard({
 }
 
 function Loading() {
-  return (
-    <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
-  );
+  return <EggLoader label="正在載入合作機會…" />;
 }
 
 function Empty({ text }: { text: string }) {

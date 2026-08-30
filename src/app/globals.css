@@ -108,8 +108,8 @@ button {
   width: 38%;
   height: 3px;
   border-radius: 0 999px 999px 0;
-  background: #111;
-  box-shadow: 0 0 12px rgb(0 0 0 / 25%);
+  background: #5c2a22;
+  box-shadow: 0 0 12px rgb(92 42 34 / 25%);
   animation: soon-loading-bar 1.15s ease-in-out infinite;
 }
 
@@ -120,15 +120,46 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgb(255 255 255 / 14%);
+  border: 1px solid #ead8cc;
   border-radius: 999px;
-  background: rgb(17 17 17 / 92%);
-  color: #fff;
+  background: rgb(251 244 238 / 97%);
+  color: #5c2a22;
   padding: 9px 13px;
   font-size: 12px;
   font-weight: 700;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+  box-shadow: 0 10px 30px rgb(92 42 34 / 16%);
   backdrop-filter: blur(10px);
+}
+
+.egg-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 2rem 1rem;
+  color: #786b67;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.egg-loader-full {
+  min-height: 70vh;
+  flex-direction: column;
+  background: #fbf4ee;
+}
+
+.egg-loader-logo,
+.global-interaction-egg {
+  flex: none;
+  animation: egg-brand-spin 1.35s linear infinite;
+}
+
+.global-interaction-egg {
+  margin-right: 0.15rem;
+}
+
+@keyframes egg-brand-spin {
+  to { transform: rotate(360deg); }
 }
 
 .global-interaction-pill span,
@@ -170,6 +201,8 @@ input[type="submit"].soon-interaction-pending::after {
 
 @media (prefers-reduced-motion: reduce) {
   .global-interaction-bar,
+  .egg-loader-logo,
+  .global-interaction-egg,
   .global-interaction-pill span,
   .soon-interaction-pending::after { animation-duration: 1.8s; }
 }

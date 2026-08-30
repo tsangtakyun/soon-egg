@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { EggLoader } from "@/components/ui/EggLoader";
 
 type PerkType = "service" | "product";
 type FilterType = "all" | PerkType;
@@ -97,7 +98,7 @@ export default function DiscoverBrandsPage() {
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-sm text-zinc-400">載入中...</div>
+        <EggLoader label="正在載入合作機會…" />
       ) : error ? (
         <div className="py-12 text-center text-sm text-red-500">{error}</div>
       ) : filteredPerks.length === 0 ? (

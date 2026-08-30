@@ -11,13 +11,36 @@ export async function uploadTopicImage(admin: SupabaseClient, workspaceId: strin
   if (file.size <= 0 || file.size > 15 * 1024 * 1024) throw new Error("每張圖片必須細過 15MB");
   const extension = extensionFor(file.type);
   const path = `${workspaceId}/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.${extension}`;
-  const { error } = await admin.storage.from(TOPIC_MEDIA_BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), {
-    contentType: file.type,
-    cacheControl: "31536000",
-    upsert: false,
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const { error } = await admin.storage.from(TOPIC_MEDIA_BUCKET).upload(path, bytes, {
+      contentType: file.type,
+      cacheControl: "31536000",
+      // Retrying the same unique path must be idempotent. A transient 5xx can
+      // arrive after Storage has already accepted the first upload.
+      upsert: true,
+    });
+    if (!error) return admin.storage.from(TOPIC_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+
+    lastError = error;
+    if (!isTransientStorageError(error) || attempt === 3) break;
+    console.warn("Topic image upload transient failure; retrying", {
+      attempt,
+      status: storageStatus(error),
+      size: file.size,
+      type: file.type,
+    });
+    await new Promise((resolve) => setTimeout(resolve, attempt * 400));
+  }
+
+  console.error("Topic image upload exhausted retries", {
+    status: storageStatus(lastError),
+    size: file.size,
+    type: file.type,
   });
-  if (error) throw error;
-  return admin.storage.from(TOPIC_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
+  throw new Error("圖片儲存服務暫時未能回應，請再試一次");
 }
 
 export async function removeTopicMedia(admin: SupabaseClient, urls: Array<string | null | undefined>) {
@@ -36,4 +59,17 @@ function extensionFor(mime: string) {
   if (mime === "image/heic") return "heic";
   if (mime === "image/heif") return "heif";
   return "jpg";
+}
+
+function storageStatus(error: unknown) {
+  if (!error || typeof error !== "object") return null;
+  const value = error as { status?: number | string; statusCode?: number | string };
+  return Number(value.statusCode ?? value.status) || null;
+}
+
+function isTransientStorageError(error: unknown) {
+  const status = storageStatus(error);
+  if (status && status >= 500) return true;
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /(?:fetch|network|timeout|temporar|<none>)/i.test(message);
 }

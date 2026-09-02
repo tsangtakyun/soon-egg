@@ -1,6 +1,5 @@
 import { LinkInBio } from "@/components/profile/LinkInBio";
 import type { ProfileBlock } from "@/components/profile/PhonePreview";
-import { createClient } from "@/lib/supabase/server";
 import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 type Profile = {
@@ -38,28 +37,23 @@ const fallbackProfile: Profile = {
 };
 
 export default async function ProfilePage() {
-  const supabase = await createClient();
   let profile = fallbackProfile;
   let theme: Theme | null = null;
   let blocks: ProfileBlock[] = [];
   let blocksError = "";
 
-  if (supabase) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      const { activeWorkspace } = await getCreatorWorkspaceContext();
-      const { data: creatorProfile } = await supabase
+  const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
+  if (user && activeWorkspace && admin) {
+      const { data: creatorProfile } = await admin
         .from("egg_creator_profiles")
         .select("*")
-        .eq("id", activeWorkspace?.id ?? "")
-        .eq("user_id", user.id)
+        .eq("id", activeWorkspace.id)
         .maybeSingle();
 
       if (creatorProfile) {
         profile = creatorProfile as Profile;
 
-        const { data: activeTheme } = await supabase
+        const { data: activeTheme } = await admin
           .from("egg_profile_themes")
           .select("background_image, background_gradient, background_color, text_color, button_color")
           .eq("creator_id", creatorProfile.id)
@@ -67,7 +61,7 @@ export default async function ProfilePage() {
           .limit(1)
           .maybeSingle();
 
-        const { data: profileBlocks, error: profileBlocksError } = await supabase
+        const { data: profileBlocks, error: profileBlocksError } = await admin
           .from("egg_profile_blocks")
           .select("*")
           .eq("creator_id", creatorProfile.id)
@@ -77,7 +71,6 @@ export default async function ProfilePage() {
         blocks = (profileBlocks ?? []) as ProfileBlock[];
         blocksError = profileBlocksError?.message ?? "";
       }
-    }
   }
 
   return <LinkInBio profile={profile} theme={theme} blocks={blocks} blocksError={blocksError} />;

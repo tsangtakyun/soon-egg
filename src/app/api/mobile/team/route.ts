@@ -3,6 +3,8 @@ import {
   acceptPendingWorkspaceInvitations,
   canManageWorkspaceMembers,
   createEggAdmin,
+  listIncomingWorkspaceInvitations,
+  respondToWorkspaceInvitation,
   type WorkspaceRole,
 } from "@/lib/creator-workspace";
 
@@ -42,11 +44,8 @@ export async function GET(request: Request) {
       { error: "登入已失效，請重新登入" },
       { status: 401 },
     );
-  if (!canManageWorkspaceMembers(ctx.role))
-    return NextResponse.json(
-      { error: "只有擁有者或 Admin 可以管理成員" },
-      { status: 403 },
-    );
+  const incomingInvitations = await listIncomingWorkspaceInvitations(ctx.admin, ctx.user.email);
+  if (!canManageWorkspaceMembers(ctx.role)) return NextResponse.json({ members: [], invitations: [], incomingInvitations, currentRole: ctx.role });
   const [{ data: members, error }, { data: invitations }] = await Promise.all([
     ctx.admin
       .from("egg_creator_workspace_members")
@@ -67,6 +66,7 @@ export async function GET(request: Request) {
     members: members ?? [],
     invitations: invitations ?? [],
     currentRole: ctx.role,
+    incomingInvitations,
   });
 }
 
@@ -77,10 +77,20 @@ export async function POST(request: Request) {
       { error: "登入已失效，請重新登入" },
       { status: 401 },
     );
-  if (!canManageWorkspaceMembers(ctx.role))
-    return NextResponse.json({ error: "你無權邀請成員" }, { status: 403 });
   const body = await request.json().catch(() => ({}));
   const action = typeof body.action === "string" ? body.action : "invite";
+  if (action === "accept-invitation" || action === "decline-invitation") {
+    const invitationId = typeof body.invitationId === "string" ? body.invitationId : "";
+    if (!invitationId) return NextResponse.json({ error: "邀請資料無效" }, { status: 400 });
+    try {
+      const workspaceId = await respondToWorkspaceInvitation(ctx.admin, ctx.user, invitationId, action === "accept-invitation" ? "accept" : "decline");
+      return NextResponse.json({ success: true, workspaceId });
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "未能處理邀請" }, { status: 409 });
+    }
+  }
+  if (!canManageWorkspaceMembers(ctx.role))
+    return NextResponse.json({ error: "你無權管理成員" }, { status: 403 });
   if (action === "invite") {
     const email =
       typeof body.email === "string" ? body.email.trim().toLowerCase() : "";

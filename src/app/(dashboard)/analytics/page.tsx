@@ -65,7 +65,6 @@ export default async function AnalyticsPage() {
       "id,instagram_handle,instagram_followers,instagram_engagement_rate,audience_demographics",
     )
     .eq("id", activeWorkspace?.id ?? "")
-    .eq("user_id", user.id)
     .single();
   const profile = profileData as Profile | null;
   if (!profile) redirect("/login");

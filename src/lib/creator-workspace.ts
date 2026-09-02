@@ -74,8 +74,11 @@ export async function getCreatorWorkspaceContext() {
     typeof user.user_metadata?.egg_active_workspace_id === "string"
       ? user.user_metadata.egg_active_workspace_id
       : null;
+  // The web switcher writes this per-browser cookie immediately. Prefer it to
+  // auth metadata, whose JWT copy may remain stale until the session refreshes.
+  // Mobile clients do not send this cookie and therefore keep using metadata.
   const requestedId =
-    savedId ?? (await cookies()).get(ACTIVE_CREATOR_COOKIE)?.value;
+    (await cookies()).get(ACTIVE_CREATOR_COOKIE)?.value ?? savedId;
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === requestedId) ??
     workspaces[0] ??
@@ -163,35 +166,87 @@ export async function getActiveCreatorProfile(select: string) {
 }
 
 export async function acceptPendingWorkspaceInvitations(
-  admin: ReturnType<typeof createEggAdmin>,
-  userId: string,
-  email?: string,
+  _admin: ReturnType<typeof createEggAdmin>,
+  _userId: string,
+  _email?: string,
 ) {
-  if (!email) return;
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data: invitations } = await admin
+  void _admin;
+  void _userId;
+  void _email;
+  // Kept as a compatibility no-op for older route contexts. Workspace access
+  // is now granted only after the recipient explicitly accepts an invitation.
+}
+
+export async function listIncomingWorkspaceInvitations(
+  admin: ReturnType<typeof createEggAdmin>,
+  email?: string | null,
+) {
+  if (!email) return [];
+  const { data: invitations, error } = await admin
+    .from("egg_creator_workspace_invitations")
+    .select("id,workspace_id,role,invited_by,expires_at,created_at")
+    .ilike("email", email.trim().toLowerCase())
+    .eq("status", "pending")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  if (!invitations?.length) return [];
+  const workspaceIds = [...new Set(invitations.map((invitation) => invitation.workspace_id))];
+  const inviterIds = [...new Set(invitations.map((invitation) => invitation.invited_by).filter(Boolean))];
+  const [{ data: workspaces }, { data: inviters }] = await Promise.all([
+    admin.from("egg_creator_profiles").select("id,display_name,username,avatar_url").in("id", workspaceIds),
+    inviterIds.length
+      ? admin.from("egg_creator_workspace_members").select("user_id,email").in("user_id", inviterIds)
+      : Promise.resolve({ data: [] as Array<{ user_id: string; email: string }> }),
+  ]);
+  const workspaceMap = new Map((workspaces ?? []).map((workspace) => [workspace.id, workspace]));
+  const inviterMap = new Map((inviters ?? []).map((inviter) => [inviter.user_id, inviter.email]));
+  return invitations.map((invitation) => ({
+    id: invitation.id,
+    workspaceId: invitation.workspace_id,
+    workspaceName: workspaceMap.get(invitation.workspace_id)?.display_name || workspaceMap.get(invitation.workspace_id)?.username || "未命名工作空間",
+    workspaceAvatar: workspaceMap.get(invitation.workspace_id)?.avatar_url ?? null,
+    inviterEmail: inviterMap.get(invitation.invited_by) || "EGG 團隊",
+    role: invitation.role as "admin" | "member",
+    expiresAt: invitation.expires_at,
+    createdAt: invitation.created_at,
+  }));
+}
+
+export async function respondToWorkspaceInvitation(
+  admin: ReturnType<typeof createEggAdmin>,
+  user: User,
+  invitationId: string,
+  action: "accept" | "decline",
+) {
+  const email = user.email?.trim().toLowerCase();
+  if (!email) throw new Error("帳戶未有有效電郵");
+  const { data: invitation, error } = await admin
     .from("egg_creator_workspace_invitations")
     .select("id,workspace_id,role")
-    .ilike("email", normalizedEmail)
+    .eq("id", invitationId)
+    .ilike("email", email)
     .eq("status", "pending")
-    .gt("expires_at", new Date().toISOString());
-  if (!invitations?.length) return;
-  await admin.from("egg_creator_workspace_members").upsert(
-    invitations.map((invite) => ({
-      workspace_id: invite.workspace_id,
-      user_id: userId,
-      email: normalizedEmail,
-      role: invite.role,
-    })),
-    { onConflict: "workspace_id,user_id" },
-  );
-  await admin
-    .from("egg_creator_workspace_invitations")
-    .update({ status: "accepted", accepted_at: new Date().toISOString() })
-    .in(
-      "id",
-      invitations.map((invite) => invite.id),
-    );
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+  if (error || !invitation) throw new Error("邀請已失效或已處理");
+  if (action === "accept") {
+    const { error: memberError } = await admin.from("egg_creator_workspace_members").upsert({
+      workspace_id: invitation.workspace_id,
+      user_id: user.id,
+      email,
+      role: invitation.role,
+    }, { onConflict: "workspace_id,user_id" });
+    if (memberError) throw memberError;
+  }
+  const { error: updateError } = await admin.from("egg_creator_workspace_invitations").update({
+    // The existing database constraint uses `revoked` for every non-accepted
+    // terminal state. In this context it means the recipient declined it.
+    status: action === "accept" ? "accepted" : "revoked",
+    ...(action === "accept" ? { accepted_at: new Date().toISOString() } : {}),
+  }).eq("id", invitation.id).eq("status", "pending");
+  if (updateError) throw updateError;
+  return invitation.workspace_id as string;
 }
 
 export function canManageWorkspaceMembers(role?: WorkspaceRole | null) {

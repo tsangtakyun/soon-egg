@@ -3,7 +3,6 @@ import { ArrowUpRight, BriefcaseBusiness, ChartNoAxesCombined, Check, Circle, Li
 import { InstagramSyncButton } from "@/components/dashboard/InstagramSyncButton";
 import { DashboardShareHeader } from "@/components/ui/DashboardShareHeader";
 import { CreatorAvatar } from "@/components/ui/CreatorAvatar";
-import { createClient } from "@/lib/supabase/server";
 import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 type CreatorProfile = {
@@ -55,18 +54,14 @@ const fallbackProfile: CreatorProfile = {
 };
 
 export default async function DashboardHome() {
-  const supabase = await createClient();
   let creator = fallbackProfile;
   let dealsCount = 0;
   let pendingInvitations = 0;
   let instagramSnapshots: InstagramSnapshot[] = [];
 
-  if (supabase) {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user) {
-      const { activeWorkspace } = await getCreatorWorkspaceContext();
-      const { data: profile } = await supabase
+  const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
+  if (user && activeWorkspace && admin) {
+      const { data: profile } = await admin
         .from("egg_creator_profiles")
         .select(`
           id,
@@ -85,21 +80,20 @@ export default async function DashboardHome() {
           onboarding_completed,
           audience_demographics
         `)
-        .eq("id", activeWorkspace?.id ?? "")
-        .eq("user_id", user.id)
+        .eq("id", activeWorkspace.id)
         .maybeSingle();
 
       if (profile) {
         creator = profile as CreatorProfile;
 
         const [{ count: dealTotal }, { count: invitationTotal }, { data: snapshotRows }] = await Promise.all([
-          supabase.from("egg_brand_deals").select("id", { count: "exact", head: true }).eq("creator_id", profile.id),
-          supabase
+          admin.from("egg_brand_deals").select("id", { count: "exact", head: true }).eq("creator_id", profile.id),
+          admin
             .from("egg_brand_invitations")
             .select("id", { count: "exact", head: true })
             .eq("creator_id", profile.id)
             .eq("status", "pending"),
-          supabase
+          admin
             .from("egg_instagram_metric_snapshots")
             .select("followers,engagement_rate,reach_7d,captured_at")
             .eq("creator_id", profile.id)
@@ -111,7 +105,6 @@ export default async function DashboardHome() {
         pendingInvitations = invitationTotal ?? 0;
         instagramSnapshots = (snapshotRows ?? []) as InstagramSnapshot[];
       }
-    }
   }
 
   const displayName = creator.display_name || creator.username;

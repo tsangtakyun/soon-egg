@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, ShieldCheck, Trash2, UserPlus, Users, X } from "lucide-react";
+import { Check, KeyRound, Mail, ShieldCheck, Trash2, UserPlus, Users, X } from "lucide-react";
 import type { WorkspaceRole } from "@/lib/creator-workspace";
 
 type Member = { user_id: string; email: string; role: WorkspaceRole };
 type Invitation = { id: string; email: string; role: "admin" | "member" };
+type IncomingInvitation = { id: string; workspaceId: string; workspaceName: string; workspaceAvatar: string | null; inviterEmail: string; role: "admin" | "member"; expiresAt: string };
 const roleLabel: Record<WorkspaceRole, string> = { owner: "擁有者", admin: "Admin", member: "Member" };
 
 export function WorkspaceAccessSettings({ role }: { role: WorkspaceRole }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [incoming, setIncoming] = useState<IncomingInvitation[]>([]);
   const [email, setEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member">("member");
   const [busy, setBusy] = useState(false);
@@ -29,6 +31,15 @@ export function WorkspaceAccessSettings({ role }: { role: WorkspaceRole }) {
     else setError(data.error ?? "未能載入成員");
   }
   useEffect(() => {
+    let cancelled = false;
+    fetch("/api/creator-workspaces/invitations", { cache: "no-store" }).then(async (response) => ({ response, data: await response.json().catch(() => ({})) })).then(({ response, data }) => {
+      if (cancelled) return;
+      if (response.ok) setIncoming(data.invitations ?? []);
+      else setError(data.error ?? "未能載入收到的邀請");
+    });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
     if (!canManage) return;
     let cancelled = false;
     fetch("/api/creator-workspaces/members", { cache: "no-store" }).then(async (response) => ({ response, data: await response.json().catch(() => ({})) })).then(({ response, data }) => {
@@ -44,8 +55,20 @@ export function WorkspaceAccessSettings({ role }: { role: WorkspaceRole }) {
     setBusy(true); setError(""); setNotice("");
     const response = await fetch("/api/creator-workspaces/members", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, role: inviteRole }) });
     const data = await response.json().catch(() => ({}));
-    if (response.ok) { setEmail(""); setNotice(data.emailSent ? "邀請電郵已寄出。" : data.existingAccount ? "邀請已建立；對方下次登入後會自動加入。" : "邀請已建立；請對方直接登入 Egg 接受。" ); await loadMembers(); }
+    if (response.ok) { setEmail(""); setNotice(data.emailSent ? "邀請電郵已寄出；對方登入後可接受或拒絕。" : "邀請已建立；對方需自行接受後先會加入。" ); await loadMembers(); }
     else setError(data.error ?? "邀請失敗");
+    setBusy(false);
+  }
+  async function respond(invitationId: string, action: "accept" | "decline") {
+    if (busy) return;
+    setBusy(true); setError(""); setNotice("");
+    const response = await fetch("/api/creator-workspaces/invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invitationId, action }) });
+    const data = await response.json().catch(() => ({}));
+    if (response.ok) {
+      setIncoming((current) => current.filter((item) => item.id !== invitationId));
+      setNotice(action === "accept" ? "已接受邀請，重新整理後可切換到新工作空間。" : "已拒絕邀請。");
+      if (action === "accept") window.location.reload();
+    } else setError(data.error ?? "未能處理邀請");
     setBusy(false);
   }
   async function changeRole(userId: string, nextRole: "admin" | "member") {
@@ -79,6 +102,10 @@ export function WorkspaceAccessSettings({ role }: { role: WorkspaceRole }) {
   }
 
   return <>
+    <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
+      <div className="flex items-start justify-between gap-4"><div><h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Mail className="h-4 w-4" />收到的工作空間邀請</h2><p className="mt-1 text-xs text-gray-400">只有你按接受後，系統先會將你加入對方工作空間。</p></div>{incoming.length ? <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{incoming.length} 個待處理</span> : null}</div>
+      {incoming.length ? <div className="mt-4 space-y-3">{incoming.map((invitation) => <div key={invitation.id} className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/40 p-4 sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-center gap-3">{invitation.workspaceAvatar ? <img src={invitation.workspaceAvatar} alt="" className="h-10 w-10 rounded-full object-cover" /> : <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm font-bold">{invitation.workspaceName.slice(0, 1)}</div>}<div className="min-w-0"><p className="truncate text-sm font-bold text-zinc-900">{invitation.workspaceName}</p><p className="truncate text-xs text-zinc-500">{invitation.inviterEmail} 邀請你成為 {roleLabel[invitation.role]}</p><p className="mt-1 text-[11px] text-zinc-400">有效至 {new Date(invitation.expiresAt).toLocaleDateString("zh-HK")}</p></div></div><div className="flex gap-2"><button type="button" disabled={busy} onClick={() => void respond(invitation.id, "decline")} className="flex-1 rounded-xl border bg-white px-3 py-2 text-xs font-semibold text-zinc-600 sm:flex-none">拒絕</button><button type="button" disabled={busy} onClick={() => void respond(invitation.id, "accept")} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-950 px-3 py-2 text-xs font-semibold text-white sm:flex-none"><Check className="h-3.5 w-3.5" />接受</button></div></div>)}</div> : <div className="mt-4 rounded-xl bg-zinc-50 px-4 py-5 text-center text-sm text-zinc-500">暫時未有待處理邀請</div>}
+    </section>
     <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4"><div><h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700"><Users className="h-4 w-4" />工作空間成員</h2><p className="mt-1 text-xs text-gray-400">你目前係 {roleLabel[role]}。</p></div>{role === "owner" ? <button type="button" onClick={() => void openPrompt()} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium hover:bg-zinc-50"><KeyRound className="h-4 w-4" />管理商務規則</button> : <span className="rounded-full bg-purple-50 px-3 py-1.5 text-xs text-purple-700">已套用專屬回覆規則</span>}</div>
       {!canManage ? <div className="mt-4 rounded-xl bg-zinc-50 p-4 text-sm text-zinc-500">只有擁有者或 Admin 可以管理成員。</div> : <>

@@ -67,8 +67,8 @@ export async function persistRemoteTopicCover(
     }
   }
 
-  const svg = generatedCoverSvg(fallback.title, fallback.platform);
-  return uploadTopicBytes(admin, workspaceId, Buffer.from(svg), "image/svg+xml", "svg");
+  console.info("Using branded topic cover fallback", { title: fallback.title, platform: fallback.platform });
+  return "https://egg.sooncreator.network/creative.jpg";
 }
 
 export async function removeTopicMedia(admin: SupabaseClient, urls: Array<string | null | undefined>) {
@@ -87,29 +87,6 @@ function extensionFor(mime: string) {
   if (mime === "image/heic") return "heic";
   if (mime === "image/heif") return "heif";
   return "jpg";
-}
-
-async function uploadTopicBytes(admin: SupabaseClient, workspaceId: string, bytes: Buffer, contentType: string, extension: string) {
-  const path = `${workspaceId}/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.${extension}`;
-  const { error } = await admin.storage.from(TOPIC_MEDIA_BUCKET).upload(path, bytes, {
-    contentType,
-    cacheControl: "31536000",
-    upsert: true,
-  });
-  if (error) throw new Error("圖片儲存服務暫時未能回應，請再試一次");
-  return admin.storage.from(TOPIC_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
-}
-
-function generatedCoverSvg(title: string, platform: string) {
-  const cleanTitle = title.trim().slice(0, 34) || "收藏題材";
-  const firstLine = escapeSvg(cleanTitle.slice(0, 17));
-  const secondLine = escapeSvg(cleanTitle.slice(17));
-  const safePlatform = escapeSvg(platform.trim().slice(0, 20) || "SOON EGG");
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1350" viewBox="0 0 1080 1350"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff3cf"/><stop offset="1" stop-color="#f2c7b5"/></linearGradient></defs><rect width="1080" height="1350" fill="url(#g)"/><circle cx="540" cy="470" r="170" fill="#fff" opacity=".72"/><circle cx="540" cy="470" r="92" fill="#ffc43d"/><circle cx="505" cy="445" r="10"/><circle cx="575" cy="445" r="10"/><path d="M495 505q45 55 90 0" fill="none" stroke="#17120f" stroke-width="14" stroke-linecap="round"/><text x="540" y="760" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="#7b2d20">${safePlatform}</text><text x="540" y="875" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="700" fill="#17120f"><tspan x="540">${firstLine}</tspan>${secondLine ? `<tspan x="540" dy="82">${secondLine}</tspan>` : ""}</text></svg>`;
-}
-
-function escapeSvg(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[character] ?? character);
 }
 
 function isAllowedRemoteCover(value: string) {

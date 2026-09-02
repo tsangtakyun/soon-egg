@@ -4,15 +4,16 @@ import { canEditWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-work
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { listTopicIdeas } from "@/lib/topic-library";
 import { persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
+import { isEggPlatformAdmin } from "@/lib/platform-admin";
 
 export async function DELETE(request: Request) {
   const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-  if (activeWorkspace.role !== "owner") return NextResponse.json({ error: "只有擁有者可以刪除題材" }, { status: 403 });
+  if (!isEggPlatformAdmin(user.email)) return NextResponse.json({ error: "只有 EGG 平台管理員可以刪除題材" }, { status: 403 });
   const ideaId = new URL(request.url).searchParams.get("ideaId") ?? "";
-  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).maybeSingle();
+  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls,workspace_id").eq("id", ideaId).not("workspace_id", "is", null).maybeSingle();
   if (!idea) return NextResponse.json({ error: "找不到可刪除題材" }, { status: 404 });
-  const { error } = await admin.from("egg_topic_ideas").delete().eq("id", idea.id).eq("workspace_id", activeWorkspace.id);
+  const { error } = await admin.from("egg_topic_ideas").delete().eq("id", idea.id);
   if (error) return NextResponse.json({ error: "未能刪除題材" }, { status: 500 });
   await removeTopicMedia(admin, [idea.image_url, ...(idea.media_urls ?? [])]);
   return NextResponse.json({ success: true });

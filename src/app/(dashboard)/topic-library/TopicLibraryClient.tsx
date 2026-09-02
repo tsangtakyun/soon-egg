@@ -39,7 +39,7 @@ function TopicMedia({ idea, onBrokenCover }: { idea: TopicIdea; onBrokenCover: (
   );
 }
 
-export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: TopicIdea[]; isOwner: boolean }) {
+export function TopicLibraryClient({ initialIdeas, isOwner, canDelete }: { initialIdeas: TopicIdea[]; isOwner: boolean; canDelete: boolean }) {
   const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
   const [libraryView, setLibraryView] = useState<"recommended" | "all">(
@@ -197,9 +197,9 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
                     <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
                   )}
                     <div className="p-3">
-                    {isOwner && idea.manageable ? <div className="mb-2 flex justify-end gap-1.5">
-                      <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button>
-                      <button type="button" disabled={pendingId !== null} onClick={() => void removeIdea(idea)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />刪除</button>
+                    {((isOwner && idea.manageable) || (canDelete && idea.workspace_id)) ? <div className="mb-2 flex justify-end gap-1.5">
+                      {isOwner && idea.manageable ? <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button> : null}
+                      {canDelete && idea.workspace_id ? <button type="button" disabled={pendingId !== null} onClick={() => void removeIdea(idea)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />刪除</button> : null}
                     </div> : null}
                     <p className="text-[11px] font-semibold uppercase text-zinc-400">{idea.source_name || idea.platform}</p>
                     <h2 className="mt-1.5 text-[17px] font-extrabold leading-[1.15] text-zinc-900">{idea.title}</h2>

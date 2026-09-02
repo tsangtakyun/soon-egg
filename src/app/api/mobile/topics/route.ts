@@ -3,6 +3,7 @@ import { createEggAdmin } from "@/lib/creator-workspace";
 import { getTopicMembership, listTopicIdeas } from "@/lib/topic-library";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
+import { isEggPlatformAdmin } from "@/lib/platform-admin";
 
 function bearerToken(request: Request) {
   const value = request.headers.get("authorization") ?? "";
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   try {
-    return NextResponse.json({ ideas: await listTopicIdeas(auth.workspaceId), role: auth.role });
+    return NextResponse.json({ ideas: await listTopicIdeas(auth.workspaceId), role: auth.role, canDelete: isEggPlatformAdmin(auth.user.email) });
   } catch (error) {
     console.error("Mobile topic library load failed", error);
     return NextResponse.json({ error: "未能載入題材靈感" }, { status: 500 });
@@ -47,11 +48,11 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-  if (auth.role !== "owner") return NextResponse.json({ error: "只有擁有者可以刪除題材" }, { status: 403 });
+  if (!isEggPlatformAdmin(auth.user.email)) return NextResponse.json({ error: "只有 EGG 平台管理員可以刪除題材" }, { status: 403 });
   const ideaId = new URL(request.url).searchParams.get("ideaId") ?? "";
-  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).maybeSingle();
+  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,image_url,media_urls,workspace_id").eq("id", ideaId).not("workspace_id", "is", null).maybeSingle();
   if (!idea) return NextResponse.json({ error: "找不到可刪除題材" }, { status: 404 });
-  const { error } = await auth.admin.from("egg_topic_ideas").delete().eq("id", idea.id).eq("workspace_id", auth.workspaceId);
+  const { error } = await auth.admin.from("egg_topic_ideas").delete().eq("id", idea.id);
   if (error) return NextResponse.json({ error: "未能刪除題材" }, { status: 500 });
   await removeTopicMedia(auth.admin, [idea.image_url, ...(idea.media_urls ?? [])]);
   return NextResponse.json({ success: true });
@@ -67,7 +68,8 @@ export async function PATCH(request: Request) {
   const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).maybeSingle();
   const ownedUploadMarker = `/storage/v1/object/public/egg-topic-media/${auth.workspaceId}/`;
   if (!idea || !imageUrl || (!(idea.media_urls ?? []).includes(imageUrl) && !imageUrl.includes(ownedUploadMarker))) return NextResponse.json({ error: "封面圖片無效" }, { status: 400 });
-  const mediaUrls = [imageUrl, ...(idea.media_urls ?? []).filter((url: string) => url !== imageUrl)];
+  const existingMedia: string[] = idea.media_urls ?? [];
+  const mediaUrls = existingMedia.includes(imageUrl) ? [imageUrl, ...existingMedia.filter((url: string) => url !== imageUrl)] : [imageUrl];
   const { error } = await auth.admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
   if (error) return NextResponse.json({ error: "未能更換封面" }, { status: 500 });
   return NextResponse.json({ success: true, imageUrl });

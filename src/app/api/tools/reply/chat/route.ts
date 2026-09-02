@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
+import { saveApprovedReplyRule, suggestReplyProjectName } from "@/lib/reply-workspace-rules";
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 type EnquiryBrief = {
@@ -47,12 +48,12 @@ export async function POST(request: Request) {
   const { data: { user } } = serverSupabase ? await serverSupabase.auth.getUser() : { data: { user: null } };
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = (await request.json().catch(() => ({}))) as { message?: string; history?: HistoryMessage[]; projectId?: string; image?: { data?: string; mediaType?: string } };
+  const body = (await request.json().catch(() => ({}))) as { message?: string; history?: HistoryMessage[]; projectId?: string; feedbackMode?: "project" | "workspace_rule"; image?: { data?: string; mediaType?: string } };
   const cleanMessage = body.message?.trim();
   if (!cleanMessage) return NextResponse.json({ error: "請貼上品牌查詢或上載截圖。" }, { status: 400 });
   if (cleanMessage.length > 8000) return NextResponse.json({ error: "訊息太長，請縮短至 8,000 字內。" }, { status: 400 });
 
-  const { profile } = await getActiveCreatorProfile("id,display_name,username,bio,content_categories,instagram_handle");
+  const { profile, activeRole } = await getActiveCreatorProfile("id,display_name,username,bio,content_categories,instagram_handle");
   if (!profile) return NextResponse.json({ error: "找不到目前工作空間。" }, { status: 404 });
   const admin = createEggAdmin();
   const [{ data: project }, { data: promptProfile }] = await Promise.all([
@@ -96,17 +97,21 @@ export async function POST(request: Request) {
       throw new Error("Invalid structured response");
     }
 
+    const suggestedName = ["一般回覆", "General Replies"].includes(project.name) ? suggestReplyProjectName(parsed.brief.brand, parsed.brief.contact) : null;
     const [{ error: historyError }, { error: briefError }] = await Promise.all([
       admin.from("egg_reply_messages").insert([
         { creator_id: profile.id, project_id: project.id, role: "user", content: imageData ? `${cleanMessage}\n\n[已附上截圖]` : cleanMessage },
         { creator_id: profile.id, project_id: project.id, role: "assistant", content: parsed.reply },
       ]),
-      admin.from("egg_reply_projects").update({ brief: parsed.brief, updated_at: new Date().toISOString() }).eq("id", project.id).eq("creator_id", profile.id),
+      admin.from("egg_reply_projects").update({ brief: parsed.brief, ...(suggestedName ? { name: suggestedName } : {}), updated_at: new Date().toISOString() }).eq("id", project.id).eq("creator_id", profile.id),
     ]);
-    const warning = historyError || briefError ? "草稿已生成，但部分 Project 紀錄暫時未能儲存。" : undefined;
+    const ruleResult = body.feedbackMode === "workspace_rule"
+      ? await saveApprovedReplyRule({ admin, workspaceId: profile.id, userId: user.id, role: activeRole, instruction: cleanMessage })
+      : null;
+    const warning = ruleResult?.warning ?? (historyError || briefError ? "草稿已生成，但部分 Project 紀錄暫時未能儲存。" : undefined);
     if (historyError) console.error("[reply workspace] history save failed", historyError.message);
     if (briefError) console.error("[reply workspace] brief save failed", briefError.message);
-    return NextResponse.json({ reply: parsed.reply, brief: parsed.brief, warning });
+    return NextResponse.json({ reply: parsed.reply, brief: parsed.brief, projectName: suggestedName ?? project.name, ruleSaved: ruleResult?.saved ?? false, warning });
   } catch (error) {
     console.error("[reply workspace] generation failed", error);
     return NextResponse.json({ error: "AI 暫時未能整理查詢，請稍後再試。" }, { status: 502 });

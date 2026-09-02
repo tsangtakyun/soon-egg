@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
+import { saveApprovedReplyRule, suggestReplyProjectName } from "@/lib/reply-workspace-rules";
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 type EnquiryBrief = {
@@ -49,7 +50,7 @@ async function getContext(request: Request) {
   const { data: profile } = await admin.from("egg_creator_profiles")
     .select("id,display_name,username,bio,content_categories,instagram_handle")
     .eq("id", membership.workspace_id).maybeSingle();
-  return profile ? { admin, profile } : null;
+  return profile ? { admin, profile, userId: user.id, role: membership.role } : null;
 }
 
 export async function GET(request: Request) {
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
   if (!context) return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as {
     action?: string; name?: string; projectId?: string; message?: string;
-    history?: HistoryMessage[]; image?: { data?: string; mediaType?: string };
+    history?: HistoryMessage[]; feedbackMode?: "project" | "workspace_rule"; image?: { data?: string; mediaType?: string };
   };
   if (body.action === "create_project") {
     const name = body.name?.trim().slice(0, 80);
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
 
 async function generateReply(
   context: NonNullable<Awaited<ReturnType<typeof getContext>>>,
-  body: { projectId?: string; message?: string; history?: HistoryMessage[]; image?: { data?: string; mediaType?: string } },
+  body: { projectId?: string; message?: string; history?: HistoryMessage[]; feedbackMode?: "project" | "workspace_rule"; image?: { data?: string; mediaType?: string } },
 ) {
   const cleanMessage = body.message?.trim();
   if (!cleanMessage) return NextResponse.json({ error: "請貼上品牌查詢或上載截圖" }, { status: 400 });
@@ -141,17 +142,21 @@ async function generateReply(
       console.error("[mobile reply] invalid structured response", { stopReason: response.stop_reason, outputLength: raw.length });
       throw new Error("Invalid structured response");
     }
+    const suggestedName = ["一般回覆", "General Replies"].includes(project.name) ? suggestReplyProjectName(parsed.brief.brand, parsed.brief.contact) : null;
     const [{ error: historyError }, { error: briefError }] = await Promise.all([
       context.admin.from("egg_reply_messages").insert([
         { creator_id: context.profile.id, project_id: project.id, role: "user", content: image ? `${cleanMessage}\n\n[已附上截圖]` : cleanMessage },
         { creator_id: context.profile.id, project_id: project.id, role: "assistant", content: parsed.reply },
       ]),
-      context.admin.from("egg_reply_projects").update({ brief: parsed.brief, updated_at: new Date().toISOString() })
+      context.admin.from("egg_reply_projects").update({ brief: parsed.brief, ...(suggestedName ? { name: suggestedName } : {}), updated_at: new Date().toISOString() })
         .eq("id", project.id).eq("creator_id", context.profile.id),
     ]);
+    const ruleResult = body.feedbackMode === "workspace_rule"
+      ? await saveApprovedReplyRule({ admin: context.admin, workspaceId: context.profile.id, userId: context.userId, role: context.role, instruction: cleanMessage })
+      : null;
     if (historyError) console.error("[mobile reply] history save failed", historyError.message);
     if (briefError) console.error("[mobile reply] brief save failed", briefError.message);
-    return NextResponse.json({ reply: parsed.reply, brief: parsed.brief, warning: historyError || briefError ? "草稿已生成，但部分紀錄暫時未能儲存" : undefined });
+    return NextResponse.json({ reply: parsed.reply, brief: parsed.brief, projectName: suggestedName ?? project.name, ruleSaved: ruleResult?.saved ?? false, warning: ruleResult?.warning ?? (historyError || briefError ? "草稿已生成，但部分紀錄暫時未能儲存" : undefined) });
   } catch (error) {
     console.error("[mobile reply] generation failed", error);
     return NextResponse.json({ error: "AI 暫時未能整理查詢，請稍後再試" }, { status: 502 });

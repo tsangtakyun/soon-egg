@@ -30,9 +30,13 @@ export async function PATCH(request: Request) {
   if (!idea) return NextResponse.json({ error: "找不到可修改題材" }, { status: 404 });
   try {
     const imageUrl = await uploadTopicImage(admin, activeWorkspace.id, cover);
-    const mediaUrls = [imageUrl, ...(idea.media_urls ?? []).filter((url: string) => url !== imageUrl)];
+    const existingMedia: string[] = idea.media_urls ?? [];
+    const mediaUrls = existingMedia.length > 1
+      ? existingMedia.map((url: string) => url === idea.image_url ? imageUrl : url)
+      : [imageUrl];
     const { error } = await admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
     if (error) throw error;
+    if (idea.image_url && idea.image_url !== imageUrl) await removeTopicMedia(admin, [idea.image_url]);
     return NextResponse.json({ success: true, imageUrl, mediaUrls });
   } catch (error) {
     console.error("Topic cover update failed", error);

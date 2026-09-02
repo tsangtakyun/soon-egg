@@ -53,6 +53,7 @@ async function ensureAvatarBucket(supabase: SupabaseClient) {
 }
 
 export async function POST(req: NextRequest) {
+  if (new URL(req.url).searchParams.get("restore") === "1") return PATCH();
   const authSupabase = await createClient();
   const { data: { user } = { user: null } } = authSupabase ? await authSupabase.auth.getUser() : { data: { user: null } };
 

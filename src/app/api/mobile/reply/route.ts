@@ -106,6 +106,18 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: "未能刪除 Project" }, { status: 500 });
     return NextResponse.json({ success: true });
   }
+  if (body.action === "rename_project") {
+    const name = body.name?.trim().slice(0, 80);
+    if (!body.projectId || !name) return NextResponse.json({ error: "請輸入新 Project 名稱" }, { status: 400 });
+    const { data: duplicate } = await context.admin.from("egg_reply_projects").select("id")
+      .eq("creator_id", context.profile.id).eq("name", name).neq("id", body.projectId).limit(1).maybeSingle();
+    if (duplicate) return NextResponse.json({ error: "已經有另一個同名 Project" }, { status: 409 });
+    const { data, error } = await context.admin.from("egg_reply_projects")
+      .update({ name, updated_at: new Date().toISOString() }).eq("id", body.projectId)
+      .eq("creator_id", context.profile.id).select("id,name,brief,updated_at").maybeSingle();
+    if (error || !data) return NextResponse.json({ error: "未能更新 Project 名稱" }, { status: 500 });
+    return NextResponse.json({ project: data });
+  }
   if (body.action !== "chat") return NextResponse.json({ error: "不支援嘅操作" }, { status: 400 });
   return generateReply(context, body);
 }

@@ -6,6 +6,7 @@ import { createEggAdmin, getCreatorWorkspaceContext } from "@/lib/creator-worksp
 const OAUTH_STATE_COOKIE = "egg-instagram-oauth-state";
 const OAUTH_WORKSPACE_COOKIE = "egg-instagram-oauth-workspace";
 const OAUTH_NEXT_COOKIE = "egg-instagram-oauth-next";
+const OAUTH_PROVIDER_COOKIE = "egg-instagram-oauth-provider";
 
 type FacebookPage = {
   id: string;
@@ -77,21 +78,89 @@ export async function GET(req: NextRequest) {
   const expectedState = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
   const requestedWorkspaceId = req.cookies.get(OAUTH_WORKSPACE_COOKIE)?.value;
   const requestedNext = req.cookies.get(OAUTH_NEXT_COOKIE)?.value === "/meta-ads" ? "/meta-ads" : "/onboarding";
+  const provider = req.cookies.get(OAUTH_PROVIDER_COOKIE)?.value === "facebook" ? "facebook" : "instagram";
   const destinationUrl = `${requestUrl.origin}${requestedNext}`;
 
   if (error || !code || !state || !expectedState || state !== expectedState || !requestedWorkspaceId) {
     return NextResponse.redirect(`${destinationUrl}?instagram_error=true`);
   }
 
-  // This flow uses Facebook Login to access Instagram Business data via linked Pages.
-  const appId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
-  const appSecret = process.env.FACEBOOK_APP_SECRET || process.env.INSTAGRAM_APP_SECRET;
+  const appId = provider === "facebook"
+    ? process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
+    : process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
+  const appSecret = provider === "facebook" ? process.env.FACEBOOK_APP_SECRET : process.env.INSTAGRAM_APP_SECRET;
 
   if (!appId || !appSecret) {
     return NextResponse.redirect(`${destinationUrl}?instagram_error=missing_credentials`);
   }
 
   try {
+    if (provider === "instagram") {
+      const form = new FormData();
+      form.set("client_id", appId);
+      form.set("client_secret", appSecret);
+      form.set("grant_type", "authorization_code");
+      form.set("redirect_uri", redirectUri);
+      form.set("code", code);
+      const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", { method: "POST", body: form, cache: "no-store" });
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || !tokenData.access_token) throw new Error(`Instagram token error: ${JSON.stringify(tokenData)}`);
+
+      let accessToken = tokenData.access_token as string;
+      let expiresIn: number | null = null;
+      const longLivedUrl = new URL("https://graph.instagram.com/access_token");
+      longLivedUrl.searchParams.set("grant_type", "ig_exchange_token");
+      longLivedUrl.searchParams.set("client_secret", appSecret);
+      longLivedUrl.searchParams.set("access_token", accessToken);
+      const longLivedRes = await fetch(longLivedUrl, { cache: "no-store" });
+      const longLivedData = await longLivedRes.json().catch(() => ({}));
+      if (longLivedRes.ok && longLivedData.access_token) {
+        accessToken = longLivedData.access_token;
+        expiresIn = typeof longLivedData.expires_in === "number" ? longLivedData.expires_in : null;
+      }
+
+      const profileUrl = new URL("https://graph.instagram.com/me");
+      profileUrl.searchParams.set("fields", "id,user_id,username,name,profile_picture_url,followers_count,media_count");
+      profileUrl.searchParams.set("access_token", accessToken);
+      const profileRes = await fetch(profileUrl, { cache: "no-store" });
+      const profile = await profileRes.json() as InstagramProfile & { user_id?: string };
+      if (!profileRes.ok || !profile.username || !(profile.id || profile.user_id)) {
+        throw new Error(`Instagram profile error: ${JSON.stringify(profile)}`);
+      }
+
+      const supabase = await createClient();
+      const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+      if (!supabase || !user) return NextResponse.redirect(`${requestUrl.origin}/login`);
+      const { workspaces } = await getCreatorWorkspaceContext();
+      const requestedWorkspace = workspaces.find((workspace) => workspace.id === requestedWorkspaceId);
+      if (!requestedWorkspace) return NextResponse.redirect(`${destinationUrl}?instagram_error=invalid_workspace`);
+      const admin = createEggAdmin();
+      const { error: updateError } = await admin.from("egg_creator_profiles").update({
+        instagram_handle: profile.username,
+        instagram_followers: profile.followers_count || 0,
+        avatar_url: profile.profile_picture_url || null,
+        instagram_access_token: accessToken,
+        instagram_user_id: profile.user_id || profile.id,
+      }).eq("id", requestedWorkspaceId);
+      if (updateError) throw updateError;
+
+      const params = new URLSearchParams({
+        instagram_connected: "true",
+        ig_username: profile.username,
+        ig_followers: String(profile.followers_count || 0),
+        ig_name: profile.name || "",
+        ig_avatar: profile.profile_picture_url || "",
+        threads_username: profile.username,
+      });
+      if (expiresIn) params.set("token_expires_in", String(expiresIn));
+      const response = NextResponse.redirect(`${destinationUrl}?${params.toString()}`);
+      response.cookies.delete(OAUTH_STATE_COOKIE);
+      response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
+      response.cookies.delete(OAUTH_NEXT_COOKIE);
+      response.cookies.delete(OAUTH_PROVIDER_COOKIE);
+      return response;
+    }
+
     const tokenUrl = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
     tokenUrl.searchParams.set("client_id", appId);
     tokenUrl.searchParams.set("client_secret", appSecret);
@@ -234,6 +303,7 @@ export async function GET(req: NextRequest) {
     response.cookies.delete(OAUTH_STATE_COOKIE);
     response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
     response.cookies.delete(OAUTH_NEXT_COOKIE);
+    response.cookies.delete(OAUTH_PROVIDER_COOKIE);
     return response;
   } catch (err) {
     console.error("Instagram OAuth error:", err);

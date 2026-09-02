@@ -42,6 +42,9 @@ function TopicMedia({ idea }: { idea: TopicIdea }) {
 export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: TopicIdea[]; isOwner: boolean }) {
   const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
+  const [libraryView, setLibraryView] = useState<"recommended" | "all">(
+    initialIdeas.some((idea) => idea.recommended) ? "recommended" : "all"
+  );
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
   const [location, setLocation] = useState("全部地區");
@@ -52,14 +55,16 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
 
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
   const locations = useMemo(() => ["全部地區", ...Array.from(new Set(ideas.flatMap((idea) => [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])])))], [ideas]);
+  const recommendedCount = useMemo(() => ideas.filter((idea) => idea.recommended).length, [ideas]);
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
     return ideas.filter((idea) =>
+      (libraryView === "all" || idea.recommended) &&
       (category === "全部" || idea.category === category) &&
       (location === "全部地區" || [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])].includes(location)) &&
       (!value || [idea.title, idea.summary, idea.source_name, ...idea.tags].filter(Boolean).join(" ").toLowerCase().includes(value))
     );
-  }, [category, ideas, location, query]);
+  }, [category, ideas, libraryView, location, query]);
   const masonryColumns = Array.from({ length: masonryColumnCount }, (_, columnIndex) =>
     filtered.filter((_, ideaIndex) => ideaIndex % masonryColumnCount === columnIndex)
   );
@@ -140,6 +145,15 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
       <section className="px-3 pb-10 pt-5 sm:px-5 lg:px-6">
         <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replaceCover(file); }} />
         <div className="sticky top-0 z-10 bg-white/95 pb-4 backdrop-blur">
+          <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-zinc-100 p-1" aria-label="題材檢視方式">
+            <button type="button" onClick={() => { setLibraryView("recommended"); setCategory("全部"); }} disabled={recommendedCount === 0} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${libraryView === "recommended" ? "bg-amber-400 text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"} disabled:cursor-not-allowed disabled:opacity-40`}>
+              為你推薦 ({recommendedCount})
+            </button>
+            <button type="button" onClick={() => { setLibraryView("all"); setCategory("全部"); }} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${libraryView === "all" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"}`}>
+              探索所有題材
+            </button>
+          </div>
+          {libraryView === "recommended" ? <p className="mb-3 text-xs leading-relaxed text-zinc-500">根據你在設定中選擇的內容類型排列。你可以隨時到個人設定更新喜好。</p> : null}
           <label className="relative block">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋題材、reference、tag" className="h-12 w-full rounded-xl border border-zinc-200 bg-white pl-11 pr-4 text-sm outline-none focus:border-zinc-900" />
@@ -190,7 +204,7 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
             ))}
           </div>
         ) : (
-          <div className="mt-4 rounded-xl border border-dashed border-zinc-300 py-16 text-center"><strong className="block text-sm">暫時未有相符題材</strong><span className="mt-2 block text-sm text-zinc-500">SOON 正在整理新一批靈感，你亦可以清除篩選查看全部。</span>{ideas.length ? <button type="button" onClick={() => { setQuery(""); setCategory("全部"); setLocation("全部地區"); }} className="mt-4 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white">查看全部</button> : null}</div>
+          <div className="mt-4 rounded-xl border border-dashed border-zinc-300 py-16 text-center"><strong className="block text-sm">暫時未有相符題材</strong><span className="mt-2 block text-sm text-zinc-500">SOON 正在整理新一批靈感，你亦可以探索其他題材。</span>{ideas.length ? <button type="button" onClick={() => { setQuery(""); setCategory("全部"); setLocation("全部地區"); setLibraryView("all"); }} className="mt-4 rounded-lg bg-zinc-950 px-3 py-2 text-xs font-semibold text-white">探索所有題材</button> : null}</div>
         )}
       </section>
     </main>

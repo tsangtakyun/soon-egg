@@ -10,7 +10,7 @@ export type TopicIdea = {
   media_urls?: string[];
   workspace_id: string | null; created_at: string; saved: boolean; want_to_create: boolean; manageable?: boolean;
   why_now?: string; hook?: string; suggested_angles?: string[]; countries?: string[]; regions?: string[];
-  localities?: string[]; directions?: string[]; recommended?: boolean;
+  localities?: string[]; directions?: string[]; direction_aliases?: string[]; recommended?: boolean;
 };
 
 type CentralTopic = {
@@ -38,17 +38,38 @@ function normalise(value: string) {
   return value.toLocaleLowerCase("zh-HK").replace(/[\s/／、·・_-]+/g, "");
 }
 
+const PREFERENCE_DIRECTIONS: Record<string, string[]> = {
+  生活美學: ["生活", "生活日常", "文化體驗", "在地體驗"],
+  美容護膚: ["美容護膚", "美容", "護膚", "美妝"],
+  時尚穿搭: ["時尚穿搭", "時尚", "穿搭", "造型"],
+  美食: ["美食", "飲食", "餐飲", "餐廳探店", "探店", "餐廳推薦"],
+  旅遊: ["旅遊", "城市攻略", "城市旅遊", "自由行", "文化體驗", "在地體驗"],
+  健康運動: ["健康運動", "健康生活", "健康", "養生", "運動"],
+  親子: ["親子", "家庭", "育兒"],
+  科技: ["科技", "數碼", "創新"],
+  財經: ["財經", "理財", "投資", "商業"],
+  教育: ["教育", "學習", "知識"],
+  娛樂: ["娛樂", "城市與文化熱話", "城市熱話", "文化現象", "社交媒體", "社群媒體", "人物故事", "文化體驗"],
+};
+
 function relevanceScore(topic: TopicIdea, preferences: string[]) {
   if (!preferences.length) return 0;
-  const fields = [...(topic.directions ?? []), ...topic.tags, topic.category, topic.title].map(normalise);
+  const fields = [
+    ...(topic.directions ?? []),
+    ...(topic.direction_aliases ?? []),
+    ...topic.tags,
+    topic.category,
+    topic.title,
+  ].map(normalise);
   return preferences.reduce((score, preference) => {
-    const target = normalise(preference);
-    return score + (fields.some((field) => field.includes(target) || target.includes(field)) ? 1 : 0);
+    const targets = [preference, ...(PREFERENCE_DIRECTIONS[preference] ?? [])].map(normalise);
+    return score + (targets.some((target) => fields.some((field) => field.includes(target) || target.includes(field))) ? 1 : 0);
   }, 0);
 }
 
 function mapCentralTopic(topic: CentralTopic): TopicIdea {
   const directions = (topic.topic_item_directions ?? []).map((item) => item.topic_directions?.label_zh?.trim() ?? "").filter(Boolean);
+  const directionAliases = (topic.topic_item_directions ?? []).flatMap((item) => cleanArray(item.topic_directions?.aliases));
   const primaryDirection = (topic.topic_item_directions ?? []).find((item) => item.is_primary)?.topic_directions?.label_zh;
   const source = topic.topic_sources?.[0];
   return {
@@ -73,6 +94,7 @@ function mapCentralTopic(topic: CentralTopic): TopicIdea {
     regions: cleanArray(topic.regions),
     localities: cleanArray(topic.localities),
     directions,
+    direction_aliases: directionAliases,
   };
 }
 

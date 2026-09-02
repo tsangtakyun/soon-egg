@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bookmark, ChevronLeft, ChevronRight, ExternalLink, ImagePlus, Search, ThumbsDown, Trash2, Video } from "lucide-react";
 import type { TopicIdea } from "@/lib/topic-library";
 
@@ -134,7 +134,7 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
     finally { setPendingId(null); setCoverIdeaId(null); if (coverInput.current) coverInput.current.value = ""; }
   }
 
-  async function repairBrokenCover(idea: TopicIdea) {
+  const repairBrokenCover = useCallback(async (idea: TopicIdea) => {
     if (!idea.manageable || repairingCovers.current.has(idea.id)) return;
     repairingCovers.current.add(idea.id);
     try {
@@ -143,7 +143,12 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
       if (!response.ok) throw new Error(result.error || "未能自動修復封面");
       setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: result.imageUrl, media_urls: result.mediaUrls } : item));
     } catch (error) { console.error("Topic cover auto repair failed", error); }
-  }
+  }, []);
+
+  useEffect(() => {
+    const legacyInstagramIdeas = ideas.filter((idea) => idea.manageable && idea.platform === "Instagram" && idea.image_url && !idea.image_url.includes("/storage/v1/object/public/egg-topic-media/"));
+    legacyInstagramIdeas.forEach((idea) => void repairBrokenCover(idea));
+  }, [ideas, repairBrokenCover]);
 
   return (
     <main className="min-h-screen bg-white text-zinc-900">

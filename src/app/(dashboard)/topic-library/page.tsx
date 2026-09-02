@@ -9,5 +9,5 @@ export const dynamic = "force-dynamic";
 export default async function TopicLibraryPage() {
   const { user, activeWorkspace } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace) redirect("/login");
-  return <TopicLibraryClient initialIdeas={await listTopicIdeas(activeWorkspace.id)} isOwner={activeWorkspace.role === "owner"} canDelete={isEggPlatformAdmin(user.email)} />;
+  return <TopicLibraryClient initialIdeas={await listTopicIdeas(activeWorkspace.id, user.id)} canDelete={isEggPlatformAdmin(user.email)} />;
 }

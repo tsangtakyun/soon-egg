@@ -9,6 +9,7 @@ export type TopicIdea = {
   id: string; title: string; summary: string | null; source_name: string | null; source_url: string | null;
   image_url: string | null; platform: string; category: string; tags: string[]; content_format: string;
   media_urls?: string[];
+  created_by?: string | null;
   workspace_id: string | null; created_at: string; saved: boolean; want_to_create: boolean; manageable?: boolean;
   why_now?: string; hook?: string; suggested_angles?: string[]; countries?: string[]; regions?: string[];
   localities?: string[]; directions?: string[]; direction_aliases?: string[]; recommended?: boolean;
@@ -131,15 +132,15 @@ async function syncCentralTopicShadows(topics: TopicIdea[]) {
   if (error) throw error;
 }
 
-async function listLocalTopics(workspaceId: string) {
+async function listLocalTopics(workspaceId: string, userId: string) {
   const admin = createEggAdmin();
   const { data, error } = await admin.from("egg_topic_ideas")
-    .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_at")
+    .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_by,created_at")
     .eq("status", "published").not("workspace_id", "is", null).order("created_at", { ascending: false });
   if (error) throw error;
   const localTopics = (data ?? []).map((topic) => ({
     ...(topic as TopicIdea),
-    manageable: topic.workspace_id === workspaceId,
+    manageable: topic.workspace_id === workspaceId && topic.created_by === userId,
   }));
   const legacyCovers = localTopics.filter((topic) => topic.manageable && topic.image_url?.includes("cdninstagram.com"));
   await Promise.all(legacyCovers.map(async (topic) => {
@@ -164,7 +165,7 @@ async function listLocalTopics(workspaceId: string) {
   return localTopics;
 }
 
-export async function listTopicIdeas(workspaceId: string, preferredCategories?: string[]) {
+export async function listTopicIdeas(workspaceId: string, userId: string, preferredCategories?: string[]) {
   const admin = createEggAdmin();
   let centralIdeas: TopicIdea[] = [];
   try {
@@ -173,7 +174,7 @@ export async function listTopicIdeas(workspaceId: string, preferredCategories?: 
   } catch (error) {
     console.error("Central topic feed unavailable; using Egg fallback", error);
   }
-  const localIdeas = await listLocalTopics(workspaceId);
+  const localIdeas = await listLocalTopics(workspaceId, userId);
   const ideas = [...localIdeas, ...centralIdeas.filter((central) => !localIdeas.some((local) => local.id === central.id))]
     .filter(hasUsableCover);
 

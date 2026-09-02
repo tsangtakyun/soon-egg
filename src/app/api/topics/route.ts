@@ -22,12 +22,11 @@ export async function DELETE(request: Request) {
 export async function PATCH(request: Request) {
   const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-  if (activeWorkspace.role !== "owner") return NextResponse.json({ error: "只有擁有者可以更換封面" }, { status: 403 });
   const form = await request.formData();
   const ideaId = String(form.get("ideaId") ?? "");
   const cover = form.get("cover");
   if (!(cover instanceof File)) return NextResponse.json({ error: "請選擇封面圖片" }, { status: 400 });
-  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).maybeSingle();
+  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).eq("created_by", user.id).maybeSingle();
   if (!idea) return NextResponse.json({ error: "找不到可修改題材" }, { status: 404 });
   try {
     const imageUrl = await uploadTopicImage(admin, activeWorkspace.id, cover);
@@ -46,7 +45,7 @@ export async function GET() {
   const { user, activeWorkspace } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   try {
-    return NextResponse.json({ ideas: await listTopicIdeas(activeWorkspace.id), role: activeWorkspace.role });
+    return NextResponse.json({ ideas: await listTopicIdeas(activeWorkspace.id, user.id), role: activeWorkspace.role });
   } catch (error) {
     console.error("Topic library load failed", error);
     return NextResponse.json({ error: "未能載入題材靈感" }, { status: 500 });

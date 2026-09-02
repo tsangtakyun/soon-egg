@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   try {
-    return NextResponse.json({ ideas: await listTopicIdeas(auth.workspaceId), role: auth.role, canDelete: isEggPlatformAdmin(auth.user.email) });
+    return NextResponse.json({ ideas: await listTopicIdeas(auth.workspaceId, auth.user.id), role: auth.role, canDelete: isEggPlatformAdmin(auth.user.email) });
   } catch (error) {
     console.error("Mobile topic library load failed", error);
     return NextResponse.json({ error: "未能載入題材靈感" }, { status: 500 });
@@ -61,11 +61,10 @@ export async function DELETE(request: Request) {
 export async function PATCH(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
-  if (auth.role !== "owner") return NextResponse.json({ error: "只有擁有者可以更換封面" }, { status: 403 });
   const body = await request.json().catch(() => ({}));
   const ideaId = typeof body.ideaId === "string" ? body.ideaId : "";
   const imageUrl = typeof body.imageUrl === "string" && body.imageUrl.startsWith("https://") ? body.imageUrl : "";
-  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).maybeSingle();
+  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).eq("created_by", auth.user.id).maybeSingle();
   const ownedUploadMarker = `/storage/v1/object/public/egg-topic-media/${auth.workspaceId}/`;
   if (!idea || !imageUrl || (!(idea.media_urls ?? []).includes(imageUrl) && !imageUrl.includes(ownedUploadMarker))) return NextResponse.json({ error: "封面圖片無效" }, { status: 400 });
   const existingMedia: string[] = idea.media_urls ?? [];

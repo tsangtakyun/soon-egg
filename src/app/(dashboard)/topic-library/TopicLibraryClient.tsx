@@ -39,10 +39,10 @@ function TopicMedia({ idea, onBrokenCover }: { idea: TopicIdea; onBrokenCover: (
   );
 }
 
-export function TopicLibraryClient({ initialIdeas, isOwner, canDelete }: { initialIdeas: TopicIdea[]; isOwner: boolean; canDelete: boolean }) {
+export function TopicLibraryClient({ initialIdeas, canDelete }: { initialIdeas: TopicIdea[]; canDelete: boolean }) {
   const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
-  const [libraryView, setLibraryView] = useState<"recommended" | "all">(
+  const [libraryView, setLibraryView] = useState<"recommended" | "latest" | "all">(
     initialIdeas.some((idea) => idea.recommended) ? "recommended" : "all"
   );
   const [query, setQuery] = useState("");
@@ -59,12 +59,14 @@ export function TopicLibraryClient({ initialIdeas, isOwner, canDelete }: { initi
   const recommendedCount = useMemo(() => ideas.filter((idea) => idea.recommended).length, [ideas]);
   const filtered = useMemo(() => {
     const value = query.trim().toLowerCase();
-    return ideas.filter((idea) =>
+    const matches = ideas.filter((idea) =>
       (libraryView === "all" || idea.recommended) &&
+      (libraryView !== "latest" || idea.workspace_id !== null) &&
       (category === "全部" || idea.category === category) &&
       (location === "全部地區" || [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])].includes(location)) &&
       (!value || [idea.title, idea.summary, idea.source_name, ...idea.tags].filter(Boolean).join(" ").toLowerCase().includes(value))
     );
+    return libraryView === "latest" ? [...matches].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)) : matches;
   }, [category, ideas, libraryView, location, query]);
   const masonryColumns = Array.from({ length: masonryColumnCount }, (_, columnIndex) =>
     filtered.filter((_, ideaIndex) => ideaIndex % masonryColumnCount === columnIndex)
@@ -162,15 +164,19 @@ export function TopicLibraryClient({ initialIdeas, isOwner, canDelete }: { initi
       <section className="px-3 pb-10 pt-5 sm:px-5 lg:px-6">
         <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replaceCover(file); }} />
         <div className="sticky top-0 z-10 bg-white/95 pb-4 backdrop-blur">
-          <div className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-zinc-100 p-1" aria-label="題材檢視方式">
+          <div className="mb-4 grid grid-cols-3 gap-2 rounded-xl bg-zinc-100 p-1" aria-label="題材檢視方式">
             <button type="button" onClick={() => { setLibraryView("recommended"); setCategory("全部"); }} disabled={recommendedCount === 0} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${libraryView === "recommended" ? "bg-amber-400 text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"} disabled:cursor-not-allowed disabled:opacity-40`}>
               為你推薦 ({recommendedCount})
             </button>
+            <button type="button" onClick={() => { setLibraryView("latest"); setCategory("全部"); }} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${libraryView === "latest" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"}`}>
+              最新題材
+            </button>
             <button type="button" onClick={() => { setLibraryView("all"); setCategory("全部"); }} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${libraryView === "all" ? "bg-white text-zinc-950 shadow-sm" : "text-zinc-500 hover:text-zinc-900"}`}>
-              探索所有題材
+              所有題材
             </button>
           </div>
           {libraryView === "recommended" ? <p className="mb-3 text-xs leading-relaxed text-zinc-500">根據你在設定中選擇的內容類型排列。你可以隨時到個人設定更新喜好。</p> : null}
+          {libraryView === "latest" ? <p className="mb-3 text-xs leading-relaxed text-zinc-500">查看所有創作者最近分享入題材庫嘅靈感，最新內容會排最前。</p> : null}
           <label className="relative block">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜尋題材、reference、tag" className="h-12 w-full rounded-xl border border-zinc-200 bg-white pl-11 pr-4 text-sm outline-none focus:border-zinc-900" />
@@ -197,8 +203,8 @@ export function TopicLibraryClient({ initialIdeas, isOwner, canDelete }: { initi
                     <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
                   )}
                     <div className="p-3">
-                    {((isOwner && idea.manageable) || (canDelete && idea.workspace_id)) ? <div className="mb-2 flex justify-end gap-1.5">
-                      {isOwner && idea.manageable ? <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button> : null}
+                    {(idea.manageable || (canDelete && idea.workspace_id)) ? <div className="mb-2 flex justify-end gap-1.5">
+                      {idea.manageable ? <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button> : null}
                       {canDelete && idea.workspace_id ? <button type="button" disabled={pendingId !== null} onClick={() => void removeIdea(idea)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />刪除</button> : null}
                     </div> : null}
                     <p className="text-[11px] font-semibold uppercase text-zinc-400">{idea.source_name || idea.platform}</p>

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set("redirect_uri", redirectUri);
   authUrl.searchParams.set("scope", wantsAds
     ? ["pages_show_list", "pages_read_engagement", "instagram_basic", "instagram_manage_insights", "business_management", "ads_management", "ads_read", "pages_manage_ads"].join(",")
-    : "instagram_business_basic");
+    : "instagram_business_basic,instagram_business_manage_insights");
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
   if (!wantsAds) {

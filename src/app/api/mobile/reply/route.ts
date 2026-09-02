@@ -62,10 +62,12 @@ export async function GET(request: Request) {
     .select("id,name,brief,updated_at").eq("creator_id", context.profile.id)
     .order("updated_at", { ascending: false });
   if (projectsError) return NextResponse.json({ error: "未能讀取 Projects" }, { status: 500 });
-  const activeId = projectId ?? projects?.[0]?.id;
-  if (activeId && !projects?.some((project) => project.id === activeId)) {
-    return NextResponse.json({ error: "找不到呢個 Project" }, { status: 404 });
-  }
+  // A project selection belongs to one workspace. When the user switches
+  // workspace, the app may still send the previous workspace's project id.
+  // Fall back to the first valid project instead of trapping the UI in 404.
+  const activeId = projectId && projects?.some((project) => project.id === projectId)
+    ? projectId
+    : projects?.[0]?.id;
   const { data: messages, error: messagesError } = activeId
     ? await context.admin.from("egg_reply_messages").select("id,role,content,created_at")
       .eq("creator_id", context.profile.id).eq("project_id", activeId)

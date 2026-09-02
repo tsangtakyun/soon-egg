@@ -40,6 +40,7 @@ export default async function SettingsPage() {
       userEmail={user.email!}
       stripeConnected={stripeConnected}
       stripeAccountMasked={stripeAccountMasked}
+      canEditWorkspace={activeRole === "owner" || activeRole === "admin"}
       workspaceAccess={activeRole ? <WorkspaceAccessSettings role={activeRole} /> : null}
     />
   );

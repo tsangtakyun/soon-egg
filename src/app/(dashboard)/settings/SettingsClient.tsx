@@ -49,16 +49,20 @@ export function SettingsClient({
   userEmail,
   stripeConnected,
   stripeAccountMasked,
+  canEditWorkspace,
   workspaceAccess,
 }: {
   profile: Profile | null;
   userEmail: string;
   stripeConnected: boolean;
   stripeAccountMasked: string | null;
+  canEditWorkspace: boolean;
   workspaceAccess: React.ReactNode;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? "");
+  const profileName = profile?.display_name || profile?.username || "";
+  const eggSoonFallback = profileName.toLowerCase().replace(/[^a-z]/g, "") === "eggsoon" ? "/soon-egg.png" : "";
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || eggSoonFallback);
   const [displayName, setDisplayName] = useState(profile?.display_name ?? "");
   const [username, setUsername] = useState(profile?.username ?? "");
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>(
@@ -182,6 +186,14 @@ export function SettingsClient({
           <h1 className="text-3xl font-bold text-zinc-950">設定</h1>
           <p className="mt-1 text-sm text-gray-500">管理你的創作者資料、社交帳號和收款設定。</p>
         </div>
+
+        {!canEditWorkspace ? (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            你目前係協作者，可以查看工作空間設定；只有工作空間擁有者或管理員可以修改。
+          </div>
+        ) : null}
+
+        <fieldset disabled={!canEditWorkspace} className="contents">
 
         <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-700">個人資料</h2>
@@ -307,9 +319,9 @@ export function SettingsClient({
                 ) : (
                   <span className="text-xs text-gray-400">未連結</span>
                 )}
-                <Link href="/api/auth/instagram" prefetch={false} className="text-xs text-purple-600 hover:underline">
+                {canEditWorkspace ? <Link href="/api/auth/instagram" prefetch={false} className="text-xs text-purple-600 hover:underline">
                   管理／重新連接
-                </Link>
+                </Link> : <span className="text-xs text-gray-400">只限管理員</span>}
               </div>
             </SocialRow>
             <SocialInput icon={<Play size={16} />} label="YouTube" value={socials.youtube_handle} onChange={(value) => setSocials({ ...socials, youtube_handle: value })} comingSoon />
@@ -357,6 +369,8 @@ export function SettingsClient({
             </div>
           )}
         </section>
+
+        </fieldset>
 
         <section className="mb-4 rounded-2xl border bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-700">帳號</h2>

@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   authUrl.searchParams.set("state", state);
   if (!wantsAds) {
     authUrl.searchParams.set("enable_fb_login", "0");
-    authUrl.searchParams.set("force_authentication", "1");
+    authUrl.searchParams.set("force_reauth", "true");
   }
   console.info("[instagram-oauth] authorize", {
     provider,

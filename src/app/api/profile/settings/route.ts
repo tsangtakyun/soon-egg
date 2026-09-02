@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { canEditWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 export async function PATCH(req: NextRequest) {
-  const authSupabase = await createClient();
-  const { data: { user } = { user: null } } = authSupabase ? await authSupabase.auth.getUser() : { data: { user: null } };
+  const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  if (!activeWorkspace || !admin) {
+    console.error("Profile settings update missing active workspace");
+    return NextResponse.json({ error: "找不到創作者工作空間，請重新登入後再試" }, { status: 404 });
   }
 
   const body = await req.json();
@@ -63,11 +65,6 @@ export async function PATCH(req: NextRequest) {
 
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: "No valid changes" }, { status: 400 });
 
-  const { activeWorkspace, admin } = await getCreatorWorkspaceContext();
-  if (!activeWorkspace || !admin) {
-    console.error("Profile settings update missing active workspace", { userId: user.id });
-    return NextResponse.json({ error: "找不到創作者工作空間，請重新登入後再試" }, { status: 404 });
-  }
   if (!canEditWorkspace(activeWorkspace.role)) return NextResponse.json({ error: "你無權修改工作空間資料" }, { status: 403 });
   const { error } = await admin.from("egg_creator_profiles").update(updates).eq("id", activeWorkspace.id);
 

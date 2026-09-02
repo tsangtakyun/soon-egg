@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canEditWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { listTopicIdeas } from "@/lib/topic-library";
-import { removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
+import { persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
 
 export async function DELETE(request: Request) {
   const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
@@ -57,6 +57,24 @@ export async function POST(request: Request) {
   const { activeWorkspace, admin } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
+  if (body.mode === "repair-cover") {
+    const ideaId = typeof body.ideaId === "string" ? body.ideaId : "";
+    const { data: idea } = await admin.from("egg_topic_ideas").select("id,title,platform,source_url,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).maybeSingle();
+    if (!idea) return NextResponse.json({ error: "找不到可修復題材" }, { status: 404 });
+    let candidate = idea.image_url ?? "";
+    if (idea.source_url) {
+      try {
+        const response = await fetch(idea.source_url, { headers: { "user-agent": "Mozilla/5.0 SOON Topic Cover Repair" }, signal: AbortSignal.timeout(8_000) });
+        const html = (await response.text()).slice(0, 300_000);
+        candidate = metaValue(html, "og:image") || candidate;
+      } catch (error) { console.warn("Topic cover source refresh unavailable", error instanceof Error ? error.message : error); }
+    }
+    const imageUrl = await persistRemoteTopicCover(admin, activeWorkspace.id, candidate, { title: idea.title, platform: idea.platform });
+    const mediaUrls = [imageUrl, ...(idea.media_urls ?? []).filter((url: string) => url !== idea.image_url && url !== imageUrl)];
+    const { error } = await admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
+    if (error) return NextResponse.json({ error: "未能修復封面" }, { status: 500 });
+    return NextResponse.json({ success: true, imageUrl, mediaUrls });
+  }
   if (body.mode === "import") {
     if (!canEditWorkspace(activeWorkspace.role)) return NextResponse.json({ error: "只有擁有者或管理員可以匯入題材" }, { status: 403 });
     const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
@@ -119,6 +137,11 @@ function decodeHtml(value: string) {
     .replace(/&gt;/gi, ">")
     .replace(/&amp;/gi, "&")
     .trim();
+}
+
+function metaValue(html: string, name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)`, "i"))?.[1] ?? "";
 }
 
 function platformName(hostname: string) {

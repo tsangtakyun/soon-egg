@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createEggAdmin } from "@/lib/creator-workspace";
 import { getTopicMembership, listTopicIdeas } from "@/lib/topic-library";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
-import { removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
+import { persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
 
 function bearerToken(request: Request) {
   const value = request.headers.get("authorization") ?? "";
@@ -176,13 +176,19 @@ export async function POST(request: Request) {
         console.warn("Mobile shared topic AI classification failed", error instanceof Error ? error.message : error);
       }
     }
+    const coverCandidate = requestedImage.startsWith("https://") ? requestedImage : (pageImage.startsWith("https://") ? pageImage : "");
+    const durableCover = await persistRemoteTopicCover(auth.admin, auth.workspaceId, coverCandidate, {
+      title: enriched.title || fallback.title,
+      platform,
+    });
     const { data: idea, error } = await auth.admin.from("egg_topic_ideas").insert({
       workspace_id: auth.workspaceId,
       title: enriched.title.trim().slice(0, 220),
       summary: enriched.summary.trim().slice(0, 2000),
       source_name: hostname.replace(/^www\./, ""),
       source_url: parsedUrl.toString(),
-      image_url: requestedImage.startsWith("https://") ? requestedImage : (pageImage.startsWith("https://") ? pageImage : null),
+      image_url: durableCover,
+      media_urls: [durableCover],
       platform,
       category: enriched.category?.trim().slice(0, 80) || "其他",
       tags: Array.isArray(enriched.tags) ? enriched.tags.slice(0, 4) : fallback.tags,

@@ -10,7 +10,7 @@ function topicMedia(idea: TopicIdea) {
   return Array.from(new Set([...(idea.media_urls ?? []), idea.image_url].filter((url): url is string => Boolean(url))));
 }
 
-function TopicMedia({ idea }: { idea: TopicIdea }) {
+function TopicMedia({ idea, onBrokenCover }: { idea: TopicIdea; onBrokenCover: (idea: TopicIdea) => void }) {
   const media = topicMedia(idea);
   const [index, setIndex] = useState(0);
   const hasMultiple = media.length > 1;
@@ -24,7 +24,7 @@ function TopicMedia({ idea }: { idea: TopicIdea }) {
   return (
     <div className="group relative block overflow-hidden bg-zinc-100">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={media[index]} alt={`${idea.title}－第 ${index + 1} 張圖片`} className="block h-auto w-full" />
+      <img src={media[index]} alt={`${idea.title}－第 ${index + 1} 張圖片`} onError={() => onBrokenCover(idea)} className="block h-auto w-full" />
       <span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span>
       {idea.recommended ? <span className="absolute right-2.5 top-2.5 rounded-full bg-amber-400 px-2 py-1 text-[11px] font-bold text-zinc-950">為你推薦</span> : null}
       {hasMultiple ? <>
@@ -52,6 +52,7 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
   const [masonryColumnCount, setMasonryColumnCount] = useState(4);
   const coverInput = useRef<HTMLInputElement>(null);
   const [coverIdeaId, setCoverIdeaId] = useState<string | null>(null);
+  const repairingCovers = useRef(new Set<string>());
 
   const categories = useMemo(() => ["全部", ...Array.from(new Set(ideas.map((idea) => idea.category)))], [ideas]);
   const locations = useMemo(() => ["全部地區", ...Array.from(new Set(ideas.flatMap((idea) => [...(idea.localities ?? []), ...(idea.regions ?? []), ...(idea.countries ?? [])])))], [ideas]);
@@ -133,6 +134,17 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
     finally { setPendingId(null); setCoverIdeaId(null); if (coverInput.current) coverInput.current.value = ""; }
   }
 
+  async function repairBrokenCover(idea: TopicIdea) {
+    if (!idea.manageable || repairingCovers.current.has(idea.id)) return;
+    repairingCovers.current.add(idea.id);
+    try {
+      const response = await fetch("/api/topics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "repair-cover", ideaId: idea.id }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "未能自動修復封面");
+      setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: result.imageUrl, media_urls: result.mediaUrls } : item));
+    } catch (error) { console.error("Topic cover auto repair failed", error); }
+  }
+
   return (
     <main className="min-h-screen bg-white text-zinc-900">
       <header className="flex min-h-16 flex-col gap-4 border-b border-zinc-200 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between lg:px-6">
@@ -175,7 +187,7 @@ export function TopicLibraryClient({ initialIdeas, isOwner }: { initialIdeas: To
               return (
                 <article key={idea.id} className="w-full overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:-translate-y-0.5 hover:shadow-xl">
                   {media.length ? (
-                    <TopicMedia idea={idea} />
+                    <TopicMedia idea={idea} onBrokenCover={(brokenIdea) => void repairBrokenCover(brokenIdea)} />
                   ) : (
                     <div className="relative min-h-36 bg-gradient-to-br from-amber-100 via-orange-50 to-white p-5"><span className="absolute left-2.5 top-2.5 rounded-full bg-zinc-950/75 px-2 py-1 text-[11px] font-semibold text-white">{idea.category}</span></div>
                   )}

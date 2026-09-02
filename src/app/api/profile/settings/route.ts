@@ -1,7 +1,6 @@
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { canEditWorkspace, getActiveCreatorProfile } from "@/lib/creator-workspace";
+import { canEditWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 
 export async function PATCH(req: NextRequest) {
   const authSupabase = await createClient();
@@ -13,17 +12,6 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
   const { buy_me_a_coffee_url, cover_url, display_name, bio, content_categories, is_public } = body;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    return NextResponse.json({ error: "Supabase is not configured" }, { status: 500 });
-  }
-
-  const serviceSupabase = createServiceClient(url, serviceKey, {
-    auth: { persistSession: false },
-  });
-
   const updates: {
     buy_me_a_coffee_url?: string | null;
     cover_url?: string | null;
@@ -75,12 +63,16 @@ export async function PATCH(req: NextRequest) {
 
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: "No valid changes" }, { status: 400 });
 
-  const { profile, activeRole } = await getActiveCreatorProfile("id");
-  if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
-  if (!canEditWorkspace(activeRole)) return NextResponse.json({ error: "你無權修改工作空間資料" }, { status: 403 });
-  const { error } = await serviceSupabase.from("egg_creator_profiles").update(updates).eq("id", profile.id);
+  const { activeWorkspace, admin } = await getCreatorWorkspaceContext();
+  if (!activeWorkspace || !admin) {
+    console.error("Profile settings update missing active workspace", { userId: user.id });
+    return NextResponse.json({ error: "找不到創作者工作空間，請重新登入後再試" }, { status: 404 });
+  }
+  if (!canEditWorkspace(activeWorkspace.role)) return NextResponse.json({ error: "你無權修改工作空間資料" }, { status: 403 });
+  const { error } = await admin.from("egg_creator_profiles").update(updates).eq("id", activeWorkspace.id);
 
   if (error) {
+    console.error("Profile settings update failed", { userId: user.id, workspaceId: activeWorkspace.id, error: error.message });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

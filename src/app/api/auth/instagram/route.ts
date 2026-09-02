@@ -40,6 +40,11 @@ export async function GET(req: NextRequest) {
     authUrl.searchParams.set("enable_fb_login", "0");
     authUrl.searchParams.set("force_authentication", "1");
   }
+  console.info("[instagram-oauth] authorize", {
+    provider,
+    redirectUri,
+    appIdSuffix: appId.slice(-4),
+  });
 
   const response = NextResponse.redirect(authUrl.toString());
   const cookieOptions = { httpOnly: true, sameSite: "lax" as const, secure: true, path: "/", maxAge: 600 };

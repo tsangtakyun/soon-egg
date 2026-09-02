@@ -102,6 +102,12 @@ export async function GET(req: NextRequest) {
 
   try {
     if (provider === "instagram") {
+      console.info("[instagram-oauth] token-exchange", {
+        redirectUri,
+        storedRedirectUri,
+        requestOrigin: requestUrl.origin,
+        appIdSuffix: appId.slice(-4),
+      });
       const form = new FormData();
       form.set("client_id", appId);
       form.set("client_secret", appSecret);

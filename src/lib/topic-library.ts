@@ -154,6 +154,13 @@ async function listLocalTopics(workspaceId: string) {
       console.error("Legacy Instagram topic cover migration failed", topic.id, migrationError);
     }
   }));
+  const appendedFallbacks = localTopics.filter((topic) => topic.manageable && topic.platform === "Instagram" && topic.image_url && topic.image_url !== "https://egg.sooncreator.network/creative.jpg" && topic.media_urls?.includes("https://egg.sooncreator.network/creative.jpg"));
+  await Promise.all(appendedFallbacks.map(async (topic) => {
+    const mediaUrls = [topic.image_url as string];
+    const { error: cleanupError } = await admin.from("egg_topic_ideas").update({ media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", topic.id).eq("workspace_id", workspaceId);
+    if (cleanupError) console.error("Appended topic fallback cleanup failed", topic.id, cleanupError);
+    else topic.media_urls = mediaUrls;
+  }));
   return localTopics;
 }
 

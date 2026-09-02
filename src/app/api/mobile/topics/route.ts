@@ -64,14 +64,17 @@ export async function PATCH(request: Request) {
   const body = await request.json().catch(() => ({}));
   const ideaId = typeof body.ideaId === "string" ? body.ideaId : "";
   const imageUrl = typeof body.imageUrl === "string" && body.imageUrl.startsWith("https://") ? body.imageUrl : "";
-  const { data: idea } = await auth.admin.from("egg_topic_ideas").select("id,media_urls").eq("id", ideaId).eq("workspace_id", auth.workspaceId).eq("created_by", auth.user.id).maybeSingle();
-  const ownedUploadMarker = `/storage/v1/object/public/egg-topic-media/${auth.workspaceId}/`;
+  const platformAdmin = isEggPlatformAdmin(auth.user.email);
+  let ideaQuery = auth.admin.from("egg_topic_ideas").select("id,image_url,media_urls,workspace_id,created_by").eq("id", ideaId).not("workspace_id", "is", null);
+  if (!platformAdmin) ideaQuery = ideaQuery.eq("workspace_id", auth.workspaceId).eq("created_by", auth.user.id);
+  const { data: idea } = await ideaQuery.maybeSingle();
+  const ownedUploadMarker = idea?.workspace_id ? `/storage/v1/object/public/egg-topic-media/${idea.workspace_id}/` : "";
   if (!idea || !imageUrl || (!(idea.media_urls ?? []).includes(imageUrl) && !imageUrl.includes(ownedUploadMarker))) return NextResponse.json({ error: "封面圖片無效" }, { status: 400 });
-  const existingMedia: string[] = idea.media_urls ?? [];
-  const mediaUrls = existingMedia.includes(imageUrl) ? [imageUrl, ...existingMedia.filter((url: string) => url !== imageUrl)] : [imageUrl];
+  const mediaUrls = [imageUrl];
   const { error } = await auth.admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
   if (error) return NextResponse.json({ error: "未能更換封面" }, { status: 500 });
-  return NextResponse.json({ success: true, imageUrl });
+  if (idea.image_url && idea.image_url !== imageUrl) await removeTopicMedia(auth.admin, [idea.image_url]);
+  return NextResponse.json({ success: true, imageUrl, mediaUrls });
 }
 
 export async function POST(request: Request) {
@@ -150,6 +153,12 @@ export async function POST(request: Request) {
       pageDescription = decodeHtml(metaValue(html, "og:description") || metaValue(html, "description") || "");
       pageImage = metaValue(html, "og:image");
     } catch (error) { console.warn("Mobile shared topic metadata unavailable", hostname, error instanceof Error ? error.message : error); }
+    if (!pageImage || !pageTitle || !pageDescription) {
+      const resolved = await resolveSharedTopicMetadata(parsedUrl.toString());
+      pageImage ||= resolved.image;
+      pageTitle ||= resolved.title;
+      pageDescription ||= resolved.description;
+    }
 
     const platform = platformName(hostname);
     const fallback = {
@@ -214,6 +223,33 @@ export async function POST(request: Request) {
   }, { onConflict: "workspace_id,idea_id" });
   if (error) return NextResponse.json({ error: "未能儲存操作" }, { status: 500 });
   return NextResponse.json({ success: true });
+}
+
+async function resolveSharedTopicMetadata(sourceUrl: string) {
+  try {
+    const response = await fetch("https://idea-brainstorm.vercel.app/api/autofill-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: sourceUrl }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return { image: "", title: "", description: "" };
+    const data = await response.json() as {
+      image?: unknown; image_url?: unknown; thumbnail?: unknown; thumbnail_url?: unknown;
+      ogImage?: unknown; og_image?: unknown; title?: unknown; desc?: unknown;
+      caption?: unknown; metadataDescription?: unknown; description?: unknown;
+      media?: { thumbnail_url?: unknown };
+    };
+    return {
+      image: String(data.image || data.image_url || data.thumbnail || data.thumbnail_url || data.ogImage || data.og_image || data.media?.thumbnail_url || ""),
+      title: String(data.title || ""),
+      description: String(data.desc || data.caption || data.metadataDescription || data.description || ""),
+    };
+  } catch (error) {
+    console.warn("Shared topic resolver unavailable", error instanceof Error ? error.message : error);
+    return { image: "", title: "", description: "" };
+  }
 }
 
 function metaValue(html: string, name: string) {

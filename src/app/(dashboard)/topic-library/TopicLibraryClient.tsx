@@ -131,13 +131,13 @@ export function TopicLibraryClient({ initialIdeas, canDelete }: { initialIdeas: 
       const response = await fetch("/api/topics", { method: "PATCH", body: form });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "未能更換封面");
-      setIdeas((current) => current.map((item) => item.id === coverIdeaId ? { ...item, image_url: result.imageUrl } : item));
+      setIdeas((current) => current.map((item) => item.id === coverIdeaId ? { ...item, image_url: result.imageUrl, media_urls: result.mediaUrls ?? [result.imageUrl] } : item));
     } catch (error) { window.alert(error instanceof Error ? error.message : "未能更換封面"); }
     finally { setPendingId(null); setCoverIdeaId(null); if (coverInput.current) coverInput.current.value = ""; }
   }
 
   const repairBrokenCover = useCallback(async (idea: TopicIdea) => {
-    if (!idea.manageable || repairingCovers.current.has(idea.id)) return;
+    if (!(idea.manageable || (canDelete && idea.workspace_id)) || repairingCovers.current.has(idea.id)) return;
     repairingCovers.current.add(idea.id);
     try {
       const response = await fetch("/api/topics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "repair-cover", ideaId: idea.id }) });
@@ -145,12 +145,12 @@ export function TopicLibraryClient({ initialIdeas, canDelete }: { initialIdeas: 
       if (!response.ok) throw new Error(result.error || "未能自動修復封面");
       setIdeas((current) => current.map((item) => item.id === idea.id ? { ...item, image_url: result.imageUrl, media_urls: result.mediaUrls } : item));
     } catch (error) { console.error("Topic cover auto repair failed", error); }
-  }, []);
+  }, [canDelete]);
 
   useEffect(() => {
-    const legacyInstagramIdeas = ideas.filter((idea) => idea.manageable && idea.platform === "Instagram" && idea.image_url && !idea.image_url.includes("/storage/v1/object/public/egg-topic-media/"));
+    const legacyInstagramIdeas = ideas.filter((idea) => (idea.manageable || (canDelete && idea.workspace_id)) && idea.platform === "Instagram" && idea.image_url && !idea.image_url.includes("/storage/v1/object/public/egg-topic-media/"));
     legacyInstagramIdeas.forEach((idea) => void repairBrokenCover(idea));
-  }, [ideas, repairBrokenCover]);
+  }, [canDelete, ideas, repairBrokenCover]);
 
   return (
     <main className="min-h-screen bg-white text-zinc-900">
@@ -204,7 +204,7 @@ export function TopicLibraryClient({ initialIdeas, canDelete }: { initialIdeas: 
                   )}
                     <div className="p-3">
                     {(idea.manageable || (canDelete && idea.workspace_id)) ? <div className="mb-2 flex justify-end gap-1.5">
-                      {idea.manageable ? <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button> : null}
+                      {(idea.manageable || (canDelete && idea.workspace_id)) ? <button type="button" disabled={pendingId !== null} onClick={() => { setCoverIdeaId(idea.id); coverInput.current?.click(); }} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] font-semibold text-zinc-600 hover:border-zinc-900"><ImagePlus className="h-3.5 w-3.5" />更換封面</button> : null}
                       {canDelete && idea.workspace_id ? <button type="button" disabled={pendingId !== null} onClick={() => void removeIdea(idea)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2 py-1.5 text-[11px] font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />刪除</button> : null}
                     </div> : null}
                     <p className="text-[11px] font-semibold uppercase text-zinc-400">{idea.source_name || idea.platform}</p>

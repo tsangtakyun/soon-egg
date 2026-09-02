@@ -3,6 +3,7 @@ import { getAnthropic } from "@/lib/ai/anthropic";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
 import { saveApprovedReplyRule, suggestReplyProjectName } from "@/lib/reply-workspace-rules";
+import { saveReplyAttachment, withReplyAttachment } from "@/lib/reply-attachments";
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 type EnquiryBrief = {
@@ -98,9 +99,10 @@ export async function POST(request: Request) {
     }
 
     const suggestedName = ["一般回覆", "General Replies"].includes(project.name) ? suggestReplyProjectName(parsed.brief.brand, parsed.brief.contact) : null;
+    const attachmentUrl = imageData ? await saveReplyAttachment(admin, profile.id, imageData) : null;
     const [{ error: historyError }, { error: briefError }] = await Promise.all([
       admin.from("egg_reply_messages").insert([
-        { creator_id: profile.id, project_id: project.id, role: "user", content: imageData ? `${cleanMessage}\n\n[已附上截圖]` : cleanMessage },
+        { creator_id: profile.id, project_id: project.id, role: "user", content: withReplyAttachment(cleanMessage, attachmentUrl) },
         { creator_id: profile.id, project_id: project.id, role: "assistant", content: parsed.reply },
       ]),
       admin.from("egg_reply_projects").update({ brief: parsed.brief, ...(suggestedName ? { name: suggestedName } : {}), updated_at: new Date().toISOString() }).eq("id", project.id).eq("creator_id", profile.id),
@@ -111,7 +113,7 @@ export async function POST(request: Request) {
     const warning = ruleResult?.warning ?? (historyError || briefError ? "草稿已生成，但部分 Project 紀錄暫時未能儲存。" : undefined);
     if (historyError) console.error("[reply workspace] history save failed", historyError.message);
     if (briefError) console.error("[reply workspace] brief save failed", briefError.message);
-    return NextResponse.json({ reply: parsed.reply, brief: parsed.brief, projectName: suggestedName ?? project.name, ruleSaved: ruleResult?.saved ?? false, warning });
+    return NextResponse.json({ reply: parsed.reply, brief: parsed.brief, projectName: suggestedName ?? project.name, attachmentUrl, ruleSaved: ruleResult?.saved ?? false, warning });
   } catch (error) {
     console.error("[reply workspace] generation failed", error);
     return NextResponse.json({ error: "AI 暫時未能整理查詢，請稍後再試。" }, { status: 502 });

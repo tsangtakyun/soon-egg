@@ -1,6 +1,7 @@
 import { masterSupabase } from "@/lib/supabase/master";
 import { enterTool } from "@/lib/tools";
 import { ReplyClient, type MayanMessage } from "./ReplyClient";
+import { presentReplyMessage } from "@/lib/reply-attachments";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
 
 export default async function ReplyPage() {
@@ -61,5 +62,5 @@ export default async function ReplyPage() {
     .order("created_at", { ascending: true })
     .limit(50);
 
-  return <ReplyClient messages={(messages ?? []) as MayanMessage[]} projects={projects ?? []} />;
+  return <ReplyClient messages={(messages ?? []).map(presentReplyMessage) as MayanMessage[]} projects={projects ?? []} />;
 }

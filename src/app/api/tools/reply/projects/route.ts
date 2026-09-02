@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
+import { presentReplyMessage } from "@/lib/reply-attachments";
 
 async function getContext() {
   const serverSupabase = await createServerClient();
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   if (!project) return NextResponse.json({ error: "找不到呢個 Project。" }, { status: 404 });
   const { data, error } = await context.admin.from("egg_reply_messages").select("id,role,content,created_at").eq("creator_id", context.profile.id).eq("project_id", projectId).order("created_at", { ascending: true }).limit(100);
   if (error) return NextResponse.json({ error: "讀取對話失敗。" }, { status: 500 });
-  return NextResponse.json({ messages: data ?? [] });
+  return NextResponse.json({ messages: (data ?? []).map(presentReplyMessage) });
 }
 
 export async function POST(request: Request) {

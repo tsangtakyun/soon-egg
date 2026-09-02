@@ -26,10 +26,13 @@ export async function PATCH(request: Request) {
   const ideaId = String(form.get("ideaId") ?? "");
   const cover = form.get("cover");
   if (!(cover instanceof File)) return NextResponse.json({ error: "請選擇封面圖片" }, { status: 400 });
-  const { data: idea } = await admin.from("egg_topic_ideas").select("id,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).eq("created_by", user.id).maybeSingle();
+  const platformAdmin = isEggPlatformAdmin(user.email);
+  let ideaQuery = admin.from("egg_topic_ideas").select("id,image_url,media_urls,workspace_id,created_by").eq("id", ideaId).not("workspace_id", "is", null);
+  if (!platformAdmin) ideaQuery = ideaQuery.eq("workspace_id", activeWorkspace.id).eq("created_by", user.id);
+  const { data: idea } = await ideaQuery.maybeSingle();
   if (!idea) return NextResponse.json({ error: "找不到可修改題材" }, { status: 404 });
   try {
-    const imageUrl = await uploadTopicImage(admin, activeWorkspace.id, cover);
+    const imageUrl = await uploadTopicImage(admin, idea.workspace_id, cover);
     const mediaUrls = [imageUrl];
     const { error } = await admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
     if (error) throw error;
@@ -60,7 +63,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   if (body.mode === "repair-cover") {
     const ideaId = typeof body.ideaId === "string" ? body.ideaId : "";
-    const { data: idea } = await admin.from("egg_topic_ideas").select("id,title,platform,source_url,image_url,media_urls").eq("id", ideaId).eq("workspace_id", activeWorkspace.id).maybeSingle();
+    const platformAdmin = isEggPlatformAdmin(user.email);
+    let repairQuery = admin.from("egg_topic_ideas").select("id,title,platform,source_url,image_url,media_urls,workspace_id,created_by").eq("id", ideaId).not("workspace_id", "is", null);
+    if (!platformAdmin) repairQuery = repairQuery.eq("workspace_id", activeWorkspace.id).eq("created_by", user.id);
+    const { data: idea } = await repairQuery.maybeSingle();
     if (!idea) return NextResponse.json({ error: "找不到可修復題材" }, { status: 404 });
     let candidate = idea.image_url ?? "";
     if (idea.source_url) {
@@ -69,9 +75,13 @@ export async function POST(request: Request) {
         const html = (await response.text()).slice(0, 300_000);
         candidate = metaValue(html, "og:image") || candidate;
       } catch (error) { console.warn("Topic cover source refresh unavailable", error instanceof Error ? error.message : error); }
+      if (!candidate || candidate === idea.image_url) {
+        const resolved = await resolveSharedTopicMetadata(idea.source_url);
+        candidate = resolved.image || candidate;
+      }
     }
-    const imageUrl = await persistRemoteTopicCover(admin, activeWorkspace.id, candidate, { title: idea.title, platform: idea.platform });
-    const mediaUrls = [imageUrl, ...(idea.media_urls ?? []).filter((url: string) => url !== idea.image_url && url !== imageUrl)];
+    const imageUrl = await persistRemoteTopicCover(admin, idea.workspace_id, candidate, { title: idea.title, platform: idea.platform });
+    const mediaUrls = [imageUrl];
     const { error } = await admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", idea.id);
     if (error) return NextResponse.json({ error: "未能修復封面" }, { status: 500 });
     return NextResponse.json({ success: true, imageUrl, mediaUrls });
@@ -126,6 +136,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "未能儲存操作" }, { status: 500 });
   }
   return NextResponse.json({ success: true });
+}
+
+async function resolveSharedTopicMetadata(sourceUrl: string) {
+  try {
+    const response = await fetch("https://idea-brainstorm.vercel.app/api/autofill-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: sourceUrl }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) return { image: "", title: "", description: "" };
+    const data = await response.json() as {
+      image?: unknown; image_url?: unknown; thumbnail?: unknown; thumbnail_url?: unknown;
+      ogImage?: unknown; og_image?: unknown; title?: unknown; desc?: unknown;
+      caption?: unknown; metadataDescription?: unknown; description?: unknown;
+      media?: { thumbnail_url?: unknown };
+    };
+    return {
+      image: String(data.image || data.image_url || data.thumbnail || data.thumbnail_url || data.ogImage || data.og_image || data.media?.thumbnail_url || ""),
+      title: String(data.title || ""),
+      description: String(data.desc || data.caption || data.metadataDescription || data.description || ""),
+    };
+  } catch (error) {
+    console.warn("Shared topic resolver unavailable", error instanceof Error ? error.message : error);
+    return { image: "", title: "", description: "" };
+  }
 }
 
 function decodeHtml(value: string) {

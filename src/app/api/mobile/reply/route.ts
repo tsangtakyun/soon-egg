@@ -84,10 +84,27 @@ export async function POST(request: Request) {
   if (body.action === "create_project") {
     const name = body.name?.trim().slice(0, 80);
     if (!name) return NextResponse.json({ error: "請輸入 Project 或聯絡人名稱" }, { status: 400 });
+    const { data: existing } = await context.admin.from("egg_reply_projects")
+      .select("id,name,brief,updated_at").eq("creator_id", context.profile.id)
+      .eq("name", name).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+    if (existing) return NextResponse.json({ project: existing, existing: true });
     const { data, error } = await context.admin.from("egg_reply_projects")
       .insert({ creator_id: context.profile.id, name }).select("id,name,brief,updated_at").single();
     if (error) return NextResponse.json({ error: "建立 Project 失敗" }, { status: 500 });
     return NextResponse.json({ project: data });
+  }
+  if (body.action === "delete_project") {
+    if (!body.projectId) return NextResponse.json({ error: "請選擇要刪除嘅 Project" }, { status: 400 });
+    const { data: project } = await context.admin.from("egg_reply_projects").select("id")
+      .eq("id", body.projectId).eq("creator_id", context.profile.id).maybeSingle();
+    if (!project) return NextResponse.json({ error: "找不到呢個 Project" }, { status: 404 });
+    const { error: messagesError } = await context.admin.from("egg_reply_messages").delete()
+      .eq("creator_id", context.profile.id).eq("project_id", project.id);
+    if (messagesError) return NextResponse.json({ error: "未能刪除 Project 對話" }, { status: 500 });
+    const { error } = await context.admin.from("egg_reply_projects").delete()
+      .eq("id", project.id).eq("creator_id", context.profile.id);
+    if (error) return NextResponse.json({ error: "未能刪除 Project" }, { status: 500 });
+    return NextResponse.json({ success: true });
   }
   if (body.action !== "chat") return NextResponse.json({ error: "不支援嘅操作" }, { status: 400 });
   return generateReply(context, body);

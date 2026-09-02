@@ -147,10 +147,17 @@ export async function GET(req: NextRequest) {
       const requestedWorkspace = workspaces.find((workspace) => workspace.id === requestedWorkspaceId);
       if (!requestedWorkspace) return NextResponse.redirect(`${destinationUrl}?instagram_error=invalid_workspace`);
       const admin = createEggAdmin();
+      const { data: existingProfile } = await admin
+        .from("egg_creator_profiles")
+        .select("avatar_url")
+        .eq("id", requestedWorkspaceId)
+        .maybeSingle();
       const { error: updateError } = await admin.from("egg_creator_profiles").update({
         instagram_handle: profile.username,
         instagram_followers: profile.followers_count || 0,
-        avatar_url: profile.profile_picture_url || null,
+        // A creator's manually uploaded avatar is their explicit choice. Only
+        // seed from Instagram when the workspace does not have an avatar yet.
+        avatar_url: existingProfile?.avatar_url || profile.profile_picture_url || null,
         instagram_access_token: accessToken,
         instagram_user_id: profile.user_id || profile.id,
       }).eq("id", requestedWorkspaceId);
@@ -228,7 +235,7 @@ export async function GET(req: NextRequest) {
       const admin = createEggAdmin();
       const { data: existingProfile } = await admin
         .from("egg_creator_profiles")
-        .select("audience_demographics")
+        .select("audience_demographics,avatar_url")
         .eq("id", requestedWorkspaceId)
         .maybeSingle();
       const currentAudience = (
@@ -240,7 +247,7 @@ export async function GET(req: NextRequest) {
         instagram_handle: profile.username,
         instagram_followers: profile.followers_count || 0,
         facebook_handle: page.name || null,
-        avatar_url: profile.profile_picture_url || null,
+        avatar_url: existingProfile?.avatar_url || profile.profile_picture_url || null,
         instagram_access_token: pageAccessToken,
         instagram_user_id: profile.id || null,
         audience_demographics: {
@@ -265,7 +272,7 @@ export async function GET(req: NextRequest) {
             instagram_handle: profile.username,
             instagram_followers: profile.followers_count || 0,
             facebook_handle: page.name || null,
-            avatar_url: profile.profile_picture_url || null,
+            avatar_url: existingProfile?.avatar_url || profile.profile_picture_url || null,
           })
           .eq("id", requestedWorkspaceId);
 

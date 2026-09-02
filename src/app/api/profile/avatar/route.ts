@@ -122,3 +122,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Avatar upload failed" }, { status: 500 });
   }
 }
+
+export async function PATCH() {
+  const authSupabase = await createClient();
+  const { data: { user } = { user: null } } = authSupabase ? await authSupabase.auth.getUser() : { data: { user: null } };
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const { profile } = await getActiveCreatorProfile("id");
+  if (!profile) return NextResponse.json({ error: "Creator workspace not found" }, { status: 404 });
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return NextResponse.json({ error: "Storage is not configured" }, { status: 500 });
+
+  try {
+    const serviceSupabase = createServiceClient(url, serviceKey, { auth: { persistSession: false } });
+    const pathPrefix = `${user.id}/${profile.id}`;
+    const { data: files, error: listError } = await serviceSupabase.storage.from(AVATAR_BUCKET).list(pathPrefix, { limit: 20 });
+    if (listError) throw listError;
+
+    const uploadedAvatar = files?.find((file) => /^avatar\.(?:jpe?g|png|webp|gif)$/i.test(file.name));
+    if (!uploadedAvatar) return NextResponse.json({ error: "No uploaded avatar found" }, { status: 404 });
+
+    const objectPath = `${pathPrefix}/${uploadedAvatar.name}`;
+    const { data } = serviceSupabase.storage.from(AVATAR_BUCKET).getPublicUrl(objectPath);
+    const avatarUrl = `${data.publicUrl}?t=${Date.now()}`;
+    const { error: updateError } = await serviceSupabase
+      .from("egg_creator_profiles")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", profile.id)
+      .eq("user_id", user.id);
+    if (updateError) throw updateError;
+
+    return NextResponse.json({ avatarUrl });
+  } catch (error) {
+    console.error("Avatar restore error:", error);
+    return NextResponse.json({ error: "Avatar restore failed" }, { status: 500 });
+  }
+}

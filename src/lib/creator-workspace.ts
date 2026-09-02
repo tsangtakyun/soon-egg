@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createClient as createAdminClient, type User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 
@@ -39,13 +39,25 @@ export async function getCreatorWorkspaceContext() {
 
   const admin = createEggAdmin();
   await acceptPendingWorkspaceInvitations(admin, user.id, user.email);
-  const { data: memberships, error } = await admin
+  const membershipQuery = await admin
     .from("egg_creator_workspace_members")
     .select(
       "role,workspace:egg_creator_profiles!inner(id,username,display_name,avatar_url,onboarding_completed,created_at)",
     )
     .eq("user_id", user.id);
-  if (error) throw error;
+  if (membershipQuery.error) throw membershipQuery.error;
+  let memberships = membershipQuery.data;
+  if (!memberships?.length) {
+    await ensureCreatorWorkspace(admin, user);
+    const retry = await admin
+      .from("egg_creator_workspace_members")
+      .select(
+        "role,workspace:egg_creator_profiles!inner(id,username,display_name,avatar_url,onboarding_completed,created_at)",
+      )
+      .eq("user_id", user.id);
+    if (retry.error) throw retry.error;
+    memberships = retry.data;
+  }
   const workspaces = (memberships ?? [])
     .map((membership) => {
       const workspace = Array.isArray(membership.workspace)
@@ -75,6 +87,62 @@ export async function getCreatorWorkspaceContext() {
     activeRole: activeWorkspace?.role ?? null,
     admin,
   };
+}
+
+async function ensureCreatorWorkspace(
+  admin: ReturnType<typeof createEggAdmin>,
+  user: User,
+) {
+  const { data: existingProfile, error: existingError } = await admin
+    .from("egg_creator_profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  let workspaceId = existingProfile?.id ?? null;
+  if (!workspaceId) {
+    const preferredName =
+      (typeof user.user_metadata?.display_name === "string" && user.user_metadata.display_name.trim()) ||
+      (typeof user.user_metadata?.full_name === "string" && user.user_metadata.full_name.trim()) ||
+      user.email?.split("@")[0] ||
+      "creator";
+    const base = preferredName
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 24) || "creator";
+    let username = base;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const { data: collision } = await admin.from("egg_creator_profiles").select("id").eq("username", username).maybeSingle();
+      if (!collision) break;
+      username = `${base}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+    const { data: created, error: createError } = await admin
+      .from("egg_creator_profiles")
+      .insert({
+        user_id: user.id,
+        username,
+        display_name: preferredName,
+        is_public: false,
+        onboarding_completed: false,
+      })
+      .select("id")
+      .single();
+    if (createError || !created) throw createError ?? new Error("Creator workspace creation failed");
+    workspaceId = created.id;
+  }
+
+  const { error: membershipError } = await admin.from("egg_creator_workspace_members").upsert({
+    workspace_id: workspaceId,
+    user_id: user.id,
+    email: user.email?.trim().toLowerCase() || `${user.id}@workspace.local`,
+    role: "owner",
+  }, { onConflict: "workspace_id,user_id" });
+  if (membershipError) throw membershipError;
 }
 
 export async function getActiveCreatorProfile(select: string) {

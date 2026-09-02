@@ -161,3 +161,9 @@ export async function PATCH() {
     return NextResponse.json({ error: "Avatar restore failed" }, { status: 500 });
   }
 }
+
+// Authenticated recovery link used when a social reconnect previously replaced
+// a creator's uploaded avatar. It only restores that user's existing object.
+export async function GET() {
+  return PATCH();
+}

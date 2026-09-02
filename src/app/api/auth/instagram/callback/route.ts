@@ -74,8 +74,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = requestUrl;
   // Reuse the exact byte-for-byte redirect URI sent to Meta. Reconstructing it
   // from the callback request can differ behind Vercel's proxy/custom domain.
-  const redirectUri = req.cookies.get(OAUTH_REDIRECT_COOKIE)?.value
-    || `${requestUrl.origin}/api/auth/instagram/callback`;
+  const storedRedirectUri = req.cookies.get(OAUTH_REDIRECT_COOKIE)?.value;
+  const redirectUri = storedRedirectUri
+    ? decodeURIComponent(storedRedirectUri)
+    : `${requestUrl.origin}/api/auth/instagram/callback`;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
   const state = searchParams.get("state");

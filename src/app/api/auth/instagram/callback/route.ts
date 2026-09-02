@@ -7,6 +7,7 @@ const OAUTH_STATE_COOKIE = "egg-instagram-oauth-state";
 const OAUTH_WORKSPACE_COOKIE = "egg-instagram-oauth-workspace";
 const OAUTH_NEXT_COOKIE = "egg-instagram-oauth-next";
 const OAUTH_PROVIDER_COOKIE = "egg-instagram-oauth-provider";
+const OAUTH_REDIRECT_COOKIE = "egg-instagram-oauth-redirect";
 
 type FacebookPage = {
   id: string;
@@ -71,7 +72,10 @@ async function findInstagramProfile(userAccessToken: string): Promise<{
 export async function GET(req: NextRequest) {
   const requestUrl = new URL(req.url);
   const { searchParams } = requestUrl;
-  const redirectUri = `${requestUrl.origin}/api/auth/instagram/callback`;
+  // Reuse the exact byte-for-byte redirect URI sent to Meta. Reconstructing it
+  // from the callback request can differ behind Vercel's proxy/custom domain.
+  const redirectUri = req.cookies.get(OAUTH_REDIRECT_COOKIE)?.value
+    || `${requestUrl.origin}/api/auth/instagram/callback`;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
   const state = searchParams.get("state");
@@ -158,6 +162,7 @@ export async function GET(req: NextRequest) {
       response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
       response.cookies.delete(OAUTH_NEXT_COOKIE);
       response.cookies.delete(OAUTH_PROVIDER_COOKIE);
+      response.cookies.delete(OAUTH_REDIRECT_COOKIE);
       return response;
     }
 
@@ -304,6 +309,7 @@ export async function GET(req: NextRequest) {
     response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
     response.cookies.delete(OAUTH_NEXT_COOKIE);
     response.cookies.delete(OAUTH_PROVIDER_COOKIE);
+    response.cookies.delete(OAUTH_REDIRECT_COOKIE);
     return response;
   } catch (err) {
     console.error("Instagram OAuth error:", err);

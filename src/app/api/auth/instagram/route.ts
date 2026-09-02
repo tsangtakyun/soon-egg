@@ -5,6 +5,7 @@ const OAUTH_STATE_COOKIE = "egg-instagram-oauth-state";
 const OAUTH_WORKSPACE_COOKIE = "egg-instagram-oauth-workspace";
 const OAUTH_NEXT_COOKIE = "egg-instagram-oauth-next";
 const OAUTH_PROVIDER_COOKIE = "egg-instagram-oauth-provider";
+const OAUTH_REDIRECT_COOKIE = "egg-instagram-oauth-redirect";
 
 export async function GET(req: NextRequest) {
   const baseUrl = new URL(req.url).origin;
@@ -46,5 +47,6 @@ export async function GET(req: NextRequest) {
   response.cookies.set(OAUTH_WORKSPACE_COOKIE, activeWorkspace.id, cookieOptions);
   response.cookies.set(OAUTH_NEXT_COOKIE, nextPath, cookieOptions);
   response.cookies.set(OAUTH_PROVIDER_COOKIE, provider, cookieOptions);
+  response.cookies.set(OAUTH_REDIRECT_COOKIE, redirectUri, cookieOptions);
   return response;
 }

@@ -16,6 +16,7 @@ type InstagramMedia = {
 type InstagramMediaResponse = { data?: InstagramMedia[]; error?: { message?: string } };
 type InstagramInsightRow = { name?: string; values?: Array<{ value?: number }>; total_value?: { value?: number } };
 type InstagramInsightsResponse = { data?: InstagramInsightRow[]; error?: { message?: string } };
+type InstagramGraphProvider = "instagram" | "facebook";
 
 export type InstagramSyncProfile = {
   id: string;
@@ -38,25 +39,42 @@ export type InstagramSyncResult = {
 
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 
-async function fetchInstagramProfile(instagramUserId: string | null, accessToken: string): Promise<InstagramProfile> {
+function graphUrl(provider: InstagramGraphProvider, path: string) {
+  const host = provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com";
+  return new URL(`https://${host}/${GRAPH_VERSION}/${path}`);
+}
+
+async function fetchInstagramProfile(instagramUserId: string | null, accessToken: string): Promise<{
+  profile: InstagramProfile;
+  provider: InstagramGraphProvider;
+}> {
   const fields = "id,username,followers_count,media_count";
+  // Instagram Login tokens are independent from Facebook Pages. Try the
+  // Instagram host first so creator connections never get sent to the legacy
+  // Facebook Page endpoints.
+  const instagramUrl = graphUrl("instagram", "me");
+  instagramUrl.searchParams.set("fields", fields);
+  instagramUrl.searchParams.set("access_token", accessToken);
+  const instagramResponse = await fetch(instagramUrl.toString(), { cache: "no-store" });
+  const instagramData = (await instagramResponse.json()) as InstagramProfile;
+  if (instagramResponse.ok && !instagramData.error && instagramData.id) {
+    return { profile: instagramData, provider: "instagram" };
+  }
+
   if (instagramUserId) {
-    const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}`);
+    const url = graphUrl("facebook", encodeURIComponent(instagramUserId));
     url.searchParams.set("fields", fields);
     url.searchParams.set("access_token", accessToken);
     const response = await fetch(url.toString(), { cache: "no-store" });
     const data = (await response.json()) as InstagramProfile;
-    if (response.ok && !data.error) return data;
+    if (response.ok && !data.error) return { profile: data, provider: "facebook" };
+    throw new Error(data.error?.message || instagramData.error?.message || "Instagram sync failed");
   }
-  const url = new URL("https://graph.instagram.com/me");
-  url.searchParams.set("fields", fields);
-  url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url.toString(), { cache: "no-store" });
-  return (await response.json()) as InstagramProfile;
+  throw new Error(instagramData.error?.message || "Instagram sync failed");
 }
 
-async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: string): Promise<InstagramMediaResponse> {
-  const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}/media`);
+async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: string, provider: InstagramGraphProvider): Promise<InstagramMediaResponse> {
+  const url = graphUrl(provider, `${encodeURIComponent(instagramUserId)}/media`);
   url.searchParams.set("fields", "id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,like_count,comments_count,timestamp");
   url.searchParams.set("limit", "12");
   url.searchParams.set("access_token", accessToken);
@@ -64,10 +82,10 @@ async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: s
   return (await response.json()) as InstagramMediaResponse;
 }
 
-async function fetchMediaInsights(mediaId: string, accessToken: string) {
+async function fetchMediaInsights(mediaId: string, accessToken: string, provider: InstagramGraphProvider) {
   const metrics: Record<string, number> = {};
   for (const metric of ["views", "plays", "reach", "total_interactions"]) {
-    const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(mediaId)}/insights`);
+    const url = graphUrl(provider, `${encodeURIComponent(mediaId)}/insights`);
     url.searchParams.set("metric", metric);
     url.searchParams.set("access_token", accessToken);
     try {
@@ -95,7 +113,7 @@ function insightValue(row: InstagramInsightRow) {
   }, 0);
 }
 
-async function fetchOfficialInsights(instagramUserId: string, accessToken: string) {
+async function fetchOfficialInsights(instagramUserId: string, accessToken: string, provider: InstagramGraphProvider) {
   const until = new Date();
   until.setUTCHours(0, 0, 0, 0);
   const since = new Date(until);
@@ -108,7 +126,7 @@ async function fetchOfficialInsights(instagramUserId: string, accessToken: strin
   ];
 
   for (const attempt of attempts) {
-    const url = new URL(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(instagramUserId)}/insights`);
+    const url = graphUrl(provider, `${encodeURIComponent(instagramUserId)}/insights`);
     url.searchParams.set("access_token", accessToken);
     url.searchParams.set("metric", attempt.metric);
     url.searchParams.set("period", "day");
@@ -135,7 +153,7 @@ async function fetchOfficialInsights(instagramUserId: string, accessToken: strin
 }
 
 export async function syncInstagramProfile(supabase: SupabaseClient, profile: InstagramSyncProfile): Promise<InstagramSyncResult> {
-  const data = await fetchInstagramProfile(profile.instagram_user_id, profile.instagram_access_token);
+  const { profile: data, provider } = await fetchInstagramProfile(profile.instagram_user_id, profile.instagram_access_token);
   if (data.error) throw new Error(data.error.message || "Instagram sync failed");
 
   const instagramUserId = data.id || profile.instagram_user_id;
@@ -146,7 +164,7 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
 
   let recentMedia: InstagramMedia[] = [];
   if (instagramUserId && followers > 0) {
-    const mediaResponse = await fetchRecentInstagramMedia(instagramUserId, profile.instagram_access_token);
+    const mediaResponse = await fetchRecentInstagramMedia(instagramUserId, profile.instagram_access_token, provider);
     const media = mediaResponse.data ?? [];
     recentMedia = media;
     if (mediaResponse.error) engagementUnavailableReason = mediaResponse.error.message || "Meta 暫時未提供貼文互動數據";
@@ -159,7 +177,7 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
   } else engagementUnavailableReason = "缺少 Instagram 帳戶或粉絲數據";
 
   const official = instagramUserId
-    ? await fetchOfficialInsights(instagramUserId, profile.instagram_access_token)
+    ? await fetchOfficialInsights(instagramUserId, profile.instagram_access_token, provider)
     : { metrics: {} as Record<string, number>, unavailableReason: "缺少 Instagram account id", window: null };
   const syncedAt = new Date().toISOString();
   const currentAudience = profile.audience_demographics && !Array.isArray(profile.audience_demographics)
@@ -172,6 +190,7 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
     audience_demographics: {
       ...currentAudience,
       instagram_sync: {
+        provider,
         synced_at: syncedAt,
         engagement_sample_size: engagementSampleSize,
         engagement_method: "recent_media_interactions_by_followers",
@@ -203,7 +222,7 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
   if (recentMedia.length > 0) {
     const enriched = await Promise.all(recentMedia.map(async (media) => ({
       media,
-      insights: await fetchMediaInsights(media.id, profile.instagram_access_token),
+      insights: await fetchMediaInsights(media.id, profile.instagram_access_token, provider),
     })));
     const mediaRows = enriched.map(({ media, insights }) => ({
       creator_id: profile.id,

@@ -154,7 +154,7 @@ async function listLocalTopics(workspaceId: string) {
       console.error("Legacy Instagram topic cover migration failed", topic.id, migrationError);
     }
   }));
-  const appendedFallbacks = localTopics.filter((topic) => topic.manageable && topic.platform === "Instagram" && topic.image_url && topic.image_url !== "https://egg.sooncreator.network/creative.jpg" && topic.media_urls?.includes("https://egg.sooncreator.network/creative.jpg"));
+  const appendedFallbacks = localTopics.filter((topic) => topic.manageable && topic.source_name === "instagram.com" && topic.image_url && (topic.media_urls?.length ?? 0) > 1);
   await Promise.all(appendedFallbacks.map(async (topic) => {
     const mediaUrls = [topic.image_url as string];
     const { error: cleanupError } = await admin.from("egg_topic_ideas").update({ media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", topic.id).eq("workspace_id", workspaceId);

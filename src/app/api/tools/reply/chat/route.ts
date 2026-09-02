@@ -21,6 +21,26 @@ type EnquiryBrief = {
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const allowedMedia = new Set(["image/jpeg", "image/png", "image/webp"]);
+const replyOutputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["brief", "reply"],
+  properties: {
+    brief: {
+      type: "object",
+      additionalProperties: false,
+      required: ["summary", "brand", "contact", "collaborationType", "deliverables", "timeline", "usageRights", "exclusivity", "budget", "missing", "risks", "nextSteps"],
+      properties: {
+        summary: { type: "string" }, brand: { type: "string" }, contact: { type: "string" },
+        collaborationType: { type: "string" }, deliverables: { type: "array", items: { type: "string" } },
+        timeline: { type: "string" }, usageRights: { type: "string" }, exclusivity: { type: "string" },
+        budget: { type: "string" }, missing: { type: "array", items: { type: "string" } },
+        risks: { type: "array", items: { type: "string" } }, nextSteps: { type: "array", items: { type: "string" } },
+      },
+    },
+    reply: { type: "string" },
+  },
+} as const;
 
 export async function POST(request: Request) {
   const serverSupabase = await createServerClient();
@@ -61,7 +81,8 @@ export async function POST(request: Request) {
     const categories = Array.isArray(profile.content_categories) ? profile.content_categories.join("、") : "未設定";
     const response = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 2500,
+      max_tokens: 3500,
+      output_config: { format: { type: "json_schema", schema: replyOutputSchema } },
       system: `${promptProfile.system_prompt}\n\n你而家要一次過完成內部 Enquiry Brief 及對客戶第一輪回覆草稿。不可虛構資料。只輸出有效 JSON，不要 Markdown code fence：\n{"brief":{"summary":"","brand":"","contact":"","collaborationType":"","deliverables":[],"timeline":"","usageRights":"","exclusivity":"","budget":"","missing":[],"risks":[],"nextSteps":[]},"reply":"可直接發給客戶的回覆草稿"}`,
       messages: [...history, { role: "user" as const, content: imageData ? [
         { type: "image" as const, source: { type: "base64" as const, media_type: imageData.mediaType as "image/jpeg" | "image/png" | "image/webp", data: imageData.data! } },
@@ -70,7 +91,10 @@ export async function POST(request: Request) {
     });
     const raw = response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
     const parsed = parseResult(raw);
-    if (!parsed) throw new Error("Invalid structured response");
+    if (!parsed) {
+      console.error("[reply workspace] invalid structured response", { stopReason: response.stop_reason, outputLength: raw.length });
+      throw new Error("Invalid structured response");
+    }
 
     const [{ error: historyError }, { error: briefError }] = await Promise.all([
       admin.from("egg_reply_messages").insert([

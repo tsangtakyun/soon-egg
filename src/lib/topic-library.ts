@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createEggAdmin, type WorkspaceRole } from "@/lib/creator-workspace";
+import { persistRemoteTopicCover } from "@/lib/topic-media";
 
 const DEFAULT_TOPIC_API = "https://soon-core.vercel.app/api/topics";
 
@@ -136,10 +137,24 @@ async function listLocalTopics(workspaceId: string) {
     .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_at")
     .eq("status", "published").not("workspace_id", "is", null).order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((topic) => ({
+  const localTopics = (data ?? []).map((topic) => ({
     ...(topic as TopicIdea),
     manageable: topic.workspace_id === workspaceId,
   }));
+  const legacyCovers = localTopics.filter((topic) => topic.manageable && topic.image_url?.includes("cdninstagram.com"));
+  await Promise.all(legacyCovers.map(async (topic) => {
+    try {
+      const imageUrl = await persistRemoteTopicCover(admin, workspaceId, topic.image_url ?? "", { title: topic.title, platform: topic.platform });
+      const mediaUrls = [imageUrl, ...(topic.media_urls ?? []).filter((url) => url !== topic.image_url && url !== imageUrl)];
+      const { error: updateError } = await admin.from("egg_topic_ideas").update({ image_url: imageUrl, media_urls: mediaUrls, updated_at: new Date().toISOString() }).eq("id", topic.id).eq("workspace_id", workspaceId);
+      if (updateError) throw updateError;
+      topic.image_url = imageUrl;
+      topic.media_urls = mediaUrls;
+    } catch (migrationError) {
+      console.error("Legacy Instagram topic cover migration failed", topic.id, migrationError);
+    }
+  }));
+  return localTopics;
 }
 
 export async function listTopicIdeas(workspaceId: string, preferredCategories?: string[]) {

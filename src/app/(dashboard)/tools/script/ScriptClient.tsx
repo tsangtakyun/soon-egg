@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { Check, Clipboard, FileText, Loader2, Save } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export type SavedScript = {
   id: string;
@@ -194,12 +194,7 @@ export function ScriptClient({
             </div>
 
             {generatedScript ? (
-              <>
-                <div className="max-h-[560px] overflow-y-auto whitespace-pre-wrap rounded-2xl bg-zinc-50 p-4 font-mono text-sm leading-7 text-zinc-800">{generatedScript}</div>
-                <Link href={`/tools/storyboard?script=${encodeURIComponent(generatedScript.substring(0, 500))}`} prefetch={false} className="mt-3 block text-xs font-medium text-purple-600 hover:underline">
-                  → 推去分鏡工作台
-                </Link>
-              </>
+              <ScriptPreview script={generatedScript} />
             ) : (
               <div className="flex min-h-[360px] items-center justify-center rounded-2xl bg-zinc-50 px-6 text-center text-sm text-zinc-400">完成 01-07 後，生成劇本會顯示在這裡。</div>
             )}
@@ -220,6 +215,52 @@ export function ScriptClient({
         </aside>
       </section>
     </main>
+  );
+}
+
+function ScriptPreview({ script }: { script: string }) {
+  return (
+    <div className="max-h-[620px] overflow-y-auto rounded-2xl border border-zinc-100 bg-zinc-50 px-4 py-5 sm:px-5">
+      <ReactMarkdown
+        components={{
+          h1: ({ children }) => <h3 className="mb-4 text-xl font-black leading-tight text-zinc-950">{children}</h3>,
+          h2: ({ children }) => (
+            <h3 className="mb-3 mt-7 border-l-4 border-purple-500 pl-3 text-base font-bold leading-snug text-zinc-950 first:mt-0">
+              {children}
+            </h3>
+          ),
+          h3: ({ children }) => <h4 className="mb-2 mt-5 text-sm font-bold text-zinc-900">{children}</h4>,
+          p: ({ children }) => <p className="my-3 text-[15px] leading-7 text-zinc-700">{children}</p>,
+          strong: ({ children }) => {
+            const label = String(children);
+            const isCamera = label.includes("鏡頭") || label.includes("畫面");
+            const isVoice = label.includes("旁白") || label.includes("VO");
+            if (isCamera || isVoice) {
+              return (
+                <strong
+                  className={`mr-2 inline-flex rounded-md px-2 py-0.5 text-xs font-bold tracking-wide ${
+                    isCamera ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {children}
+                </strong>
+              );
+            }
+            return <strong className="font-bold text-zinc-950">{children}</strong>;
+          },
+          blockquote: ({ children }) => (
+            <blockquote className="my-3 rounded-xl border border-zinc-200 bg-white px-4 py-1 shadow-sm [&>p]:my-2 [&>p]:text-zinc-900">
+              {children}
+            </blockquote>
+          ),
+          hr: () => <hr className="my-6 border-zinc-200" />,
+          ul: ({ children }) => <ul className="my-3 list-disc space-y-2 pl-5 text-sm leading-7 text-zinc-700">{children}</ul>,
+          ol: ({ children }) => <ol className="my-3 list-decimal space-y-2 pl-5 text-sm leading-7 text-zinc-700">{children}</ol>,
+        }}
+      >
+        {script}
+      </ReactMarkdown>
+    </div>
   );
 }
 

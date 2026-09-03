@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Clipboard, FileText, Loader2, Save } from "lucide-react";
+import { Check, Clipboard, FileText, Loader2, MessageCircle, Save } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 export type SavedScript = {
@@ -80,6 +80,7 @@ export function ScriptClient({
   const [generatedId, setGeneratedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [whatsAppCopied, setWhatsAppCopied] = useState(false);
   const [balance, setBalance] = useState(initialBalance);
   const [savedScripts, setSavedScripts] = useState<SavedScript[]>(scripts);
   const [showPrevious, setShowPrevious] = useState(true);
@@ -117,6 +118,13 @@ export function ScriptClient({
     await navigator.clipboard.writeText(generatedScript);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
+  }
+
+  async function handleWhatsAppCopy() {
+    if (!generatedScript) return;
+    await navigator.clipboard.writeText(formatScriptForWhatsApp(generatedScript));
+    setWhatsAppCopied(true);
+    window.setTimeout(() => setWhatsAppCopied(false), 1800);
   }
 
   return (
@@ -182,6 +190,10 @@ export function ScriptClient({
                 {generatedId && <p className="mt-1 text-xs text-zinc-400">已儲存至劇本庫</p>}
               </div>
               <div className="flex gap-2">
+                <button onClick={handleWhatsAppCopy} disabled={!generatedScript} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40" type="button">
+                  {whatsAppCopied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <MessageCircle className="h-3.5 w-3.5" aria-hidden />}
+                  {whatsAppCopied ? "已複製" : "WhatsApp 格式"}
+                </button>
                 <button onClick={handleCopy} disabled={!generatedScript} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-40" type="button">
                   {copied ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Clipboard className="h-3.5 w-3.5" aria-hidden />}
                   {copied ? "已複製" : "複製"}
@@ -216,6 +228,26 @@ export function ScriptClient({
       </section>
     </main>
   );
+}
+
+function formatScriptForWhatsApp(script: string) {
+  return script
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (/^-{3,}$/.test(trimmed)) return "";
+      if (/^#{1,6}\s+/.test(trimmed)) {
+        return `*${trimmed.replace(/^#{1,6}\s+/, "").replace(/\*\*/g, "")}*`;
+      }
+      return line
+        .replace(/^\s*>\s?/, "")
+        .replace(/\*\*\[(?:鏡頭|畫面)\]\*\*/g, "🎥 *畫面*")
+        .replace(/\*\*\[(?:旁白|VO)\]\*\*/gi, "🎙️ *VO／旁白*")
+        .replace(/\*\*(.+?)\*\*/g, "*$1*");
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function ScriptPreview({ script }: { script: string }) {

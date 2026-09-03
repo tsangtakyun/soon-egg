@@ -199,7 +199,7 @@ export default async function DashboardHome() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Metric icon={UserRound} label="總粉絲數" value={formatCompact(reach)} trend={followerTrend} />
+              <Metric icon={UserRound} label="總粉絲數" value={formatExactNumber(reach)} trend={followerTrend} />
               <Metric
                 icon={ChartNoAxesCombined}
                 label={instagramSync.sampleSize ? `IG 近 ${instagramSync.sampleSize} 篇互動率` : "Instagram 互動率"}
@@ -225,6 +225,12 @@ function formatCompact(value: number) {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
+}
+
+function formatExactNumber(value: number) {
+  return new Intl.NumberFormat("zh-HK", {
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
 }
 
 function getInstagramSync(value: Record<string, unknown> | null) {

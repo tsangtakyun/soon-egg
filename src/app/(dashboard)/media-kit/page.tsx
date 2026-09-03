@@ -650,6 +650,8 @@ export default function MediaKitPage() {
   const [editingRateId, setEditingRateId] = useState<string | null>(null);
   const [previewKey, setPreviewKey] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -658,32 +660,28 @@ export default function MediaKitPage() {
 
     async function load() {
       setLoading(true);
-      const workspaceResponse = await fetch("/api/creator-workspaces", { cache: "no-store" });
-      const workspaceData = await workspaceResponse.json().catch(() => ({}));
-      const activeCreatorId = workspaceData.activeWorkspaceId as string | undefined;
-      if (!workspaceResponse.ok || !activeCreatorId) {
+      setLoadError(null);
+      try {
+        const response = await fetch("/api/media-kit", { cache: "no-store" });
+        const payload = (await response.json().catch(() => ({}))) as {
+          profile?: CreatorProfile;
+          rateCards?: RateCard[];
+          error?: string;
+        };
+        if (!response.ok || !payload.profile) {
+          throw new Error(payload.error || "未能讀取 Media Kit 資料");
+        }
+        if (!cancelled) {
+          setProfile(payload.profile);
+          setRateCards(payload.rateCards ?? []);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setProfile(null);
+          setLoadError(error instanceof Error ? error.message : "未能讀取 Media Kit 資料");
+        }
+      } finally {
         if (!cancelled) setLoading(false);
-        return;
-      }
-
-      const { data: creator } = await supabase.from("egg_creator_profiles").select("*").eq("id", activeCreatorId).single();
-
-      if (!creator) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase
-        .from("egg_rate_cards")
-        .select("*")
-        .eq("creator_id", creator.id)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
-
-      if (!cancelled) {
-        setProfile(creator as CreatorProfile);
-        setRateCards((data ?? []) as RateCard[]);
-        setLoading(false);
       }
     }
 
@@ -692,7 +690,7 @@ export default function MediaKitPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [loadAttempt]);
 
   async function saveProfile(updates: Partial<CreatorProfile>, refreshPreview = true) {
     if (!profile) return;
@@ -825,8 +823,19 @@ export default function MediaKitPage() {
           </div>
 
           <div className="max-h-[calc(100vh-210px)] overflow-y-auto">
-            {loading || !profile ? (
+            {loading ? (
               <p className="py-12 text-center text-sm text-zinc-400">載入 Media Kit 設定中...</p>
+            ) : loadError || !profile ? (
+              <div className="px-6 py-12 text-center">
+                <p className="text-sm font-medium text-red-700">{loadError || "找不到 Media Kit 資料"}</p>
+                <button
+                  type="button"
+                  onClick={() => setLoadAttempt((current) => current + 1)}
+                  className="mt-4 rounded-full bg-black px-4 py-2 text-sm font-semibold text-white"
+                >
+                  重新載入
+                </button>
+              </div>
             ) : (
               <>
                 {activeTab === "design" && (

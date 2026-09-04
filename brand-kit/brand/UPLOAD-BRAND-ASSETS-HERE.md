@@ -1,0 +1,1 @@
+Upload the approved Egg.soon reference image files to this folder. Keep filenames lowercase and use hyphens.

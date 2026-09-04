@@ -1,0 +1,49 @@
+version: 1
+
+brand:
+  character_sheet: brand-kit/brand/eggy-character-sheet.png
+  expression_library: brand-kit/brand/eggy-expression-library.png
+  visual_language: brand-kit/brand/egg-soon-visual-language.png
+  layout_references: brand-kit/layout-references/
+
+output:
+  format: png
+  aspect_ratio: "4:5"
+  language: zh-Hant
+  default_pages: 9
+
+workflow:
+  fact_check_first: true
+  lock_storyboard_before_generation: true
+  map_source_images_before_generation: true
+  generate_one_page_at_a_time: true
+  require_approval_between_pages: true
+
+character:
+  name: Eggy
+  body_count: 1
+  yolk_face_count: 1
+  arm_count: 2
+  leg_count: 2
+  outline: dark_brown
+  personality:
+    - optimistic
+    - food_lover
+    - troublemaker
+
+design:
+  background: warm_off_white
+  primary_text: dark_brown
+  accent_colors:
+    - warm_red
+    - egg_yellow
+  max_decorations_per_page: 3
+  preserve_news_photo_realism: true
+  instagram_ui: false
+  page_counter: false
+  fake_logo: false
+
+editing:
+  exact_target_only: true
+  preserve_unmentioned_elements: true
+  reconstruct_removed_background: true

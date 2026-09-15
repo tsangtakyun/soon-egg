@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createEggAdmin } from "@/lib/creator-workspace";
 import { getTopicMembership, listTopicIdeas } from "@/lib/topic-library";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
-import { persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
+import { isWorkspaceTopicMediaUrl, persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
 import { isEggPlatformAdmin } from "@/lib/platform-admin";
 
 function bearerToken(request: Request) {
@@ -24,7 +24,16 @@ export async function GET(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   try {
-    return NextResponse.json({ ideas: await listTopicIdeas(auth.workspaceId, auth.user.id), role: auth.role, canDelete: isEggPlatformAdmin(auth.user.email) });
+    const ideas = (await listTopicIdeas(auth.workspaceId, auth.user.id))
+      .filter((idea) => idea.scope === "central")
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    return NextResponse.json({
+      ideas,
+      scope: "central",
+      source: "soon-core",
+      role: auth.role,
+      canDelete: isEggPlatformAdmin(auth.user.email),
+    });
   } catch (error) {
     console.error("Mobile topic library load failed", error);
     return NextResponse.json({ error: "未能載入題材靈感" }, { status: 500 });
@@ -140,8 +149,18 @@ export async function POST(request: Request) {
     if (parsedUrl.protocol !== "https:" || !allowedHosts.includes(hostname)) return NextResponse.json({ error: "暫時支援 Instagram、Threads、YouTube、TikTok 及小紅書連結" }, { status: 400 });
 
     const { data: existing } = await auth.admin.from("egg_topic_ideas")
-      .select("id").eq("workspace_id", auth.workspaceId).eq("source_url", parsedUrl.toString()).limit(1).maybeSingle();
-    if (existing?.id) return NextResponse.json({ success: true, ideaId: existing.id, existing: true });
+      .select("id,image_url,workspace_id").eq("source_url", parsedUrl.toString()).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    if (existing?.id) {
+      if (existing.workspace_id === auth.workspaceId && isWorkspaceTopicMediaUrl(requestedImage, auth.workspaceId) && existing.image_url !== requestedImage) {
+        const { error: coverError } = await auth.admin.from("egg_topic_ideas").update({
+          image_url: requestedImage,
+          media_urls: [requestedImage],
+          updated_at: new Date().toISOString(),
+        }).eq("id", existing.id).eq("workspace_id", auth.workspaceId);
+        if (coverError) console.warn("Existing shared topic cover update failed", coverError.message);
+      }
+      return NextResponse.json({ success: true, ideaId: existing.id, existing: true });
+    }
 
     let pageTitle = "";
     let pageDescription = "";
@@ -187,10 +206,12 @@ export async function POST(request: Request) {
       }
     }
     const coverCandidate = requestedImage.startsWith("https://") ? requestedImage : (pageImage.startsWith("https://") ? pageImage : "");
-    const durableCover = await persistRemoteTopicCover(auth.admin, auth.workspaceId, coverCandidate, {
-      title: enriched.title || fallback.title,
-      platform,
-    });
+    const durableCover = isWorkspaceTopicMediaUrl(coverCandidate, auth.workspaceId)
+      ? coverCandidate
+      : await persistRemoteTopicCover(auth.admin, auth.workspaceId, coverCandidate, {
+        title: enriched.title || fallback.title,
+        platform,
+      });
     const { data: idea, error } = await auth.admin.from("egg_topic_ideas").insert({
       workspace_id: auth.workspaceId,
       title: enriched.title.trim().slice(0, 220),

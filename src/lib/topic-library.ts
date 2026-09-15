@@ -4,6 +4,7 @@ import { createEggAdmin, type WorkspaceRole } from "@/lib/creator-workspace";
 import { persistRemoteTopicCover } from "@/lib/topic-media";
 
 const DEFAULT_TOPIC_API = "https://soon-core.vercel.app/api/topics";
+const TOPIC_COVER_FALLBACK = "https://egg.sooncreator.network/creative.jpg";
 
 export type TopicIdea = {
   id: string; title: string; summary: string | null; source_name: string | null; source_url: string | null;
@@ -13,6 +14,7 @@ export type TopicIdea = {
   workspace_id: string | null; created_at: string; saved: boolean; want_to_create: boolean; manageable?: boolean;
   why_now?: string; hook?: string; suggested_angles?: string[]; countries?: string[]; regions?: string[];
   localities?: string[]; directions?: string[]; direction_aliases?: string[]; recommended?: boolean;
+  scope?: "central" | "workspace";
 };
 
 type CentralTopic = {
@@ -38,6 +40,18 @@ function cleanArray(value: unknown) {
 
 function normalise(value: string) {
   return value.toLocaleLowerCase("zh-HK").replace(/[\s/／、·・_-]+/g, "");
+}
+
+function usableCentralCover(value: string | null | undefined) {
+  const cover = value?.trim();
+  if (!cover) return TOPIC_COVER_FALLBACK;
+  try {
+    const url = new URL(cover);
+    const isMissingLegacyAsset = url.hostname === "soon-core.vercel.app" && url.pathname.startsWith("/topic-covers/");
+    return isMissingLegacyAsset ? TOPIC_COVER_FALLBACK : cover;
+  } catch {
+    return TOPIC_COVER_FALLBACK;
+  }
 }
 
 const PREFERENCE_DIRECTIONS: Record<string, string[]> = {
@@ -80,13 +94,13 @@ function mapCentralTopic(topic: CentralTopic): TopicIdea {
     summary: topic.summary?.trim() || null,
     source_name: source?.source_name?.trim() || "SOON 編輯團隊",
     source_url: source?.url?.trim() || null,
-    image_url: topic.cover_url?.trim() || null,
+    image_url: usableCentralCover(topic.cover_url),
     platform: "SOON",
     category: primaryDirection?.trim() || directions[0] || "最新精選",
     tags: cleanArray(topic.keywords).slice(0, 6),
     content_format: cleanArray(topic.content_formats)[0] || "short_video",
     workspace_id: null,
-    created_at: topic.published_at || topic.updated_at || new Date(0).toISOString(),
+    created_at: topic.updated_at || topic.published_at || new Date(0).toISOString(),
     saved: false,
     want_to_create: false,
     why_now: topic.why_now?.trim() || undefined,
@@ -97,6 +111,7 @@ function mapCentralTopic(topic: CentralTopic): TopicIdea {
     localities: cleanArray(topic.localities),
     directions,
     direction_aliases: directionAliases,
+    scope: "central",
   };
 }
 
@@ -136,11 +151,12 @@ async function listLocalTopics(workspaceId: string, userId: string) {
   const admin = createEggAdmin();
   const { data, error } = await admin.from("egg_topic_ideas")
     .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_by,created_at")
-    .eq("status", "published").not("workspace_id", "is", null).order("created_at", { ascending: false });
+    .eq("status", "published").eq("workspace_id", workspaceId).order("created_at", { ascending: false });
   if (error) throw error;
   const localTopics = (data ?? []).map((topic) => ({
     ...(topic as TopicIdea),
     manageable: topic.workspace_id === workspaceId && topic.created_by === userId,
+    scope: "workspace" as const,
   }));
   const legacyCovers = localTopics.filter((topic) => topic.manageable && topic.image_url?.includes("cdninstagram.com"));
   await Promise.all(legacyCovers.map(async (topic) => {

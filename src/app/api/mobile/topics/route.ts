@@ -24,13 +24,10 @@ export async function GET(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   try {
-    const ideas = (await listTopicIdeas(auth.workspaceId, auth.user.id))
-      .filter((idea) => idea.scope === "central")
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    const ideas = await listTopicIdeas(auth.workspaceId, auth.user.id);
     return NextResponse.json({
       ideas,
-      scope: "central",
-      source: "soon-core",
+      scope: "shared-and-workspace",
       role: auth.role,
       canDelete: isEggPlatformAdmin(auth.user.email),
     });

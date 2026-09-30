@@ -36,7 +36,7 @@ async function getContext(request: Request) {
 const profileFields =
   "id,user_id,instagram_handle,instagram_followers,instagram_engagement_rate,instagram_access_token,instagram_user_id,audience_demographics";
 const mediaFields =
-  "id,media_type,caption,permalink,media_url,thumbnail_url,views,reach,plays,total_interactions,like_count,comments_count,published_at";
+  "id,media_type,caption,permalink,media_url,thumbnail_url,views,reach,saved,shares,total_interactions,like_count,comments_count,published_at";
 
 export async function GET(request: Request) {
   const context = await getContext(request);
@@ -154,7 +154,6 @@ function readInstagramSync(value: unknown) {
 function performanceValue(media: Record<string, unknown>) {
   return Number(
     media.views ??
-      media.plays ??
       media.reach ??
       media.total_interactions ??
       Number(media.like_count ?? 0) + Number(media.comments_count ?? 0),

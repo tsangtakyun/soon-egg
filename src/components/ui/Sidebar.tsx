@@ -2,7 +2,10 @@ import Link from "next/link";
 import { LogOut, Settings, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { CreditBadge } from "./CreditBadge";
-import { canCreateCreatorWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
+import {
+  canCreateCreatorWorkspace,
+  getCreatorWorkspaceContext,
+} from "@/lib/creator-workspace";
 import { CreatorWorkspaceSwitcher } from "./CreatorWorkspaceSwitcher";
 import { EggBrandMark } from "./EggBrandMark";
 import { SidebarNav } from "./SidebarNav";
@@ -13,6 +16,9 @@ export async function Sidebar() {
     data: { user },
   } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
   const workspaceContext = user ? await getCreatorWorkspaceContext() : null;
+  const canManageWorkspace =
+    workspaceContext?.activeRole === "owner" ||
+    workspaceContext?.activeRole === "admin";
 
   return (
     <aside className="hidden h-screen w-72 shrink-0 flex-col border-r border-zinc-200 bg-zinc-50/80 px-4 py-5 lg:flex">
@@ -21,7 +27,11 @@ export async function Sidebar() {
           <EggBrandMark compact />
         </Link>
 
-        <CreatorWorkspaceSwitcher initialWorkspaces={workspaceContext?.workspaces ?? []} initialActiveId={workspaceContext?.activeWorkspace?.id ?? null} canCreate={canCreateCreatorWorkspace(user?.email)} />
+        <CreatorWorkspaceSwitcher
+          initialWorkspaces={workspaceContext?.workspaces ?? []}
+          initialActiveId={workspaceContext?.activeWorkspace?.id ?? null}
+          canCreate={canCreateCreatorWorkspace(user?.email)}
+        />
 
         <div className="mt-6 px-2">
           <CreditBadge />
@@ -33,16 +43,27 @@ export async function Sidebar() {
       </div>
 
       <div className="shrink-0 border-t border-zinc-200 pt-4">
-        <Link href="/team" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
-          <Users className="h-4 w-4" aria-hidden />
-          邀請團隊成員
-        </Link>
-        <Link href="/settings" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
+        {canManageWorkspace ? (
+          <Link
+            href="/team"
+            className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white"
+          >
+            <Users className="h-4 w-4" aria-hidden />
+            邀請團隊成員
+          </Link>
+        ) : null}
+        <Link
+          href="/settings"
+          className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white"
+        >
           <Settings className="h-4 w-4" aria-hidden />
-          設定
+          {canManageWorkspace ? "設定" : "設定（唯讀）"}
         </Link>
         <form action="/api/auth/signout" method="POST">
-          <button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white">
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-600 hover:bg-white"
+          >
             <LogOut className="h-4 w-4" aria-hidden />
             登出
           </button>

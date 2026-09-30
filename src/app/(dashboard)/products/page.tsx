@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Eye, EyeOff, Pencil, Plus, Trash2 } from "lucide-react";
 import { EggLoader } from "@/components/ui/EggLoader";
-import { createClient } from "@/lib/supabase/client";
 import {
   ProductTypeIcon,
   productTypeBadgeClasses,
@@ -40,6 +39,10 @@ type Order = {
   buyer_name: string | null;
   buyer_email: string | null;
   amount: number | null;
+  gross_amount_minor?: number | null;
+  platform_fee_amount_minor?: number | null;
+  creator_net_amount_minor?: number | null;
+  platform_fee_bps?: number | null;
   currency: string | null;
   status: string | null;
   delivery_name: string | null;
@@ -99,7 +102,6 @@ const paidOrderStatuses = new Set([
 ]);
 
 export default function ProductsPage() {
-  const supabase = useMemo(() => createClient(), []);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -107,6 +109,7 @@ export default function ProductsPage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeComplete, setStripeComplete] = useState<boolean | null>(null);
+  const [canManageStripe, setCanManageStripe] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "products" | "orders" | "analytics"
@@ -117,12 +120,9 @@ export default function ProductsPage() {
     paidOrderStatuses.has(order.status ?? ""),
   );
   const orderRevenue = paidOrders.reduce(
-    (sum, order) => sum + Number(order.amount ?? 0),
+    (sum, order) => sum + Number(order.gross_amount_minor != null ? order.gross_amount_minor / 100 : order.amount ?? 0),
     0,
   );
-  const averageOrderValue = paidOrders.length
-    ? orderRevenue / paidOrders.length
-    : 0;
   const salesTrend = useMemo<SalesTrendPoint[]>(() => {
     const now = new Date();
     return Array.from({ length: 6 }, (_, index) => {
@@ -146,42 +146,17 @@ export default function ProductsPage() {
 
     async function load() {
       setLoading(true);
-      const workspaceResponse = await fetch("/api/creator-workspaces", { cache: "no-store" });
-      const workspaceData = await workspaceResponse.json().catch(() => ({}));
-      const activeCreatorId = workspaceData.activeWorkspaceId as string | undefined;
-      if (!workspaceResponse.ok || !activeCreatorId) {
+      const response = await fetch("/api/products", { cache: "no-store" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.workspaceId) {
         if (!cancelled) setLoading(false);
         return;
       }
-
-      const { data: profile } = await supabase
-        .from("egg_creator_profiles")
-        .select("id")
-        .eq("id", activeCreatorId)
-        .single();
-      if (!profile?.id) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      const [{ data: productData }, { data: orderData }] = await Promise.all([
-        supabase
-          .from("egg_digital_products")
-          .select("*")
-          .eq("creator_id", profile.id)
-          .eq("is_archived", false)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("egg_product_orders")
-          .select("*")
-          .eq("creator_id", profile.id)
-          .order("created_at", { ascending: false }),
-      ]);
 
       if (!cancelled) {
-        setProfileId(profile.id);
-        setProducts((productData ?? []) as Product[]);
-        setOrders((orderData ?? []) as Order[]);
+        setProfileId(payload.workspaceId);
+        setProducts((payload.products ?? []) as Product[]);
+        setOrders((payload.orders ?? []) as Order[]);
         setLoading(false);
       }
     }
@@ -193,6 +168,7 @@ export default function ProductsPage() {
       if (!cancelled) {
         setStripeConnected(Boolean(data.connected));
         setStripeComplete(Boolean(data.complete));
+        setCanManageStripe(Boolean(data.can_manage));
       }
     }
 
@@ -201,7 +177,7 @@ export default function ProductsPage() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, []);
 
   function openAddModal() {
     setEditingProduct(null);
@@ -242,22 +218,16 @@ export default function ProductsPage() {
 
   async function updateProduct(id: string, updates: Partial<Product>) {
     if (!profileId) return;
-    const { data, error } = await supabase
-      .from("egg_digital_products")
-      .update(updates)
-      .eq("id", id)
-      .eq("creator_id", profileId)
-      .eq("is_archived", false)
-      .select("*")
-      .single();
-    if (error) {
-      alert(error.message);
+    const response = await fetch(`/api/products/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(payload.error ?? "更新貨品失敗");
       return;
     }
-    if (data)
+    if (payload.product)
       setProducts((current) =>
         current.map((product) =>
-          product.id === id ? (data as Product) : product,
+          product.id === id ? (payload.product as Product) : product,
         ),
       );
   }
@@ -265,20 +235,10 @@ export default function ProductsPage() {
   async function deleteProduct(id: string) {
     if (!profileId || !confirm("確定移除此貨品？已建立的訂單紀錄會保留。"))
       return;
-    const { data, error } = await supabase
-      .from("egg_digital_products")
-      .update({ is_archived: true, is_active: false })
-      .eq("id", id)
-      .eq("creator_id", profileId)
-      .eq("is_archived", false)
-      .select("id")
-      .single();
-    if (error) {
-      alert(`移除失敗：${error.message}`);
-      return;
-    }
-    if (!data) {
-      alert("移除失敗：找不到可移除的貨品，請重新整理後再試。");
+    const response = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(`移除失敗：${payload.error ?? "未知錯誤"}`);
       return;
     }
     setProducts((current) => current.filter((product) => product.id !== id));
@@ -287,12 +247,9 @@ export default function ProductsPage() {
   async function reloadOrders() {
     if (!profileId) return;
     setOrdersLoading(true);
-    const { data } = await supabase
-      .from("egg_product_orders")
-      .select("*")
-      .eq("creator_id", profileId)
-      .order("created_at", { ascending: false });
-    setOrders((data ?? []) as Order[]);
+    const response = await fetch("/api/products", { cache: "no-store" });
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) setOrders((payload.orders ?? []) as Order[]);
     setOrdersLoading(false);
   }
 
@@ -333,17 +290,17 @@ export default function ProductsPage() {
               連結後買家可直接喺你的貨品頁付款，款項直接入帳
             </p>
           </div>
-          <button
-            onClick={handleStripeOnboard}
-            disabled={stripeLoading}
-            className="rounded-xl bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
-          >
-            {stripeLoading
-              ? "連結中..."
-              : stripeConnected
-                ? "繼續設定"
-                : "立即連結"}
-          </button>
+          {canManageStripe ? (
+            <button
+              onClick={handleStripeOnboard}
+              disabled={stripeLoading}
+              className="rounded-xl bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
+            >
+              {stripeLoading ? "連結中..." : stripeConnected ? "繼續設定" : "立即連結"}
+            </button>
+          ) : (
+            <span className="text-xs font-medium text-orange-700">請聯絡工作空間擁有者設定</span>
+          )}
         </div>
       )}
 
@@ -448,12 +405,16 @@ export default function ProductsPage() {
                   value={paidOrders.length.toLocaleString("zh-HK")}
                 />
                 <OrderSummary
-                  label="貨品收入"
+                  label="總銷售額（Gross Sales）"
                   value={`HK$${orderRevenue.toLocaleString("zh-HK")}`}
                 />
                 <OrderSummary
-                  label="平均訂單金額"
-                  value={`HK$${Math.round(averageOrderValue).toLocaleString("zh-HK")}`}
+                  label="SOON 分成（SOON Share）"
+                  value={`HK$${(paidOrders.reduce((sum, order) => sum + Number(order.platform_fee_amount_minor ?? 0), 0) / 100).toLocaleString("zh-HK")}`}
+                />
+                <OrderSummary
+                  label="創作者淨收入（Creator Net）"
+                  value={`HK$${(paidOrders.reduce((sum, order) => sum + Number(order.creator_net_amount_minor ?? 0), 0) / 100).toLocaleString("zh-HK")}`}
                 />
                 <OrderSummary
                   label="全部訂單"
@@ -468,7 +429,6 @@ export default function ProductsPage() {
 
       {modalOpen && profileId && (
         <ProductModal
-          creatorId={profileId}
           product={editingProduct}
           onClose={() => {
             setModalOpen(false);
@@ -610,17 +570,14 @@ function OrderSummary({ label, value }: { label: string; value: string }) {
 }
 
 function ProductModal({
-  creatorId,
   product,
   onClose,
   onSaved,
 }: {
-  creatorId: string;
   product: Product | null;
   onClose: () => void;
   onSaved: (product: Product) => void;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<ProductForm>(() =>
     product
@@ -656,7 +613,6 @@ function ProductModal({
     setSaving(true);
     const isFree = form.currency === "FREE";
     const payload = {
-      creator_id: creatorId,
       title: form.title.trim(),
       description: form.description.trim() || null,
       price: isFree ? 0 : Number(form.price || 0),
@@ -670,27 +626,19 @@ function ProductModal({
       is_archived: false,
     };
 
-    const query = product
-      ? supabase
-          .from("egg_digital_products")
-          .update(payload)
-          .eq("id", product.id)
-          .select("*")
-          .single()
-      : supabase
-          .from("egg_digital_products")
-          .insert(payload)
-          .select("*")
-          .single();
-
-    const { data, error } = await query;
+    const response = await fetch(product ? `/api/products/${product.id}` : "/api/products", {
+      method: product ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
     setSaving(false);
 
-    if (error) {
-      alert(error.message);
+    if (!response.ok) {
+      alert(result.error ?? "儲存貨品失敗");
       return;
     }
-    if (data) onSaved(data as Product);
+    if (result.product) onSaved(result.product as Product);
   }
 
   return (

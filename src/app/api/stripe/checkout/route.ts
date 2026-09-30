@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
   const { data: creator } = await supabaseAdmin
     .from("egg_creator_profiles")
-    .select("username, stripe_account_id, stripe_onboarding_complete")
+    .select("id, username, stripe_account_id, stripe_onboarding_complete, commerce_fee_bps, commerce_fee_effective_at")
     .eq("id", product.creator_id)
     .single();
 
@@ -59,7 +59,11 @@ export async function POST(req: Request) {
   };
   const currency = currencyMap[product.currency ?? "HKD"] ?? "hkd";
   const unitAmount = Math.round(price * 100);
-  const applicationFeeAmount = Math.round(unitAmount * 0.1);
+  if (creator.id !== product.creator_id) return NextResponse.json({ error: "Product ownership mismatch" }, { status: 409 });
+  const effectiveAt = creator.commerce_fee_effective_at ? new Date(creator.commerce_fee_effective_at).getTime() : 0;
+  const feeBps = effectiveAt <= Date.now() ? Number(creator.commerce_fee_bps ?? 1000) : 1000;
+  if (!Number.isInteger(feeBps) || feeBps < 0 || feeBps > 10000) return NextResponse.json({ error: "Invalid Creator fee terms" }, { status: 500 });
+  const applicationFeeAmount = Math.round((unitAmount * feeBps) / 10000);
   const needsShipping = product.product_type === "physical";
   const baseUrl = appUrl(req);
 
@@ -95,10 +99,32 @@ export async function POST(req: Request) {
     cancel_url: `${baseUrl}/${creator.username}/shop`,
     metadata: {
       product_id: product.id,
+      creator_id: product.creator_id,
+      connected_account_id: creator.stripe_account_id,
+      gross_amount_minor: String(unitAmount),
+      platform_fee_bps: String(feeBps),
+      platform_fee_amount_minor: String(applicationFeeAmount),
+      creator_net_amount_minor: String(unitAmount - applicationFeeAmount),
       creator_username: creator.username,
       product_type: product.product_type ?? "other",
     },
   });
+
+  await supabaseAdmin.from("egg_product_orders").upsert({
+    creator_id: product.creator_id,
+    product_id: product.id,
+    product_title: product.title,
+    amount: unitAmount / 100,
+    gross_amount_minor: unitAmount,
+    platform_fee_bps: feeBps,
+    platform_fee_amount_minor: applicationFeeAmount,
+    creator_net_amount_minor: unitAmount - applicationFeeAmount,
+    currency: currency.toUpperCase(),
+    buyer_email: buyer_email || null,
+    stripe_session_id: session.id,
+    status: "pending",
+    payment_status: "pending",
+  }, { onConflict: "stripe_session_id" });
 
   return NextResponse.json({ url: session.url });
 }

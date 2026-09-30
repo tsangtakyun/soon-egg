@@ -20,13 +20,16 @@ export default async function SettingsPage() {
   );
 
   const { activeWorkspace, activeRole } = await getCreatorWorkspaceContext();
-  const { data: profile } = await supabaseAdmin
+  const { data: rawProfile } = await supabaseAdmin
     .from("egg_creator_profiles")
-    .select("*")
+    .select("id,username,display_name,bio,avatar_url,content_categories,instagram_handle,instagram_followers,facebook_handle,threads_handle,youtube_handle,tiktok_handle,xiaohongshu_handle,stripe_account_id,stripe_onboarding_complete,instagram_access_token")
     .eq("id", activeWorkspace?.id ?? "")
     .single();
+  const { instagram_access_token, ...safeProfile } = rawProfile ?? {};
+  const profile = rawProfile ? { ...safeProfile, instagram_connected: Boolean(instagram_access_token) } : null;
 
   let stripeConnected = false;
+  const { data: profileLinks } = activeWorkspace ? await supabaseAdmin.from("egg_profile_blocks").select("id,title,url").eq("creator_id", activeWorkspace.id).eq("block_type", "link").order("sort_order") : { data: [] };
   let stripeAccountMasked: string | null = null;
 
   if (profile?.stripe_account_id) {
@@ -41,6 +44,8 @@ export default async function SettingsPage() {
       stripeConnected={stripeConnected}
       stripeAccountMasked={stripeAccountMasked}
       canEditWorkspace={activeRole === "owner" || activeRole === "admin"}
+      canManagePayments={activeRole === "owner"}
+      profileLinks={profileLinks ?? []}
       workspaceAccess={activeRole ? <WorkspaceAccessSettings role={activeRole} /> : null}
     />
   );

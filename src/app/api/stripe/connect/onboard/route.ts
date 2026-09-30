@@ -34,8 +34,9 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const supabaseAdmin = getSupabaseAdmin() as any;
-    const { profile } = await getActiveCreatorProfile("id, username, stripe_account_id");
+    const { profile, activeRole } = await getActiveCreatorProfile("id, username, stripe_account_id");
     if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+    if (activeRole !== "owner") return NextResponse.json({ error: "只有工作空間擁有者可以管理 Stripe 收款帳戶" }, { status: 403 });
 
     let accountId = profile.stripe_account_id as string | null;
     const stripe = getStripe();

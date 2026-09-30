@@ -6,6 +6,7 @@ const ALLOWED_PATHS = [
   /^sessions(?:\/[0-9a-f-]+)?$/i,
   /^transcribe$/,
   /^refine$/,
+  /^split-lines$/,
   /^lines\/[0-9a-f-]+$/i,
   /^export-srt$/,
   /^fal\/proxy$/,
@@ -35,7 +36,9 @@ export async function proxySubtitleService(request: Request, path: string) {
   const incomingUrl = new URL(request.url);
   const upstreamUrl = new URL(`/api/${upstreamPath}${incomingUrl.search}`, baseUrl);
   const headers = new Headers(request.headers);
-  for (const name of ["host", "content-length", "cookie", "authorization", "accept-encoding"]) {
+  // Body framing is specific to each network hop. Let fetch generate it for
+  // the upstream request instead of forwarding Vercel's incoming value.
+  for (const name of ["host", "content-length", "transfer-encoding", "cookie", "authorization", "accept-encoding"]) {
     headers.delete(name);
   }
   headers.set("x-soon-integration-secret", secret);

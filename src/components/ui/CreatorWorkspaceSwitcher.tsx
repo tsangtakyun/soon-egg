@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, Plus, Trash2, X } from "lucide-react";
+import { Check, LoaderCircle, ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { CreatorAvatar } from "./CreatorAvatar";
 import type { CreatorWorkspace } from "@/lib/creator-workspace";
 import { workspaceRoleLabel } from "@/lib/workspace-role-labels";
@@ -16,6 +16,8 @@ export function CreatorWorkspaceSwitcher({ initialWorkspaces, initialActiveId, c
   const [activeId, setActiveId] = useState(initialActiveId);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const switchLock = useRef(false);
+  const [switchingName, setSwitchingName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<CreatorWorkspace | null>(null);
@@ -31,13 +33,17 @@ export function CreatorWorkspaceSwitcher({ initialWorkspaces, initialActiveId, c
   }, []);
 
   async function selectWorkspace(id: string) {
-    if (id === activeId || busy) return;
+    if (id === activeId || busy || switchLock.current) return;
+    switchLock.current = true;
+    setSwitchingName(workspaces.find(workspace => workspace.id === id)?.display_name || "工作空間");
+    try {
     setBusy(true); setError("");
     const response = await fetch("/api/creator-workspaces", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId: id }) });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) { setError(data.error ?? "切換失敗"); setBusy(false); return; }
+    if (!response.ok) throw new Error(data.error ?? "切換失敗");
     setActiveId(id);
     window.location.reload();
+    } catch (error) { setError(error instanceof Error ? error.message : "未能切換，請重試"); setBusy(false); setSwitchingName(""); switchLock.current = false; setOpen(true); }
   }
 
   async function createWorkspace() {
@@ -66,6 +72,7 @@ export function CreatorWorkspaceSwitcher({ initialWorkspaces, initialActiveId, c
 
   return (
     <div ref={wrapRef} className="relative mt-5">
+      {switchingName ? <div role="dialog" aria-modal="true" aria-label="切換工作空間" className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-6"><div role="status" className="w-full max-w-sm rounded-3xl bg-white p-8 text-center text-zinc-900"><LoaderCircle className="mx-auto mb-4 h-9 w-9 animate-spin text-[#7c4a50]" /><p>正在切換至 {switchingName}…</p><p className="mt-2 text-sm text-zinc-500">正在載入工作空間</p></div></div> : null}
       <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="flex w-full items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 text-left transition hover:border-zinc-300">
         <CreatorAvatar avatarUrl={active?.avatar_url} creatorName={active?.display_name || active?.username || "Creator"} />
         <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-zinc-900">{active?.display_name || active?.username || "Creator"}</span><span className="block text-xs text-zinc-400">{workspaceRoleLabel(active?.role)}</span></span>

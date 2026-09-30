@@ -1,3 +1,5 @@
+import { InstagramCover } from "@/components/analytics/InstagramCover";
+import { coverUrl } from "@/lib/instagram-covers";
 import { Activity, Eye, Heart, MessageCircle, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseAdmin } from "@supabase/supabase-js";
@@ -38,7 +40,8 @@ type InstagramMedia = {
   thumbnail_url: string | null;
   views: number | null;
   reach: number | null;
-  plays: number | null;
+  saved: number | null;
+  shares: number | null;
   total_interactions: number | null;
   like_count: number | null;
   comments_count: number | null;
@@ -79,7 +82,7 @@ export default async function AnalyticsPage() {
     admin
       .from("egg_instagram_media")
       .select(
-        "id,media_type,caption,permalink,media_url,thumbnail_url,views,reach,plays,total_interactions,like_count,comments_count,published_at",
+        "id,media_type,caption,permalink,media_url,thumbnail_url,views,reach,saved,shares,total_interactions,like_count,comments_count,published_at",
       )
       .eq("creator_id", profile.id)
       .order("published_at", { ascending: false })
@@ -229,34 +232,20 @@ function MediaRow({ media, rank }: { media: InstagramMedia; rank: number }) {
   const interactions =
     media.total_interactions ??
     Number(media.like_count ?? 0) + Number(media.comments_count ?? 0);
-  const primary = media.views ?? media.plays ?? media.reach;
+  const primary = media.views ?? media.reach;
   const primaryLabel =
     media.views != null
       ? "觀看"
-      : media.plays != null
-        ? "播放"
-        : media.reach != null
+      : media.reach != null
           ? "觸及"
           : "互動";
-  const image = media.thumbnail_url || media.media_url;
+  const image = coverUrl(media);
   return (
     <div className="flex items-center gap-3 py-4">
       <span className="w-5 shrink-0 text-center text-xs font-bold text-zinc-300">
         {rank}
       </span>
-      {image ? (
-        <>
-          {/* Instagram CDN URLs are dynamic and cannot be allow-listed safely. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image}
-            alt=""
-            className="h-14 w-14 shrink-0 rounded-xl bg-zinc-100 object-cover"
-          />
-        </>
-      ) : (
-        <div className="h-14 w-14 shrink-0 rounded-xl bg-zinc-100" />
-      )}
+      <InstagramCover key={`${media.id}:${image}`} mediaId={media.id} initialUrl={image} />
       <div className="min-w-0 flex-1">
         {media.permalink ? (
           <a
@@ -307,7 +296,6 @@ function readInstagramSync(
 function performanceValue(media: InstagramMedia) {
   return Number(
     media.views ??
-      media.plays ??
       media.reach ??
       media.total_interactions ??
       (media.like_count ?? 0) + (media.comments_count ?? 0),

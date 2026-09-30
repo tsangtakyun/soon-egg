@@ -661,8 +661,14 @@ export default function MediaKitPage() {
     async function load() {
       setLoading(true);
       setLoadError(null);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 15000);
       try {
-        const response = await fetch("/api/media-kit", { cache: "no-store" });
+        const response = await fetch("/api/media-kit", {
+          cache: "no-store",
+          credentials: "same-origin",
+          signal: controller.signal,
+        });
         const payload = (await response.json().catch(() => ({}))) as {
           profile?: CreatorProfile;
           rateCards?: RateCard[];
@@ -678,9 +684,12 @@ export default function MediaKitPage() {
       } catch (error) {
         if (!cancelled) {
           setProfile(null);
-          setLoadError(error instanceof Error ? error.message : "未能讀取 Media Kit 資料");
+          setLoadError(error instanceof DOMException && error.name === "AbortError"
+            ? "載入時間較長，請檢查網絡後重試。"
+            : error instanceof Error ? error.message : "未能讀取 Media Kit 資料");
         }
       } finally {
+        window.clearTimeout(timeout);
         if (!cancelled) setLoading(false);
       }
     }
@@ -698,13 +707,20 @@ export default function MediaKitPage() {
     setSaveState("saving");
     setSaveError(null);
     setProfile((current) => (current ? { ...current, ...updates } : current));
-    const { error } = await supabase.from("egg_creator_profiles").update(updates).eq("id", profile.id);
-    if (error) {
+    const publicationChange = typeof updates.mediakit_is_public === "boolean";
+    const response = publicationChange
+      ? await fetch("/api/media-kit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mediakit_is_public: updates.mediakit_is_public }) })
+      : null;
+    const directResult = publicationChange ? null : await supabase.from("egg_creator_profiles").update(updates).eq("id", profile.id);
+    const responsePayload = response ? await response.json().catch(() => ({})) : null;
+    const errorMessage = response && !response.ok ? responsePayload?.error : directResult?.error?.message;
+    if (errorMessage) {
       setProfile(previous);
       setSaveState("error");
-      setSaveError(error.message);
+      setSaveError(errorMessage);
       return;
     }
+    if (publicationChange && responsePayload?.profile) setProfile(responsePayload.profile as CreatorProfile);
     setSaveState("saved");
     if (refreshPreview) setPreviewKey((current) => current + 1);
     window.setTimeout(() => setSaveState("idle"), 2500);
@@ -824,7 +840,13 @@ export default function MediaKitPage() {
 
           <div className="max-h-[calc(100vh-210px)] overflow-y-auto">
             {loading ? (
-              <p className="py-12 text-center text-sm text-zinc-400">載入 Media Kit 設定中...</p>
+              <div role="status" aria-label="載入 Media Kit 設定中" className="space-y-4 p-5">
+                <div className="h-5 w-36 animate-pulse rounded bg-zinc-200" />
+                <div className="grid grid-cols-2 gap-3">
+                  {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-20 animate-pulse rounded-2xl bg-zinc-100" />)}
+                </div>
+                <p className="text-center text-sm text-zinc-400">載入 Media Kit 設定中…</p>
+              </div>
             ) : loadError || !profile ? (
               <div className="px-6 py-12 text-center">
                 <p className="text-sm font-medium text-red-700">{loadError || "找不到 Media Kit 資料"}</p>

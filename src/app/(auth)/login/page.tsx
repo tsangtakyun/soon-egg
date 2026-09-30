@@ -18,8 +18,7 @@ function GoogleLogo() {
 }
 
 function getAuthRedirectUrl(next: string) {
-  const origin = window.location.hostname === "localhost" ? window.location.origin : "https://egg.sooncreator.network";
-  return `${origin}/auth/callback?next=${next}`;
+  return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
 export default function LoginPage() {
@@ -32,17 +31,17 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setLoading(true);
     setError("");
-
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: getAuthRedirectUrl("auto"),
-      },
-    });
-
-    if (oauthError) {
-      setError(oauthError.message);
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: getAuthRedirectUrl("auto"),
+        },
+      });
+      if (oauthError) throw oauthError;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "暫時未能連接登入服務，請稍後再試。");
       setLoading(false);
     }
   };
@@ -51,24 +50,27 @@ export default function LoginPage() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    try {
+      const supabase = createClient();
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError || !data.user) {
+        setError(loginError?.message || "登入失敗，請檢查電郵及密碼。");
+        return;
+      }
 
-    const supabase = createClient();
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data: profile } = await supabase
+        .from("egg_creator_profiles")
+        .select("onboarding_completed")
+        .eq("user_id", data.user.id)
+        .limit(1)
+        .maybeSingle();
 
-    if (loginError || !data.user) {
-      setError(loginError?.message || "登入失敗，請檢查電郵及密碼。");
+      router.push(profile?.onboarding_completed ? "/dashboard" : "/onboarding");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "暫時未能連接登入服務，請稍後再試。");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data: profile } = await supabase
-      .from("egg_creator_profiles")
-      .select("onboarding_completed")
-      .eq("user_id", data.user.id)
-      .limit(1)
-      .maybeSingle();
-
-    router.push(profile?.onboarding_completed ? "/dashboard" : "/onboarding");
   };
 
   return (

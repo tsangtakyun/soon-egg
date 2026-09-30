@@ -1,6 +1,12 @@
+import { refreshTopInstagramCovers } from "./instagram-covers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type InstagramProfile = { id?: string; username?: string; followers_count?: number; error?: { message?: string } };
+type InstagramProfile = {
+  id?: string;
+  username?: string;
+  followers_count?: number;
+  error?: { message?: string };
+};
 type InstagramMedia = {
   id: string;
   media_type?: string;
@@ -13,9 +19,19 @@ type InstagramMedia = {
   like_count?: number;
   comments_count?: number;
 };
-type InstagramMediaResponse = { data?: InstagramMedia[]; error?: { message?: string } };
-type InstagramInsightRow = { name?: string; values?: Array<{ value?: number }>; total_value?: { value?: number } };
-type InstagramInsightsResponse = { data?: InstagramInsightRow[]; error?: { message?: string } };
+type InstagramMediaResponse = {
+  data?: InstagramMedia[];
+  error?: { message?: string };
+};
+type InstagramInsightRow = {
+  name?: string;
+  values?: Array<{ value?: number }>;
+  total_value?: { value?: number };
+};
+type InstagramInsightsResponse = {
+  data?: InstagramInsightRow[];
+  error?: { message?: string };
+};
 type InstagramGraphProvider = "instagram" | "facebook";
 
 export type InstagramSyncProfile = {
@@ -40,11 +56,15 @@ export type InstagramSyncResult = {
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v23.0";
 
 function graphUrl(provider: InstagramGraphProvider, path: string) {
-  const host = provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com";
+  const host =
+    provider === "instagram" ? "graph.instagram.com" : "graph.facebook.com";
   return new URL(`https://${host}/${GRAPH_VERSION}/${path}`);
 }
 
-async function fetchInstagramProfile(instagramUserId: string | null, accessToken: string): Promise<{
+async function fetchInstagramProfile(
+  instagramUserId: string | null,
+  accessToken: string,
+): Promise<{
   profile: InstagramProfile;
   provider: InstagramGraphProvider;
 }> {
@@ -55,7 +75,9 @@ async function fetchInstagramProfile(instagramUserId: string | null, accessToken
   const instagramUrl = graphUrl("instagram", "me");
   instagramUrl.searchParams.set("fields", fields);
   instagramUrl.searchParams.set("access_token", accessToken);
-  const instagramResponse = await fetch(instagramUrl.toString(), { cache: "no-store" });
+  const instagramResponse = await fetch(instagramUrl.toString(), {
+    cache: "no-store",
+  });
   const instagramData = (await instagramResponse.json()) as InstagramProfile;
   if (instagramResponse.ok && !instagramData.error && instagramData.id) {
     return { profile: instagramData, provider: "instagram" };
@@ -67,24 +89,43 @@ async function fetchInstagramProfile(instagramUserId: string | null, accessToken
     url.searchParams.set("access_token", accessToken);
     const response = await fetch(url.toString(), { cache: "no-store" });
     const data = (await response.json()) as InstagramProfile;
-    if (response.ok && !data.error) return { profile: data, provider: "facebook" };
-    throw new Error(data.error?.message || instagramData.error?.message || "Instagram sync failed");
+    if (response.ok && !data.error)
+      return { profile: data, provider: "facebook" };
+    throw new Error(
+      data.error?.message ||
+        instagramData.error?.message ||
+        "Instagram sync failed",
+    );
   }
   throw new Error(instagramData.error?.message || "Instagram sync failed");
 }
 
-async function fetchRecentInstagramMedia(instagramUserId: string, accessToken: string, provider: InstagramGraphProvider): Promise<InstagramMediaResponse> {
-  const url = graphUrl(provider, `${encodeURIComponent(instagramUserId)}/media`);
-  url.searchParams.set("fields", "id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,like_count,comments_count,timestamp");
+async function fetchRecentInstagramMedia(
+  instagramUserId: string,
+  accessToken: string,
+  provider: InstagramGraphProvider,
+): Promise<InstagramMediaResponse> {
+  const url = graphUrl(
+    provider,
+    `${encodeURIComponent(instagramUserId)}/media`,
+  );
+  url.searchParams.set(
+    "fields",
+    "id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,like_count,comments_count,timestamp",
+  );
   url.searchParams.set("limit", "12");
   url.searchParams.set("access_token", accessToken);
   const response = await fetch(url.toString(), { cache: "no-store" });
   return (await response.json()) as InstagramMediaResponse;
 }
 
-async function fetchMediaInsights(mediaId: string, accessToken: string, provider: InstagramGraphProvider) {
+async function fetchMediaInsights(
+  mediaId: string,
+  accessToken: string,
+  provider: InstagramGraphProvider,
+) {
   const metrics: Record<string, number> = {};
-  for (const metric of ["views", "plays", "reach", "total_interactions"]) {
+  for (const metric of ["views", "reach", "saved", "shares", "total_interactions"]) {
     const url = graphUrl(provider, `${encodeURIComponent(mediaId)}/insights`);
     url.searchParams.set("metric", metric);
     url.searchParams.set("access_token", accessToken);
@@ -102,18 +143,35 @@ async function fetchMediaInsights(mediaId: string, accessToken: string, provider
 }
 
 function mediaScore(media: InstagramMedia, insights: Record<string, number>) {
-  return insights.views ?? insights.plays ?? insights.reach ?? insights.total_interactions
-    ?? ((media.like_count ?? 0) + (media.comments_count ?? 0));
+  return (
+    insights.views ??
+    insights.reach ??
+    insights.total_interactions ??
+    (media.like_count ?? 0) + (media.comments_count ?? 0)
+  );
 }
 
 function insightValue(row: InstagramInsightRow) {
-  if (typeof row.total_value?.value === "number" && Number.isFinite(row.total_value.value)) return row.total_value.value;
+  if (
+    typeof row.total_value?.value === "number" &&
+    Number.isFinite(row.total_value.value)
+  )
+    return row.total_value.value;
   return (row.values ?? []).reduce((sum, item) => {
-    return sum + (typeof item.value === "number" && Number.isFinite(item.value) ? item.value : 0);
+    return (
+      sum +
+      (typeof item.value === "number" && Number.isFinite(item.value)
+        ? item.value
+        : 0)
+    );
   }, 0);
 }
 
-async function fetchOfficialInsights(instagramUserId: string, accessToken: string, provider: InstagramGraphProvider) {
+async function fetchOfficialInsights(
+  instagramUserId: string,
+  accessToken: string,
+  provider: InstagramGraphProvider,
+) {
   const until = new Date();
   until.setUTCHours(0, 0, 0, 0);
   const since = new Date(until);
@@ -122,25 +180,36 @@ async function fetchOfficialInsights(instagramUserId: string, accessToken: strin
   const errors: string[] = [];
   const attempts = [
     { metric: "reach" },
-    { metric: "accounts_engaged,total_interactions", metricType: "total_value" },
+    {
+      metric: "accounts_engaged,total_interactions",
+      metricType: "total_value",
+    },
   ];
 
   for (const attempt of attempts) {
-    const url = graphUrl(provider, `${encodeURIComponent(instagramUserId)}/insights`);
+    const url = graphUrl(
+      provider,
+      `${encodeURIComponent(instagramUserId)}/insights`,
+    );
     url.searchParams.set("access_token", accessToken);
     url.searchParams.set("metric", attempt.metric);
     url.searchParams.set("period", "day");
     url.searchParams.set("since", String(Math.floor(since.getTime() / 1000)));
     url.searchParams.set("until", String(Math.floor(until.getTime() / 1000)));
-    if (attempt.metricType) url.searchParams.set("metric_type", attempt.metricType);
+    if (attempt.metricType)
+      url.searchParams.set("metric_type", attempt.metricType);
     try {
       const response = await fetch(url.toString(), { cache: "no-store" });
       const payload = (await response.json()) as InstagramInsightsResponse;
       if (!response.ok || payload.error) {
-        errors.push(payload.error?.message || `Meta insights request failed (${response.status})`);
+        errors.push(
+          payload.error?.message ||
+            `Meta insights request failed (${response.status})`,
+        );
         continue;
       }
-      for (const row of payload.data ?? []) if (row.name) metrics[row.name] = insightValue(row);
+      for (const row of payload.data ?? [])
+        if (row.name) metrics[row.name] = insightValue(row);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : String(error));
     }
@@ -152,9 +221,16 @@ async function fetchOfficialInsights(instagramUserId: string, accessToken: strin
   };
 }
 
-export async function syncInstagramProfile(supabase: SupabaseClient, profile: InstagramSyncProfile): Promise<InstagramSyncResult> {
-  const { profile: data, provider } = await fetchInstagramProfile(profile.instagram_user_id, profile.instagram_access_token);
-  if (data.error) throw new Error(data.error.message || "Instagram sync failed");
+export async function syncInstagramProfile(
+  supabase: SupabaseClient,
+  profile: InstagramSyncProfile,
+): Promise<InstagramSyncResult> {
+  const { profile: data, provider } = await fetchInstagramProfile(
+    profile.instagram_user_id,
+    profile.instagram_access_token,
+  );
+  if (data.error)
+    throw new Error(data.error.message || "Instagram sync failed");
 
   const instagramUserId = data.id || profile.instagram_user_id;
   const followers = data.followers_count ?? 0;
@@ -164,25 +240,80 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
 
   let recentMedia: InstagramMedia[] = [];
   if (instagramUserId && followers > 0) {
-    const mediaResponse = await fetchRecentInstagramMedia(instagramUserId, profile.instagram_access_token, provider);
+    const mediaResponse = await fetchRecentInstagramMedia(
+      instagramUserId,
+      profile.instagram_access_token,
+      provider,
+    );
     const media = mediaResponse.data ?? [];
     recentMedia = media;
-    if (mediaResponse.error) engagementUnavailableReason = mediaResponse.error.message || "Meta 暫時未提供貼文互動數據";
-    else if (media.length === 0) engagementUnavailableReason = "未有可用嘅 Instagram 貼文數據";
+    if (mediaResponse.error)
+      engagementUnavailableReason =
+        mediaResponse.error.message || "Meta 暫時未提供貼文互動數據";
+    else if (media.length === 0)
+      engagementUnavailableReason = "未有可用嘅 Instagram 貼文數據";
     else {
       engagementSampleSize = media.length;
-      const interactions = media.reduce((sum, item) => sum + (item.like_count ?? 0) + (item.comments_count ?? 0), 0);
-      engagementRate = Number(((interactions / media.length / followers) * 100).toFixed(2));
+      const interactions = media.reduce(
+        (sum, item) =>
+          sum + (item.like_count ?? 0) + (item.comments_count ?? 0),
+        0,
+      );
+      engagementRate = Number(
+        ((interactions / media.length / followers) * 100).toFixed(2),
+      );
     }
   } else engagementUnavailableReason = "缺少 Instagram 帳戶或粉絲數據";
 
   const official = instagramUserId
-    ? await fetchOfficialInsights(instagramUserId, profile.instagram_access_token, provider)
-    : { metrics: {} as Record<string, number>, unavailableReason: "缺少 Instagram account id", window: null };
+    ? await fetchOfficialInsights(
+        instagramUserId,
+        profile.instagram_access_token,
+        provider,
+      )
+    : {
+        metrics: {} as Record<string, number>,
+        unavailableReason: "缺少 Instagram account id",
+        window: null,
+      };
   const syncedAt = new Date().toISOString();
-  const currentAudience = profile.audience_demographics && !Array.isArray(profile.audience_demographics)
-    ? profile.audience_demographics
-    : {};
+  const currentAudience =
+    profile.audience_demographics &&
+    !Array.isArray(profile.audience_demographics)
+      ? profile.audience_demographics
+      : {};
+  const connectedPage = currentAudience.connected_facebook_page;
+  let facebookUpdate: Record<string, unknown> = {};
+  if (
+    provider === "facebook" &&
+    connectedPage &&
+    typeof connectedPage === "object" &&
+    !Array.isArray(connectedPage) &&
+    typeof (connectedPage as Record<string, unknown>).id === "string"
+  ) {
+    const pageId = (connectedPage as Record<string, unknown>).id as string;
+    const pageUrl = graphUrl("facebook", encodeURIComponent(pageId));
+    pageUrl.searchParams.set("fields", "name,fan_count");
+    pageUrl.searchParams.set("access_token", profile.instagram_access_token);
+    try {
+      const pageResponse = await fetch(pageUrl.toString(), {
+        cache: "no-store",
+      });
+      const pageData = (await pageResponse.json()) as {
+        name?: string;
+        fan_count?: number;
+      };
+      if (pageResponse.ok) {
+        facebookUpdate = {
+          facebook_handle: pageData.name || null,
+          facebook_followers:
+            typeof pageData.fan_count === "number" ? pageData.fan_count : 0,
+        };
+      }
+    } catch {
+      // Instagram metrics should still update if Page metrics are unavailable.
+    }
+  }
   const updates: Record<string, unknown> = {
     instagram_handle: data.username,
     instagram_followers: followers,
@@ -201,29 +332,46 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
         total_interactions_7d: official.metrics.total_interactions ?? null,
       },
     },
+    ...facebookUpdate,
   };
-  if (engagementRate !== null) updates.instagram_engagement_rate = engagementRate;
+  if (engagementRate !== null)
+    updates.instagram_engagement_rate = engagementRate;
 
-  const { error: updateError } = await supabase.from("egg_creator_profiles").update(updates).eq("id", profile.id);
+  const { error: updateError } = await supabase
+    .from("egg_creator_profiles")
+    .update(updates)
+    .eq("id", profile.id);
   if (updateError) throw new Error(updateError.message);
-  const { error: snapshotError } = await supabase.from("egg_instagram_metric_snapshots").upsert({
-    creator_id: profile.id,
-    snapshot_date: syncedAt.slice(0, 10),
-    followers,
-    engagement_rate: engagementRate,
-    engagement_sample_size: engagementSampleSize,
-    reach_7d: official.metrics.reach ?? null,
-    accounts_engaged_7d: official.metrics.accounts_engaged ?? null,
-    total_interactions_7d: official.metrics.total_interactions ?? null,
-    captured_at: syncedAt,
-  }, { onConflict: "creator_id,snapshot_date" });
-  if (snapshotError) throw new Error(`Instagram snapshot failed: ${snapshotError.message}`);
+  const { error: snapshotError } = await supabase
+    .from("egg_instagram_metric_snapshots")
+    .upsert(
+      {
+        creator_id: profile.id,
+        snapshot_date: syncedAt.slice(0, 10),
+        followers,
+        engagement_rate: engagementRate,
+        engagement_sample_size: engagementSampleSize,
+        reach_7d: official.metrics.reach ?? null,
+        accounts_engaged_7d: official.metrics.accounts_engaged ?? null,
+        total_interactions_7d: official.metrics.total_interactions ?? null,
+        captured_at: syncedAt,
+      },
+      { onConflict: "creator_id,snapshot_date" },
+    );
+  if (snapshotError)
+    throw new Error(`Instagram snapshot failed: ${snapshotError.message}`);
 
   if (recentMedia.length > 0) {
-    const enriched = await Promise.all(recentMedia.map(async (media) => ({
-      media,
-      insights: await fetchMediaInsights(media.id, profile.instagram_access_token, provider),
-    })));
+    const enriched = await Promise.all(
+      recentMedia.map(async (media) => ({
+        media,
+        insights: await fetchMediaInsights(
+          media.id,
+          profile.instagram_access_token,
+          provider,
+        ),
+      })),
+    );
     const mediaRows = enriched.map(({ media, insights }) => ({
       creator_id: profile.id,
       instagram_media_id: media.id,
@@ -238,14 +386,55 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
       comments_count: media.comments_count ?? 0,
       views: insights.views ?? null,
       reach: insights.reach ?? null,
-      plays: insights.plays ?? null,
+      plays: null,
+      saved: insights.saved ?? null,
+      shares: insights.shares ?? null,
       total_interactions: insights.total_interactions ?? null,
       synced_at: syncedAt,
     }));
     const { error: mediaError } = await supabase
       .from("egg_instagram_media")
       .upsert(mediaRows, { onConflict: "creator_id,instagram_media_id" });
-    if (mediaError) throw new Error(`Instagram media sync failed: ${mediaError.message}`);
+    if (mediaError)
+      throw new Error(`Instagram media sync failed: ${mediaError.message}`);
+
+    const mediaSnapshotRows = enriched.map(({ media, insights }) => {
+      const reach = insights.reach ?? null;
+      const saved = insights.saved ?? null;
+      const shares = insights.shares ?? null;
+      return {
+        creator_id: profile.id,
+        instagram_media_id: media.id,
+        snapshot_date: syncedAt.slice(0, 10),
+        published_at: media.timestamp ?? null,
+        media_type: media.media_type ?? null,
+        media_product_type: media.media_product_type ?? null,
+        followers_at_capture: followers,
+        views: insights.views ?? null,
+        reach,
+        saved,
+        shares,
+        total_interactions: insights.total_interactions ?? null,
+        like_count: media.like_count ?? 0,
+        comments_count: media.comments_count ?? 0,
+        save_rate_by_reach:
+          reach && saved != null ? Number((saved / reach).toFixed(6)) : null,
+        share_rate_by_reach:
+          reach && shares != null ? Number((shares / reach).toFixed(6)) : null,
+        graph_provider: provider,
+        graph_version: GRAPH_VERSION,
+        captured_at: syncedAt,
+      };
+    });
+    const { error: mediaSnapshotError } = await supabase
+      .from("egg_instagram_media_metric_snapshots")
+      .upsert(mediaSnapshotRows, {
+        onConflict: "creator_id,instagram_media_id,snapshot_date",
+      });
+    if (mediaSnapshotError)
+      throw new Error(
+        `Instagram media snapshot failed: ${mediaSnapshotError.message}`,
+      );
 
     const { data: featured } = await supabase
       .from("egg_instagram_media")
@@ -255,7 +444,10 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
       .limit(1);
     if (!featured?.length) {
       const topFiveIds = enriched
-        .toSorted((a, b) => mediaScore(b.media, b.insights) - mediaScore(a.media, a.insights))
+        .toSorted(
+          (a, b) =>
+            mediaScore(b.media, b.insights) - mediaScore(a.media, a.insights),
+        )
         .slice(0, 5)
         .map(({ media }) => media.id);
       for (const [sortOrder, instagramMediaId] of topFiveIds.entries()) {
@@ -264,10 +456,15 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
           .update({ is_featured: true, sort_order: sortOrder })
           .eq("creator_id", profile.id)
           .eq("instagram_media_id", instagramMediaId);
-        if (error) throw new Error(`Instagram featured media failed: ${error.message}`);
+        if (error)
+          throw new Error(`Instagram featured media failed: ${error.message}`);
       }
     }
   }
+
+  await refreshTopInstagramCovers(supabase, profile.id).catch(() => {
+    console.warn("[instagram sync] Some top covers could not be refreshed");
+  });
 
   return {
     followers,
@@ -275,7 +472,9 @@ export async function syncInstagramProfile(supabase: SupabaseClient, profile: In
     engagementRate,
     engagementSampleSize,
     engagementUnavailableReason,
-    officialInsights: Object.keys(official.metrics).length ? official.metrics : null,
+    officialInsights: Object.keys(official.metrics).length
+      ? official.metrics
+      : null,
     insightsUnavailableReason: official.unavailableReason,
     syncedAt,
   };

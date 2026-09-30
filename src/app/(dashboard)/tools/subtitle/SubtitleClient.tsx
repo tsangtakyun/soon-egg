@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fal } from "@fal-ai/client";
 import { Captions, FileAudio, FileVideo, Loader2, Trash2, Upload } from "lucide-react";
+import { compressAudioForTranscription, isWavFile } from "@/lib/compress-audio";
 import type { SubtitleSession } from "@/types/subtitle";
 
 const ACCEPTED_TYPES = [
@@ -20,6 +21,30 @@ const ACCEPTED_TYPES = [
 ];
 
 fal.config({ proxyUrl: "/api/tools/subtitle/service/fal/proxy" });
+
+const UPLOAD_ATTEMPTS = 3;
+
+function isRetryableUploadError(error: unknown) {
+  return error instanceof TypeError
+    || (error instanceof Error && /failed to fetch|fetch failed|network|load failed/i.test(error.message));
+}
+
+async function uploadWithRetry(file: File, onRetry: (attempt: number) => void) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      return await fal.storage.upload(file);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableUploadError(error) || attempt === UPLOAD_ATTEMPTS) throw error;
+      onRetry(attempt + 1);
+      await new Promise((resolve) => window.setTimeout(resolve, 750 * 2 ** (attempt - 1)));
+    }
+  }
+
+  throw lastError;
+}
 
 const statusLabels: Record<SubtitleSession["status"], string> = {
   pending: "準備中",
@@ -59,8 +84,18 @@ export function SubtitleClient({ sessions: initialSessions }: { sessions: Subtit
     setUploading(true);
     setError("");
     try {
+      let uploadFile = file;
+      if (isWavFile(file)) {
+        const result = await compressAudioForTranscription(file, ({ ratio, message }) => {
+          setStatus(`${message}（${Math.round(ratio * 100)}%）…`);
+        });
+        uploadFile = result.file;
+        setStatus(`壓縮完成：${formatFileSize(file.size)} → ${formatFileSize(uploadFile.size)}`);
+      }
       setStatus("正在安全上傳影片／錄音…");
-      const mediaUrl = await fal.storage.upload(file);
+      const mediaUrl = await uploadWithRetry(uploadFile, (attempt) => {
+        setStatus(`上傳連線中斷，正在重新嘗試（${attempt}/${UPLOAD_ATTEMPTS}）…`);
+      });
       setStatus("正在建立字幕 Session…");
       const response = await fetch("/api/tools/subtitle/service/sessions", {
         method: "POST",
@@ -70,7 +105,7 @@ export function SubtitleClient({ sessions: initialSessions }: { sessions: Subtit
           title: title.trim() || file.name,
           originalFilename: file.name,
           originalSizeBytes: file.size,
-          compressedSizeBytes: file.size,
+          compressedSizeBytes: uploadFile.size,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -79,7 +114,12 @@ export function SubtitleClient({ sessions: initialSessions }: { sessions: Subtit
       }
       router.push(`/tools/subtitle/${data.session.id}`);
     } catch (uploadError) {
-      setError(uploadError instanceof Error ? uploadError.message : "上傳失敗，請稍後再試。");
+      const message = uploadError instanceof Error ? uploadError.message : "";
+      setError(
+        isRetryableUploadError(uploadError)
+          ? "上傳連線失敗，已自動重試 3 次。請檢查網絡後再試。"
+          : message || "上傳失敗，請稍後再試。",
+      );
       setStatus("");
       setUploading(false);
     }

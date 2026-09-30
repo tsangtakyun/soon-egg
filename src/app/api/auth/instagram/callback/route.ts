@@ -1,7 +1,10 @@
 import { logDealActivity } from "@/lib/deals-activity";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-import { createEggAdmin, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
+import {
+  createEggAdmin,
+  getCreatorWorkspaceContext,
+} from "@/lib/creator-workspace";
 
 const OAUTH_STATE_COOKIE = "egg-instagram-oauth-state";
 const OAUTH_WORKSPACE_COOKIE = "egg-instagram-oauth-workspace";
@@ -13,6 +16,7 @@ type FacebookPage = {
   id: string;
   access_token?: string;
   name?: string;
+  fan_count?: number;
 };
 
 type InstagramProfile = {
@@ -45,7 +49,10 @@ async function findInstagramProfile(userAccessToken: string): Promise<{
   page: FacebookPage;
   pageAccessToken: string;
 } | null> {
-  const pagesResponse = await fetchGraph("me/accounts?fields=id,name,access_token", userAccessToken);
+  const pagesResponse = await fetchGraph(
+    "me/accounts?fields=id,name,access_token,fan_count",
+    userAccessToken,
+  );
   const pages = (pagesResponse?.data || []) as FacebookPage[];
 
   for (const page of pages) {
@@ -56,7 +63,8 @@ async function findInstagramProfile(userAccessToken: string): Promise<{
         `${page.id}?fields=instagram_business_account{id,username,name,biography,followers_count,media_count,profile_picture_url,website}`,
         page.access_token,
       );
-      const profile = pageResponse?.instagram_business_account as InstagramProfile | undefined;
+      const profile = pageResponse?.instagram_business_account as
+        InstagramProfile | undefined;
 
       if (profile?.id && profile.username) {
         return { profile, page, pageAccessToken: page.access_token };
@@ -83,21 +91,47 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get("state");
   const expectedState = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
   const requestedWorkspaceId = req.cookies.get(OAUTH_WORKSPACE_COOKIE)?.value;
-  const requestedNext = req.cookies.get(OAUTH_NEXT_COOKIE)?.value === "/meta-ads" ? "/meta-ads" : "/onboarding";
-  const provider = req.cookies.get(OAUTH_PROVIDER_COOKIE)?.value === "facebook" ? "facebook" : "instagram";
-  const destinationUrl = `${requestUrl.origin}${requestedNext}`;
+  const requestedNextCookie = req.cookies.get(OAUTH_NEXT_COOKIE)?.value;
+  const requestedNext = requestedNextCookie === "/meta-ads"
+    ? "/meta-ads"
+    : requestedNextCookie === "/core"
+      ? "/core"
+      : requestedNextCookie === "/dashboard"
+        ? "/dashboard"
+      : "/onboarding";
+  const provider =
+    req.cookies.get(OAUTH_PROVIDER_COOKIE)?.value === "facebook"
+      ? "facebook"
+      : "instagram";
+  const destinationUrl = requestedNext === "/core"
+    ? "https://soon-core.vercel.app/intelligence-inbox"
+    : `${requestUrl.origin}${requestedNext}`;
 
-  if (error || !code || !state || !expectedState || state !== expectedState || !requestedWorkspaceId) {
+  if (
+    error ||
+    !code ||
+    !state ||
+    !expectedState ||
+    state !== expectedState ||
+    !requestedWorkspaceId
+  ) {
     return NextResponse.redirect(`${destinationUrl}?instagram_error=true`);
   }
 
-  const appId = provider === "facebook"
-    ? process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
-    : process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
-  const appSecret = provider === "facebook" ? process.env.FACEBOOK_APP_SECRET : process.env.INSTAGRAM_APP_SECRET;
+  const appId =
+    provider === "facebook"
+      ? process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
+      : process.env.INSTAGRAM_APP_ID ||
+        process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
+  const appSecret =
+    provider === "facebook"
+      ? process.env.FACEBOOK_APP_SECRET
+      : process.env.INSTAGRAM_APP_SECRET;
 
   if (!appId || !appSecret) {
-    return NextResponse.redirect(`${destinationUrl}?instagram_error=missing_credentials`);
+    return NextResponse.redirect(
+      `${destinationUrl}?instagram_error=missing_credentials`,
+    );
   }
 
   try {
@@ -114,9 +148,13 @@ export async function GET(req: NextRequest) {
       form.set("grant_type", "authorization_code");
       form.set("redirect_uri", redirectUri);
       form.set("code", code);
-      const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", { method: "POST", body: form, cache: "no-store" });
+      const tokenRes = await fetch(
+        "https://api.instagram.com/oauth/access_token",
+        { method: "POST", body: form, cache: "no-store" },
+      );
       const tokenData = await tokenRes.json();
-      if (!tokenRes.ok || !tokenData.access_token) throw new Error(`Instagram token error: ${JSON.stringify(tokenData)}`);
+      if (!tokenRes.ok || !tokenData.access_token)
+        throw new Error(`Instagram token error: ${JSON.stringify(tokenData)}`);
 
       let accessToken = tokenData.access_token as string;
       let expiresIn: number | null = null;
@@ -128,39 +166,63 @@ export async function GET(req: NextRequest) {
       const longLivedData = await longLivedRes.json().catch(() => ({}));
       if (longLivedRes.ok && longLivedData.access_token) {
         accessToken = longLivedData.access_token;
-        expiresIn = typeof longLivedData.expires_in === "number" ? longLivedData.expires_in : null;
+        expiresIn =
+          typeof longLivedData.expires_in === "number"
+            ? longLivedData.expires_in
+            : null;
       }
 
       const profileUrl = new URL("https://graph.instagram.com/me");
-      profileUrl.searchParams.set("fields", "id,user_id,username,name,profile_picture_url,followers_count,media_count");
+      profileUrl.searchParams.set(
+        "fields",
+        "id,user_id,username,name,profile_picture_url,followers_count,media_count",
+      );
       profileUrl.searchParams.set("access_token", accessToken);
       const profileRes = await fetch(profileUrl, { cache: "no-store" });
-      const profile = await profileRes.json() as InstagramProfile & { user_id?: string };
-      if (!profileRes.ok || !profile.username || !(profile.id || profile.user_id)) {
+      const profile = (await profileRes.json()) as InstagramProfile & {
+        user_id?: string;
+      };
+      if (
+        !profileRes.ok ||
+        !profile.username ||
+        !(profile.id || profile.user_id)
+      ) {
         throw new Error(`Instagram profile error: ${JSON.stringify(profile)}`);
       }
 
       const supabase = await createClient();
-      const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-      if (!supabase || !user) return NextResponse.redirect(`${requestUrl.origin}/login`);
+      const {
+        data: { user },
+      } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+      if (!supabase || !user)
+        return NextResponse.redirect(`${requestUrl.origin}/login`);
       const { workspaces } = await getCreatorWorkspaceContext();
-      const requestedWorkspace = workspaces.find((workspace) => workspace.id === requestedWorkspaceId);
-      if (!requestedWorkspace) return NextResponse.redirect(`${destinationUrl}?instagram_error=invalid_workspace`);
+      const requestedWorkspace = workspaces.find(
+        (workspace) => workspace.id === requestedWorkspaceId,
+      );
+      if (!requestedWorkspace)
+        return NextResponse.redirect(
+          `${destinationUrl}?instagram_error=invalid_workspace`,
+        );
       const admin = createEggAdmin();
       const { data: existingProfile } = await admin
         .from("egg_creator_profiles")
         .select("avatar_url")
         .eq("id", requestedWorkspaceId)
         .maybeSingle();
-      const { error: updateError } = await admin.from("egg_creator_profiles").update({
-        instagram_handle: profile.username,
-        instagram_followers: profile.followers_count || 0,
-        // A creator's manually uploaded avatar is their explicit choice. Only
-        // seed from Instagram when the workspace does not have an avatar yet.
-        avatar_url: existingProfile?.avatar_url || profile.profile_picture_url || null,
-        instagram_access_token: accessToken,
-        instagram_user_id: profile.user_id || profile.id,
-      }).eq("id", requestedWorkspaceId);
+      const { error: updateError } = await admin
+        .from("egg_creator_profiles")
+        .update({
+          instagram_handle: profile.username,
+          instagram_followers: profile.followers_count || 0,
+          // A creator's manually uploaded avatar is their explicit choice. Only
+          // seed from Instagram when the workspace does not have an avatar yet.
+          avatar_url:
+            existingProfile?.avatar_url || profile.profile_picture_url || null,
+          instagram_access_token: accessToken,
+          instagram_user_id: profile.user_id || profile.id,
+        })
+        .eq("id", requestedWorkspaceId);
       if (updateError) throw updateError;
 
       const params = new URLSearchParams({
@@ -172,7 +234,9 @@ export async function GET(req: NextRequest) {
         threads_username: profile.username,
       });
       if (expiresIn) params.set("token_expires_in", String(expiresIn));
-      const response = NextResponse.redirect(`${destinationUrl}?${params.toString()}`);
+      const response = NextResponse.redirect(
+        `${destinationUrl}?${params.toString()}`,
+      );
       response.cookies.delete(OAUTH_STATE_COOKIE);
       response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
       response.cookies.delete(OAUTH_NEXT_COOKIE);
@@ -181,7 +245,9 @@ export async function GET(req: NextRequest) {
       return response;
     }
 
-    const tokenUrl = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
+    const tokenUrl = new URL(
+      "https://graph.facebook.com/v21.0/oauth/access_token",
+    );
     tokenUrl.searchParams.set("client_id", appId);
     tokenUrl.searchParams.set("client_secret", appSecret);
     tokenUrl.searchParams.set("redirect_uri", redirectUri);
@@ -196,41 +262,66 @@ export async function GET(req: NextRequest) {
     }
 
     let userAccessToken = tokenData.access_token as string;
-    let tokenExpiresIn = typeof tokenData.expires_in === "number" ? tokenData.expires_in : null;
+    let tokenExpiresIn =
+      typeof tokenData.expires_in === "number" ? tokenData.expires_in : null;
     try {
-      const longLivedUrl = new URL("https://graph.facebook.com/v21.0/oauth/access_token");
+      const longLivedUrl = new URL(
+        "https://graph.facebook.com/v21.0/oauth/access_token",
+      );
       longLivedUrl.searchParams.set("grant_type", "fb_exchange_token");
       longLivedUrl.searchParams.set("client_id", appId);
       longLivedUrl.searchParams.set("client_secret", appSecret);
       longLivedUrl.searchParams.set("fb_exchange_token", userAccessToken);
-      const longLivedResponse = await fetch(longLivedUrl.toString(), { cache: "no-store" });
+      const longLivedResponse = await fetch(longLivedUrl.toString(), {
+        cache: "no-store",
+      });
       const longLivedData = await longLivedResponse.json().catch(() => ({}));
       if (longLivedResponse.ok && longLivedData.access_token) {
         userAccessToken = longLivedData.access_token;
-        tokenExpiresIn = typeof longLivedData.expires_in === "number" ? longLivedData.expires_in : tokenExpiresIn;
+        tokenExpiresIn =
+          typeof longLivedData.expires_in === "number"
+            ? longLivedData.expires_in
+            : tokenExpiresIn;
       }
     } catch (exchangeError) {
-      console.warn("Long-lived Meta token exchange failed; using initial token", exchangeError);
+      console.warn(
+        "Long-lived Meta token exchange failed; using initial token",
+        exchangeError,
+      );
     }
     const match = await findInstagramProfile(userAccessToken);
 
     if (!match) {
-      return NextResponse.redirect(`${destinationUrl}?instagram_error=no_connected_ig`);
+      return NextResponse.redirect(
+        `${destinationUrl}?instagram_error=no_connected_ig`,
+      );
     }
 
     const { profile, page, pageAccessToken } = match;
     const supabase = await createClient();
-    const { data: { user } } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+    const {
+      data: { user },
+    } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
     let onboardedNewKol = false;
 
     if (supabase && user) {
       const { workspaces } = await getCreatorWorkspaceContext();
-      const requestedWorkspace = workspaces.find((workspace) => workspace.id === requestedWorkspaceId);
+      const requestedWorkspace = workspaces.find(
+        (workspace) => workspace.id === requestedWorkspaceId,
+      );
       if (!requestedWorkspace) {
-        return NextResponse.redirect(`${destinationUrl}?instagram_error=invalid_workspace`);
+        return NextResponse.redirect(
+          `${destinationUrl}?instagram_error=invalid_workspace`,
+        );
       }
-      if (requestedNext === "/meta-ads" && requestedWorkspace.role !== "owner" && requestedWorkspace.role !== "admin") {
-        return NextResponse.redirect(`${destinationUrl}?instagram_error=forbidden`);
+      if (
+        requestedNext === "/meta-ads" &&
+        requestedWorkspace.role !== "owner" &&
+        requestedWorkspace.role !== "admin"
+      ) {
+        return NextResponse.redirect(
+          `${destinationUrl}?instagram_error=forbidden`,
+        );
       }
       const admin = createEggAdmin();
       const { data: existingProfile } = await admin
@@ -238,16 +329,19 @@ export async function GET(req: NextRequest) {
         .select("audience_demographics,avatar_url")
         .eq("id", requestedWorkspaceId)
         .maybeSingle();
-      const currentAudience = (
+      const currentAudience =
         typeof existingProfile?.audience_demographics === "object" &&
         existingProfile.audience_demographics !== null &&
         !Array.isArray(existingProfile.audience_demographics)
-      ) ? existingProfile.audience_demographics : {};
+          ? existingProfile.audience_demographics
+          : {};
       const payloadWithToken = {
         instagram_handle: profile.username,
         instagram_followers: profile.followers_count || 0,
         facebook_handle: page.name || null,
-        avatar_url: existingProfile?.avatar_url || profile.profile_picture_url || null,
+        facebook_followers: page.fan_count || 0,
+        avatar_url:
+          existingProfile?.avatar_url || profile.profile_picture_url || null,
         instagram_access_token: pageAccessToken,
         instagram_user_id: profile.id || null,
         audience_demographics: {
@@ -265,32 +359,55 @@ export async function GET(req: NextRequest) {
         .eq("id", requestedWorkspaceId)
         .select("id");
 
-      if (updateError && /column|schema|instagram_access_token|instagram_user_id/i.test(updateError.message)) {
+      if (
+        updateError &&
+        /column|schema|instagram_access_token|instagram_user_id/i.test(
+          updateError.message,
+        )
+      ) {
         const { error: fallbackError } = await admin
           .from("egg_creator_profiles")
           .update({
             instagram_handle: profile.username,
             instagram_followers: profile.followers_count || 0,
             facebook_handle: page.name || null,
-            avatar_url: existingProfile?.avatar_url || profile.profile_picture_url || null,
+            facebook_followers: page.fan_count || 0,
+            avatar_url:
+              existingProfile?.avatar_url ||
+              profile.profile_picture_url ||
+              null,
           })
           .eq("id", requestedWorkspaceId);
 
-        if (fallbackError) console.error("Instagram profile fallback save error:", fallbackError);
+        if (fallbackError)
+          console.error(
+            "Instagram profile fallback save error:",
+            fallbackError,
+          );
       } else if (updateError) {
         console.error("Instagram profile save error:", updateError);
       } else if (!updatedRows || updatedRows.length === 0) {
         throw new Error("Selected creator workspace no longer exists");
       } else if (!existingProfile) onboardedNewKol = true;
 
-      if (requestedWorkspace.role === "owner" || requestedWorkspace.role === "admin") {
-        const { error: metaConnectionError } = await admin.from("egg_meta_connections").upsert({
-          workspace_id: requestedWorkspaceId,
-          user_access_token: userAccessToken,
-          token_expires_at: tokenExpiresIn ? new Date(Date.now() + tokenExpiresIn * 1000).toISOString() : null,
-          updated_by: user.id,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "workspace_id" });
+      if (
+        requestedWorkspace.role === "owner" ||
+        requestedWorkspace.role === "admin"
+      ) {
+        const { error: metaConnectionError } = await admin
+          .from("egg_meta_connections")
+          .upsert(
+            {
+              workspace_id: requestedWorkspaceId,
+              user_access_token: userAccessToken,
+              token_expires_at: tokenExpiresIn
+                ? new Date(Date.now() + tokenExpiresIn * 1000).toISOString()
+                : null,
+              updated_by: user.id,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "workspace_id" },
+          );
         if (metaConnectionError) throw metaConnectionError;
       }
     }
@@ -319,7 +436,9 @@ export async function GET(req: NextRequest) {
       threads_username: profile.username || "",
     });
 
-    const response = NextResponse.redirect(`${destinationUrl}?${params.toString()}`);
+    const response = NextResponse.redirect(
+      `${destinationUrl}?${params.toString()}`,
+    );
     response.cookies.delete(OAUTH_STATE_COOKIE);
     response.cookies.delete(OAUTH_WORKSPACE_COOKIE);
     response.cookies.delete(OAUTH_NEXT_COOKIE);

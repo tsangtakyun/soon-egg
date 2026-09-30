@@ -15,28 +15,41 @@ export async function GET(req: NextRequest) {
   if (!activeWorkspace) return NextResponse.redirect(`${baseUrl}/onboarding?instagram_error=missing_workspace`);
   const state = crypto.randomUUID();
   const wantsAds = req.nextUrl.searchParams.get("ads") === "true";
-  const nextPath = req.nextUrl.searchParams.get("next") === "/meta-ads" ? "/meta-ads" : "/onboarding";
+  const wantsCollector = req.nextUrl.searchParams.get("collector") === "true";
+  const requestedNext = req.nextUrl.searchParams.get("next");
+  const nextPath = requestedNext === "/meta-ads"
+    ? "/meta-ads"
+    : requestedNext === "/core"
+      ? "/core"
+      : requestedNext === "/dashboard"
+        ? "/dashboard"
+        : "/onboarding";
   if (wantsAds && activeRole !== "owner" && activeRole !== "admin") {
     return NextResponse.redirect(`${baseUrl}/meta-ads?meta_error=forbidden`);
   }
 
-  const provider = wantsAds ? "facebook" : "instagram";
-  const appId = wantsAds
+  const provider = wantsAds || wantsCollector ? "facebook" : "instagram";
+  const appId = provider === "facebook"
     ? process.env.NEXT_PUBLIC_FACEBOOK_APP_ID
     : process.env.INSTAGRAM_APP_ID || process.env.NEXT_PUBLIC_INSTAGRAM_APP_ID;
-  if (!appId) return NextResponse.redirect(`${baseUrl}${nextPath}?instagram_error=missing_app_id`);
+  if (!appId) {
+    const errorDestination = nextPath === "/core" ? "https://soon-core.vercel.app/intelligence-inbox" : `${baseUrl}${nextPath}`;
+    return NextResponse.redirect(`${errorDestination}?instagram_error=missing_app_id`);
+  }
 
-  const authUrl = new URL(wantsAds
+  const authUrl = new URL(provider === "facebook"
     ? "https://www.facebook.com/v21.0/dialog/oauth"
     : "https://www.instagram.com/oauth/authorize");
   authUrl.searchParams.set("client_id", appId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("scope", wantsAds
-    ? ["pages_show_list", "pages_read_engagement", "instagram_basic", "instagram_manage_insights", "business_management", "ads_management", "ads_read", "pages_manage_ads"].join(",")
+  authUrl.searchParams.set("scope", provider === "facebook"
+    ? wantsCollector
+      ? ["pages_show_list", "pages_read_engagement", "instagram_basic"].join(",")
+      : ["pages_show_list", "pages_read_engagement", "instagram_basic", "instagram_manage_insights", "business_management", "ads_management", "ads_read"].join(",")
     : "instagram_business_basic,instagram_business_manage_insights");
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
-  if (!wantsAds) {
+  if (provider === "instagram") {
     authUrl.searchParams.set("enable_fb_login", "0");
     authUrl.searchParams.set("force_reauth", "true");
   }

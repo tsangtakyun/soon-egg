@@ -30,23 +30,24 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const supabaseAdmin = getSupabaseAdmin() as any;
-    const { profile } = await getActiveCreatorProfile("id, stripe_account_id, stripe_onboarding_complete");
+    const { profile, activeRole } = await getActiveCreatorProfile("id, stripe_account_id, stripe_onboarding_complete");
 
     if (!profile?.stripe_account_id) {
-      return NextResponse.json({ connected: false, complete: false });
+      return NextResponse.json({ connected: false, complete: false, can_manage: activeRole === "owner" });
     }
 
     const account = await getStripe().accounts.retrieve(profile.stripe_account_id);
     const complete = Boolean(account.details_submitted && account.charges_enabled);
 
-    if (complete && !profile.stripe_onboarding_complete) {
-      await supabaseAdmin.from("egg_creator_profiles").update({ stripe_onboarding_complete: true }).eq("id", profile.id).eq("user_id", user.id);
+    if (complete && !profile.stripe_onboarding_complete && activeRole === "owner") {
+      await supabaseAdmin.from("egg_creator_profiles").update({ stripe_onboarding_complete: true }).eq("id", profile.id);
     }
 
     return NextResponse.json({
       connected: true,
       complete,
       charges_enabled: account.charges_enabled,
+      can_manage: activeRole === "owner",
     });
   } catch (error) {
     console.error("[stripe/connect/status]", error);

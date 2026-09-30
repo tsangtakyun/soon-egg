@@ -1,4 +1,8 @@
+import { dnaCategories } from "@/lib/creator-dna";
 import "server-only";
+import { canonicalCountry } from "@/lib/topicGeography";
+import { recommendationMatch } from "@/lib/topic-recommendations";
+import { topicCountries } from "@/lib/topicCountries";
 
 import { createEggAdmin, type WorkspaceRole } from "@/lib/creator-workspace";
 import { persistRemoteTopicCover } from "@/lib/topic-media";
@@ -11,10 +15,15 @@ export type TopicIdea = {
   image_url: string | null; platform: string; category: string; tags: string[]; content_format: string;
   media_urls?: string[];
   created_by?: string | null;
-  workspace_id: string | null; created_at: string; saved: boolean; want_to_create: boolean; manageable?: boolean;
+  workspace_id: string | null; created_at: string; saved: boolean; saved_at?: string | null; want_to_create: boolean; manageable?: boolean;
   why_now?: string; hook?: string; suggested_angles?: string[]; countries?: string[]; regions?: string[];
+  geography_kind?: string; geography_status?: string;
   localities?: string[]; directions?: string[]; direction_aliases?: string[]; recommended?: boolean;
-  scope?: "central" | "workspace";
+  recommendation_reason?: string;
+  recommendation_score?: number;
+  dismissed?: boolean;
+  import_state?: "pending" | "ready" | "failed"; import_error?: string | null;
+  scope?: "central" | "workspace"; central_available?: boolean;
 };
 
 type CentralTopic = {
@@ -42,6 +51,13 @@ function normalise(value: string) {
   return value.toLocaleLowerCase("zh-HK").replace(/[\s/／、·・_-]+/g, "");
 }
 
+function normaliseCountry(value: string) { return canonicalCountry(value).toLowerCase(); }
+
+function countryDisplayName(value: string | undefined) {
+  const country = normaliseCountry(value ?? "");
+  return ({ gb: "英國", hk: "香港", tw: "台灣", jp: "日本" } as Record<string, string>)[country] || value || "目前國家";
+}
+
 function usableCentralCover(value: string | null | undefined) {
   const cover = value?.trim();
   if (!cover) return TOPIC_COVER_FALLBACK;
@@ -52,35 +68,6 @@ function usableCentralCover(value: string | null | undefined) {
   } catch {
     return TOPIC_COVER_FALLBACK;
   }
-}
-
-const PREFERENCE_DIRECTIONS: Record<string, string[]> = {
-  生活美學: ["生活", "生活日常", "文化體驗", "在地體驗"],
-  美容護膚: ["美容護膚", "美容", "護膚", "美妝"],
-  時尚穿搭: ["時尚穿搭", "時尚", "穿搭", "造型"],
-  美食: ["美食", "飲食", "餐飲", "餐廳探店", "探店", "餐廳推薦"],
-  旅遊: ["旅遊", "城市攻略", "城市旅遊", "自由行", "文化體驗", "在地體驗"],
-  健康運動: ["健康運動", "健康生活", "健康", "養生", "運動"],
-  親子: ["親子", "家庭", "育兒"],
-  科技: ["科技", "數碼", "創新"],
-  財經: ["財經", "理財", "投資", "商業"],
-  教育: ["教育", "學習", "知識"],
-  娛樂: ["娛樂", "城市與文化熱話", "城市熱話", "文化現象", "社交媒體", "社群媒體", "人物故事", "文化體驗"],
-};
-
-function relevanceScore(topic: TopicIdea, preferences: string[]) {
-  if (!preferences.length) return 0;
-  const fields = [
-    ...(topic.directions ?? []),
-    ...(topic.direction_aliases ?? []),
-    ...topic.tags,
-    topic.category,
-    topic.title,
-  ].map(normalise);
-  return preferences.reduce((score, preference) => {
-    const targets = [preference, ...(PREFERENCE_DIRECTIONS[preference] ?? [])].map(normalise);
-    return score + (targets.some((target) => fields.some((field) => field.includes(target) || target.includes(field))) ? 1 : 0);
-  }, 0);
 }
 
 function mapCentralTopic(topic: CentralTopic): TopicIdea {
@@ -104,9 +91,9 @@ function mapCentralTopic(topic: CentralTopic): TopicIdea {
     saved: false,
     want_to_create: false,
     why_now: topic.why_now?.trim() || undefined,
-    hook: topic.hook?.trim() || undefined,
+    // Opening lines are generated later, after the production style is chosen.
     suggested_angles: cleanArray(topic.suggested_angles),
-    countries: cleanArray(topic.countries),
+    countries: topicCountries({ ...topic, tags: cleanArray(topic.keywords) }),
     regions: cleanArray(topic.regions),
     localities: cleanArray(topic.localities),
     directions,
@@ -115,15 +102,29 @@ function mapCentralTopic(topic: CentralTopic): TopicIdea {
   };
 }
 
-async function fetchCentralTopics() {
+async function fetchCentralTopics(consumer: "egg-web" | "egg-app") {
   const endpoint = process.env.SOON_TOPIC_API_URL?.trim() || DEFAULT_TOPIC_API;
-  const response = await fetch(`${endpoint}?language=zh-HK&limit=60`, {
+  const response = await fetch(`${endpoint}?language=zh-HK&limit=60&consumer=${consumer}`, {
     headers: { accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(8_000),
   });
   if (!response.ok) throw new Error(`SOON Topic API ${response.status}`);
-  const payload = await response.json() as { topics?: CentralTopic[] };
+  const payload = await response.json() as { topics?: CentralTopic[]; delivery?: { token?: string } };
   if (!Array.isArray(payload.topics)) throw new Error("SOON Topic API response is invalid");
-  return payload.topics.map(mapCentralTopic);
+  const ideas = payload.topics.map(mapCentralTopic);
+  // Core may still speak the older geography contract. Overlay reviewed EGG metadata
+  // by public topic ID, without exposing private source text or workspace membership.
+  if (ideas.length) {
+    const { data, error } = await createEggAdmin().from("egg_topic_ideas")
+      .select("id,countries,regions,localities,geography_kind,geography_status")
+      .in("id", ideas.map(idea => idea.id)).gte("geography_version", 2);
+    if (error) throw error;
+    const reviewed = new Map((data ?? []).map(row => [row.id, row]));
+    for (const idea of ideas) {
+      const location = reviewed.get(idea.id);
+      if (location) Object.assign(idea, location);
+    }
+  }
+  return { ideas, receipt: payload.delivery?.token };
 }
 
 function hasUsableCover(topic: TopicIdea) {
@@ -139,9 +140,15 @@ function hasUsableCover(topic: TopicIdea) {
 async function syncCentralTopicShadows(topics: TopicIdea[]) {
   if (!topics.length) return;
   const admin = createEggAdmin();
-  const { error } = await admin.from("egg_topic_ideas").upsert(topics.map((topic) => ({
+  const { data: originals, error: readError } = await admin.from("egg_topic_ideas").select("id,workspace_id,created_by").in("id", topics.map(topic => topic.id));
+  if (readError) throw readError;
+  const protectedIds = new Set((originals ?? []).filter(row => row.workspace_id || row.created_by).map(row => row.id));
+  const shadows = topics.filter(topic => !protectedIds.has(topic.id));
+  if (!shadows.length) return;
+  const { error } = await admin.from("egg_topic_ideas").upsert(shadows.map((topic) => ({
     id: topic.id, workspace_id: null, title: topic.title, summary: topic.summary, source_name: topic.source_name,
     source_url: topic.source_url, image_url: topic.image_url, platform: topic.platform, category: topic.category,
+    countries: topic.countries ?? [], regions: topic.regions ?? [], localities: topic.localities ?? [],
     tags: topic.tags, content_format: topic.content_format, status: "published", updated_at: new Date().toISOString(),
   })), { onConflict: "id" });
   if (error) throw error;
@@ -149,12 +156,13 @@ async function syncCentralTopicShadows(topics: TopicIdea[]) {
 
 async function listLocalTopics(workspaceId: string, userId: string) {
   const admin = createEggAdmin();
+  await admin.from("egg_topic_ideas").update({ import_state: "failed", import_error: "整理逾時，請重新分享同一來源。", title: "題材整理未完成", summary: "未能取得完整內容，請重新分享連結並補充原文。", tags: ["待重試"] }).eq("workspace_id", workspaceId).eq("import_state", "pending").lt("import_started_at", new Date(Date.now() - 180_000).toISOString());
   const { data, error } = await admin.from("egg_topic_ideas")
-    .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_by,created_at")
+    .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_by,created_at,import_state,import_error,countries,regions,localities,geography_status,geography_kind")
     .eq("status", "published").eq("workspace_id", workspaceId).order("created_at", { ascending: false });
   if (error) throw error;
   const localTopics = (data ?? []).map((topic) => ({
-    ...(topic as TopicIdea),
+    ...(topic as unknown as TopicIdea),
     manageable: topic.workspace_id === workspaceId && topic.created_by === userId,
     scope: "workspace" as const,
   }));
@@ -181,37 +189,126 @@ async function listLocalTopics(workspaceId: string, userId: string) {
   return localTopics;
 }
 
-export async function listTopicIdeas(workspaceId: string, userId: string, preferredCategories?: string[]) {
+type TopicPersonalisation = {
+  locality?: string;
+  region?: string;
+  country?: string;
+  recentlySeen?: string[];
+  surface?: "home" | "library";
+  includeHidden?: boolean;
+};
+
+function locationScore(topic: TopicIdea, personalisation: TopicPersonalisation) {
+  if (topic.geography_kind === "context" || topic.geography_kind === "none") return 0;
+  const locality = normalise(personalisation.locality ?? "");
+  const region = normalise(personalisation.region ?? "");
+  const country = normaliseCountry(personalisation.country ?? "");
+  if (locality && (topic.localities ?? []).some((value) => normalise(value).includes(locality) || locality.includes(normalise(value)))) return 5;
+  if (region && [...(topic.localities ?? []), ...(topic.regions ?? [])].some((value) => normalise(value).includes(region) || region.includes(normalise(value)))) return 3;
+  if (country && (topic.countries ?? []).some((value) => normaliseCountry(value) === country)) return 1;
+  return 0;
+}
+
+function freshnessScore(createdAt: string) {
+  const ageDays = Math.max(0, (Date.now() - Date.parse(createdAt)) / 86_400_000);
+  return Math.max(0, 3 - ageDays / 7);
+}
+
+async function reportTopicDelivery(consumer: "egg-web" | "egg-app", body: { token: string } | { failed: true }) {
+  const key = process.env.SOON_CORE_BUNDLE_KEY || process.env.SOON_CORE_KNOWLEDGE_KEY;
+  if (!key) return;
+  try {
+    const response = await fetch("https://soon-core.vercel.app/api/topics/delivery-receipt", {
+      method: "POST", headers: { "Content-Type": "application/json", "x-soon-knowledge-key": key, "x-soon-topic-consumer": consumer },
+      body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) console.warn("Topic delivery receipt was not recorded", consumer, response.status);
+  } catch { console.warn("Topic delivery receipt unavailable", consumer); }
+}
+
+export async function listTopicIdeas(workspaceId: string, userId: string, preferredCategories?: string[], personalisation: TopicPersonalisation = {}, consumer: "egg-web" | "egg-app" = "egg-web") {
   const admin = createEggAdmin();
   let centralIdeas: TopicIdea[] = [];
+  let deliveryToken: string | undefined;
   try {
-    centralIdeas = await fetchCentralTopics();
+    const central = await fetchCentralTopics(consumer);
+    centralIdeas = central.ideas;
+    deliveryToken = central.receipt;
     await syncCentralTopicShadows(centralIdeas);
   } catch (error) {
     console.error("Central topic feed unavailable; using Egg fallback", error);
+    await reportTopicDelivery(consumer, { failed: true });
   }
   const localIdeas = await listLocalTopics(workspaceId, userId);
-  const ideas = [...localIdeas, ...centralIdeas.filter((central) => !localIdeas.some((local) => local.id === central.id))]
-    .filter(hasUsableCover);
+  const centralById = new Map(centralIdeas.map(idea => [idea.id, idea]));
+  const localWithSharedMetadata = localIdeas.map(local => {
+    const central = centralById.get(local.id);
+    const geography = local.geography_kind === "context" || local.geography_kind === "none" || local.countries?.length ? local : central || local;
+    return { ...central, ...local,
+      geography_kind: geography.geography_kind,
+      countries: geography.countries,
+      regions: geography.regions,
+      localities: geography.localities,
+      central_available: Boolean(central) && local.import_state === "ready" };
+  });
+  const ideas = [...localWithSharedMetadata, ...centralIdeas.filter((central) => !localIdeas.some((local) => local.id === central.id))]
+    .filter(topic => topic.scope === "workspace" || hasUsableCover(topic))
+    .map(topic => ({ ...topic, countries: topicCountries(topic) }));
 
-  let preferences = preferredCategories;
-  if (!preferences) {
-    const { data } = await admin.from("egg_creator_profiles").select("content_categories").eq("id", workspaceId).maybeSingle();
-    preferences = cleanArray(data?.content_categories);
-  }
-  const { data: actions, error: actionsError } = await admin.from("egg_topic_actions")
-    .select("idea_id,saved,want_to_create,dismissed").eq("workspace_id", workspaceId);
+  const [profileResult, dnaResult, actionsResult] = await Promise.all([
+    preferredCategories ? Promise.resolve({ data: null }) : admin.from("egg_creator_profiles").select("content_categories").eq("id", workspaceId).maybeSingle(),
+    admin.from("creator_dna_profiles").select("primary_industry_code,secondary_industry_codes,content_styles,preferred_formats,audience_summary").eq("workspace_id", workspaceId).maybeSingle(),
+    admin.from("egg_topic_actions").select("idea_id,saved,want_to_create,dismissed,updated_at").eq("workspace_id", workspaceId),
+  ]);
+  const profilePreferences = dnaCategories(dnaResult.data, preferredCategories ?? cleanArray(profileResult.data?.content_categories));
+  const dna = dnaResult.data;
+
+  const { data: actions, error: actionsError } = actionsResult;
   if (actionsError) throw actionsError;
   const actionMap = new Map((actions ?? []).map((action) => [action.idea_id, action]));
-  return ideas.flatMap((idea) => {
+  // A hidden central topic may have aged out of the current delivery window.
+  // Retrieve only this workspace's hidden records so they remain restorable.
+  if (personalisation.includeHidden) {
+    const ids = new Set(ideas.map(idea => idea.id));
+    const hiddenIds = (actions ?? []).filter(action => action.dismissed && !ids.has(action.idea_id)).map(action => action.idea_id);
+    if (hiddenIds.length) {
+      const { data: hidden, error } = await admin.from("egg_topic_ideas")
+        .select("id,title,summary,source_name,source_url,image_url,media_urls,platform,category,tags,content_format,workspace_id,created_by,created_at,import_state,import_error,countries,regions,localities,geography_status,geography_kind")
+        .in("id", hiddenIds).eq("status", "published");
+      if (error) throw error;
+      for (const topic of hidden ?? []) {
+        if (topic.workspace_id && topic.workspace_id !== workspaceId) continue;
+        ideas.push({ ...topic, countries: topicCountries(topic), saved: false, want_to_create: false,
+          manageable: topic.workspace_id === workspaceId && topic.created_by === userId,
+          scope: topic.workspace_id ? "workspace" : "central" } as TopicIdea & { countries: string[] });
+      }
+    }
+  }
+  const positives = ideas.filter(idea => { const action = actionMap.get(idea.id); return !action?.dismissed && (action?.saved || action?.want_to_create); });
+  const seen = new Set(personalisation.recentlySeen ?? []);
+  const hasLocationFilter = Boolean(personalisation.locality || personalisation.region || personalisation.country);
+  const ranked = ideas.flatMap((idea) => {
     const action = actionMap.get(idea.id);
-    if (action?.dismissed) return [];
-    const score = relevanceScore(idea, preferences ?? []);
-    return [{ ...idea, saved: action?.saved ?? false, want_to_create: action?.want_to_create ?? false, recommended: score > 0, _score: score }];
+    if (action?.dismissed && !personalisation.includeHidden) return [];
+    const match = recommendationMatch(idea, dna, profilePreferences, positives);
+    const nearbyScore = locationScore(idea, personalisation);
+    // A location-enabled feed must not present unrelated global topics as
+    // "nearby" merely because they match the creator's content preferences.
+    if (personalisation.surface === "home" && hasLocationFilter && nearbyScore === 0 && !action?.dismissed) return [];
+    const interactionScore = action?.want_to_create ? -8 : action?.saved ? -1 : 0;
+    const exposurePenalty = seen.has(idea.id) ? 8 : 0;
+    const score = match.score + nearbyScore * 2 + interactionScore + freshnessScore(idea.created_at) - exposurePenalty;
+    const reason = nearbyScore >= 5 ? `你目前在${personalisation.locality || "附近"}`
+      : nearbyScore >= 3 ? `適合${personalisation.region || "目前地區"}`
+        : nearbyScore > 0 ? `${countryDisplayName(personalisation.country)}題材`
+        : match.reason || (freshnessScore(idea.created_at) > 1 ? "最近加入" : undefined);
+    return [{ ...idea, dismissed: action?.dismissed ?? false, saved: action?.saved ?? false, saved_at: action?.saved ? action.updated_at : null, want_to_create: action?.want_to_create ?? false, recommended: idea.import_state !== "pending" && idea.import_state !== "failed" && (match.relevant || nearbyScore > 0 || Boolean(action?.saved)), recommendation_reason: match.reason || reason, recommendation_score: score, _score: score }];
   }).sort((a, b) => b._score - a._score || Date.parse(b.created_at) - Date.parse(a.created_at))
     .map((rankedIdea) => {
       const { _score, ...idea } = rankedIdea;
       void _score;
       return idea;
     });
+  if (deliveryToken) await reportTopicDelivery(consumer, { token: deliveryToken });
+  return ranked;
 }

@@ -1,0 +1,10 @@
+# This project is deployed with npm/package-lock.json. Local pnpm workspace
+# experiments must not make Vercel switch package managers during a release.
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Local-only test output.
+test-results
+playwright-report
+.next
+.next-stale-*

@@ -71,6 +71,13 @@ export async function persistRemoteTopicCover(
   return "https://egg.sooncreator.network/creative.jpg";
 }
 
+export function isWorkspaceTopicMediaUrl(value: string, workspaceId: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  if (!supabaseUrl) return false;
+  const prefix = `${supabaseUrl}/storage/v1/object/public/${TOPIC_MEDIA_BUCKET}/${encodeURIComponent(workspaceId)}/`;
+  return value.startsWith(prefix);
+}
+
 export async function removeTopicMedia(admin: SupabaseClient, urls: Array<string | null | undefined>) {
   const marker = `/storage/v1/object/public/${TOPIC_MEDIA_BUCKET}/`;
   const paths = urls.flatMap((value) => {
@@ -94,7 +101,7 @@ function isAllowedRemoteCover(value: string) {
     const url = new URL(value);
     if (url.protocol !== "https:") return false;
     const hostname = url.hostname.toLowerCase();
-    return ["instagram.com", "cdninstagram.com", "fbcdn.net", "ytimg.com", "youtube.com", "tiktokcdn.com", "tiktokcdn-us.com", "xhscdn.com", "xiaohongshu.com", "threads.net"].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+    return ["instagram.com", "cdninstagram.com", "fbcdn.net", "ytimg.com", "youtube.com", "tiktokcdn.com", "tiktokcdn-us.com", "tiktokcdn-eu.com", "xhscdn.com", "xiaohongshu.com", "threads.net", "threads.com"].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
   } catch {
     return false;
   }

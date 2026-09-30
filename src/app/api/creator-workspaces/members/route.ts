@@ -1,3 +1,4 @@
+import { teamIdentities } from "@/lib/team-identities";
 import { NextResponse } from "next/server";
 import { canManageWorkspaceMembers, getCreatorWorkspaceContext, type WorkspaceRole } from "@/lib/creator-workspace";
 
@@ -6,13 +7,18 @@ const roles = new Set<WorkspaceRole>(["owner", "admin", "member"]);
 export async function GET() {
   const { user, activeWorkspace, activeRole, admin } = await getCreatorWorkspaceContext();
   if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManageWorkspaceMembers(activeRole)) return NextResponse.json({ error: "你無權管理成員" }, { status: 403 });
-  const [{ data: members, error }, { data: invitations }] = await Promise.all([
+  const canManage = canManageWorkspaceMembers(activeRole);
+  const [{ data: members, error }, { data: invitations, error: invitationError }] = await Promise.all([
     admin.from("egg_creator_workspace_members").select("user_id,email,role,created_at").eq("workspace_id", activeWorkspace.id).order("created_at"),
-    admin.from("egg_creator_workspace_invitations").select("id,email,role,expires_at,created_at").eq("workspace_id", activeWorkspace.id).eq("status", "pending").gt("expires_at", new Date().toISOString()).order("created_at"),
+    canManage ? admin.from("egg_creator_workspace_invitations").select("id,email,role,expires_at,created_at").eq("workspace_id", activeWorkspace.id).eq("status", "pending").gt("expires_at", new Date().toISOString()).order("created_at") : Promise.resolve({ data: [], error: null }),
   ]);
-  if (error) return NextResponse.json({ error: "讀取成員失敗" }, { status: 500 });
-  return NextResponse.json({ members, invitations: invitations ?? [], currentRole: activeRole });
+  if (error || invitationError) return NextResponse.json({ error: "讀取成員失敗" }, { status: 500 });
+  return NextResponse.json({
+    members: await teamIdentities(admin, members ?? [], user.id, canManage),
+    invitations: invitations ?? [], currentRole: activeRole,
+    workspaceAvatar: activeWorkspace.avatar_url ?? null,
+    workspaceName: activeWorkspace.display_name || activeWorkspace.username || "目前工作空間",
+  });
 }
 
 export async function POST(request: Request) {

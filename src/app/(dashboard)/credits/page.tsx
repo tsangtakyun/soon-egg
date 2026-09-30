@@ -18,8 +18,8 @@ export default async function CreditsPage() {
         <p className="mt-3 text-sm leading-6 text-zinc-500">
           現階段所有創作工具均可免費使用，毋須購買或扣除 Credits。
         </p>
-        <div className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-          目前顯示餘額：<span className="font-semibold text-zinc-950">0 Credits</span>
+        <div className="mt-6 rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
+          Beta 期間免費 · 不會扣除點數
         </div>
       </div>
     </main>

@@ -5,23 +5,35 @@
   --foreground: #18181b;
   --soon-black: #0a0a0a;
   --soon-white: #fafafa;
-  --soon-gold: #f5a623;
+  --soon-brown: #7b4a4f;
+  --soon-brown-deep: #2a1718;
+  --soon-yolk: #ffc83d;
+  --soon-cream: #fff7e6;
+  --soon-lilac: #8b5cf6;
+  --soon-sky: #39b6ff;
+  --soon-lime: #c7f464;
+  --soon-coral: #ff6b6b;
+  --soon-gold: var(--soon-yolk);
   --soon-green: #00c853;
-  --soon-mid: #f4f1ec;
+  --soon-mid: #f8f7f5;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-nunito-sans), "PingFang TC", "Noto Sans TC", sans-serif;
+  --font-sans:
+    var(--font-nunito-sans), "PingFang TC", "Noto Sans TC", sans-serif;
   --font-display: var(--font-nunito), "PingFang TC", "Noto Sans TC", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-nunito-sans), "PingFang TC", "Noto Sans TC", sans-serif;
+  font-family:
+    var(--font-nunito-sans), "PingFang TC", "Noto Sans TC", sans-serif;
 }
 
 h1,
@@ -40,7 +52,9 @@ button {
 .reveal {
   opacity: 0;
   transform: translateY(24px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
 }
 
 .reveal.revealed {
@@ -71,13 +85,38 @@ button {
   }
 }
 
+.egg-command-drift {
+  animation: egg-command-drift 4.8s ease-in-out infinite;
+}
+
+@keyframes egg-command-drift {
+  0%,
+  100% {
+    transform: translateX(-12px) rotate(-3deg);
+  }
+  50% {
+    transform: translateX(12px) rotate(3deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .egg-command-drift {
+    animation: none;
+  }
+}
+
 .shimmer-tag {
   position: relative;
   overflow: hidden;
 }
 
 .shimmer-tag::after {
-  background: linear-gradient(90deg, transparent, rgba(245, 166, 35, 0.3), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(245, 166, 35, 0.3),
+    transparent
+  );
   content: "";
   inset: 0;
   position: absolute;
@@ -108,8 +147,8 @@ button {
   width: 38%;
   height: 3px;
   border-radius: 0 999px 999px 0;
-  background: #5c2a22;
-  box-shadow: 0 0 12px rgb(92 42 34 / 25%);
+  background: var(--soon-brown);
+  box-shadow: 0 0 12px rgb(123 74 79 / 25%);
   animation: soon-loading-bar 1.15s ease-in-out infinite;
 }
 
@@ -120,14 +159,14 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid #ead8cc;
+  border: 1px solid #ead8dc;
   border-radius: 999px;
-  background: rgb(251 244 238 / 97%);
-  color: #5c2a22;
+  background: rgb(255 247 230 / 97%);
+  color: var(--soon-brown);
   padding: 9px 13px;
   font-size: 12px;
   font-weight: 700;
-  box-shadow: 0 10px 30px rgb(92 42 34 / 16%);
+  box-shadow: 0 10px 30px rgb(123 74 79 / 16%);
   backdrop-filter: blur(10px);
 }
 
@@ -143,8 +182,9 @@ button {
 }
 
 .egg-loader-full {
-  min-height: 70vh;
+  min-height: calc(100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   flex-direction: column;
+  text-align: center;
   background: #fbf4ee;
 }
 
@@ -159,7 +199,9 @@ button {
 }
 
 @keyframes egg-brand-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .global-interaction-pill span,
@@ -190,13 +232,21 @@ input[type="submit"].soon-interaction-pending::after {
 }
 
 @keyframes soon-loading-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes soon-loading-bar {
-  0% { transform: translateX(-110%); }
-  55% { transform: translateX(125%); }
-  100% { transform: translateX(300%); }
+  0% {
+    transform: translateX(-110%);
+  }
+  55% {
+    transform: translateX(125%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -204,5 +254,7 @@ input[type="submit"].soon-interaction-pending::after {
   .egg-loader-logo,
   .global-interaction-egg,
   .global-interaction-pill span,
-  .soon-interaction-pending::after { animation-duration: 1.8s; }
+  .soon-interaction-pending::after {
+    animation-duration: 1.8s;
+  }
 }

@@ -1,27 +1,25 @@
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
-import { demoCreator } from "@/lib/mock-data";
-import { createClient } from "@/lib/supabase/server";
+import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 import { NextRequest, NextResponse } from "next/server";
-
-const fallbackCopy = {
-  tagline_zh: "把亞洲生活靈感孵成可合作的內容品牌",
-  tagline_en: "Turning Asian lifestyle stories into creator commerce.",
-  about_zh: "SOON-EGG 專注香港生活、美食探店與創作者工具內容，以清晰、有溫度的短片連結年輕消費者。內容橫跨 Instagram、YouTube、小紅書與 TikTok，擅長把品牌訊息自然放進日常場景。",
-  collaboration_types: ["短片開箱", "探店系列", "限時動態導流", "品牌體驗日記", "Affiliate campaign"],
-  audience_highlight_zh: "核心受眾為 18-34 歲香港與台灣城市消費者，對美食、旅遊、美妝和創作者工具有高互動。",
-  past_brand_categories: ["餐飲平台", "旅遊體驗", "美妝零售", "食品飲料"],
-};
 
 export async function POST(req: NextRequest) {
   try {
     const { creator_id } = await req.json();
-    const supabase = await createClient();
-    let creator = demoCreator;
+    const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
+    if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    if (!creator_id || creator_id !== activeWorkspace.id) return NextResponse.json({ error: "無權存取此工作空間" }, { status: 403 });
+    const { data: creator, error: creatorError } = await admin.from("egg_creator_profiles").select("*").eq("id", activeWorkspace.id).single();
+    if (creatorError || !creator) return NextResponse.json({ error: "找不到創作者資料" }, { status: 404 });
 
-    if (supabase && creator_id) {
-      const { data } = await supabase.from("egg_creator_profiles").select("*").eq("id", creator_id).single();
-      creator = data ?? creator;
-    }
+    const categories = Array.isArray(creator.content_categories) ? creator.content_categories : [];
+    const fallbackCopy = {
+      tagline_zh: creator.ai_profile_summary || creator.bio || `${creator.display_name || creator.username} 的創作者 Media Kit`,
+      tagline_en: creator.display_name || creator.username,
+      about_zh: creator.bio || creator.ai_profile_summary || "尚未填寫創作者介紹。",
+      collaboration_types: [] as string[],
+      audience_highlight_zh: "尚未有足夠受眾資料。",
+      past_brand_categories: categories,
+    };
 
     const anthropic = getAnthropic();
     let copy = fallbackCopy;

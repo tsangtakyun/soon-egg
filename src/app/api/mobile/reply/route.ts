@@ -1,14 +1,18 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 import { saveApprovedReplyRule, suggestReplyProjectName } from "@/lib/reply-workspace-rules";
 import { presentReplyMessage, saveReplyAttachment, withReplyAttachment } from "@/lib/reply-attachments";
+import { buildReplyLanguageInstruction } from "@/lib/reply-language";
+import { isReplyProjectStatus } from "@/lib/reply-project-status";
 
 type HistoryMessage = { role: "user" | "assistant"; content: string };
 type EnquiryBrief = {
   summary: string; brand: string; contact: string; collaborationType: string;
   deliverables: string[]; timeline: string; usageRights: string; exclusivity: string;
   budget: string; missing: string[]; risks: string[]; nextSteps: string[];
+  fieldEvidence: Array<{ field: string; value: string; source: "text" | "screenshot" | "audio" | "previous"; observedAt: string; confirmation: "client_stated" | "creator_confirmed" | "unconfirmed" }>;
+  conflicts: string[];
 };
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
@@ -21,13 +25,15 @@ const replyOutputSchema = {
     brief: {
       type: "object",
       additionalProperties: false,
-      required: ["summary", "brand", "contact", "collaborationType", "deliverables", "timeline", "usageRights", "exclusivity", "budget", "missing", "risks", "nextSteps"],
+      required: ["summary", "brand", "contact", "collaborationType", "deliverables", "timeline", "usageRights", "exclusivity", "budget", "missing", "risks", "nextSteps", "fieldEvidence", "conflicts"],
       properties: {
         summary: { type: "string" }, brand: { type: "string" }, contact: { type: "string" },
         collaborationType: { type: "string" }, deliverables: { type: "array", items: { type: "string" } },
         timeline: { type: "string" }, usageRights: { type: "string" }, exclusivity: { type: "string" },
         budget: { type: "string" }, missing: { type: "array", items: { type: "string" } },
         risks: { type: "array", items: { type: "string" } }, nextSteps: { type: "array", items: { type: "string" } },
+        conflicts: { type: "array", items: { type: "string" } },
+        fieldEvidence: { type: "array", items: { type: "object", additionalProperties: false, required: ["field", "value", "source", "observedAt", "confirmation"], properties: { field: { type: "string" }, value: { type: "string" }, source: { type: "string", enum: ["text", "screenshot", "audio", "previous"] }, observedAt: { type: "string" }, confirmation: { type: "string", enum: ["client_stated", "creator_confirmed", "unconfirmed"] } } } },
       },
     },
     reply: { type: "string" },
@@ -59,7 +65,7 @@ export async function GET(request: Request) {
   if (!context) return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
   const projectId = new URL(request.url).searchParams.get("projectId");
   const { data: projects, error: projectsError } = await context.admin.from("egg_reply_projects")
-    .select("id,name,brief,updated_at").eq("creator_id", context.profile.id)
+    .select("id,name,brief,updated_at,lifecycle_status,status_updated_at").eq("creator_id", context.profile.id)
     .order("updated_at", { ascending: false });
   if (projectsError) return NextResponse.json({ error: "未能讀取 Projects" }, { status: 500 });
   // A project selection belongs to one workspace. When the user switches
@@ -74,21 +80,36 @@ export async function GET(request: Request) {
       .order("created_at", { ascending: true }).limit(100)
     : { data: [], error: null };
   if (messagesError) return NextResponse.json({ error: "未能讀取對話" }, { status: 500 });
-  return NextResponse.json({ projects: projects ?? [], activeProjectId: activeId ?? null, messages: (messages ?? []).map(presentReplyMessage) });
+  const { data: pendingJob } = activeId
+    ? await context.admin.from("egg_reply_generation_jobs").select("id,status,created_at")
+      .eq("creator_id", context.profile.id).eq("project_id", activeId).eq("status", "processing")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle()
+    : { data: null };
+  return NextResponse.json({ projects: projects ?? [], activeProjectId: activeId ?? null, messages: (messages ?? []).map(presentReplyMessage), pendingJob });
 }
 
 export async function POST(request: Request) {
   const context = await getContext(request);
   if (!context) return NextResponse.json({ error: "登入已失效，請重新登入" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as {
-    action?: string; name?: string; projectId?: string; message?: string;
+    action?: string; name?: string; projectId?: string; message?: string; lifecycle_status?: unknown;
     history?: HistoryMessage[]; feedbackMode?: "project" | "workspace_rule"; image?: { data?: string; mediaType?: string };
   };
+  if (body.action === 'set_project_status') {
+    if (!body.projectId || !isReplyProjectStatus(body.lifecycle_status)) return NextResponse.json({ error: '請選擇有效的項目及狀態' }, { status: 400 });
+    const { data, error } = await context.admin.from('egg_reply_projects')
+      .update({ lifecycle_status: body.lifecycle_status, status_updated_at: new Date().toISOString() })
+      .eq('id', body.projectId).eq('creator_id', context.profile.id)
+      .select('id,name,brief,updated_at,lifecycle_status,status_updated_at').maybeSingle();
+    if (error) return NextResponse.json({ error: '未能更新項目狀態，請重試' }, { status: 500 });
+    if (!data) return NextResponse.json({ error: '找不到項目' }, { status: 404 });
+    return NextResponse.json({ project: data });
+  }
   if (body.action === "create_project") {
     const name = body.name?.trim().slice(0, 80);
     if (!name) return NextResponse.json({ error: "請輸入 Project 或聯絡人名稱" }, { status: 400 });
     const { data: existing } = await context.admin.from("egg_reply_projects")
-      .select("id,name,brief,updated_at").eq("creator_id", context.profile.id)
+      .select("id,name,brief,updated_at,lifecycle_status,status_updated_at").eq("creator_id", context.profile.id)
       .eq("name", name).order("updated_at", { ascending: false }).limit(1).maybeSingle();
     if (existing) return NextResponse.json({ project: existing, existing: true });
     const { data, error } = await context.admin.from("egg_reply_projects")
@@ -116,10 +137,45 @@ export async function POST(request: Request) {
       .eq("creator_id", context.profile.id).eq("name", name).neq("id", body.projectId).limit(1).maybeSingle();
     if (duplicate) return NextResponse.json({ error: "已經有另一個同名 Project" }, { status: 409 });
     const { data, error } = await context.admin.from("egg_reply_projects")
-      .update({ name, updated_at: new Date().toISOString() }).eq("id", body.projectId)
+      .update({ name }).eq("id", body.projectId)
       .eq("creator_id", context.profile.id).select("id,name,brief,updated_at").maybeSingle();
     if (error || !data) return NextResponse.json({ error: "未能更新 Project 名稱" }, { status: 500 });
     return NextResponse.json({ project: data });
+  }
+  if (body.action === "job_status") {
+    const jobId = typeof (body as { jobId?: unknown }).jobId === "string" ? String((body as { jobId?: string }).jobId) : "";
+    if (!jobId) return NextResponse.json({ error: "缺少處理編號" }, { status: 400 });
+    const { data: job } = await context.admin.from("egg_reply_generation_jobs")
+      .select("id,status,result,error,updated_at").eq("id", jobId).eq("creator_id", context.profile.id).maybeSingle();
+    if (!job) return NextResponse.json({ error: "找不到處理紀錄" }, { status: 404 });
+    return NextResponse.json({ job });
+  }
+  if (body.action === "start_chat") {
+    const cleanMessage = body.message?.trim();
+    if (!cleanMessage) return NextResponse.json({ error: "請貼上品牌查詢或上載截圖" }, { status: 400 });
+    const { data: project } = body.projectId
+      ? await context.admin.from("egg_reply_projects").select("id").eq("id", body.projectId).eq("creator_id", context.profile.id).maybeSingle()
+      : { data: null };
+    if (!project) return NextResponse.json({ error: "找不到目前 Project" }, { status: 404 });
+    const { data: job, error: jobError } = await context.admin.from("egg_reply_generation_jobs")
+      .insert({ creator_id: context.profile.id, project_id: project.id, status: "processing" })
+      .select("id,status,created_at").single();
+    if (jobError || !job) return NextResponse.json({ error: "暫時未能開始整理，請稍後再試" }, { status: 503 });
+    after(async () => {
+      try {
+        const response = await generateReply(context, body);
+        const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+        await context.admin.from("egg_reply_generation_jobs").update(response.ok
+          ? { status: "completed", result, updated_at: new Date().toISOString() }
+          : { status: "failed", error: String(result.error || "AI 暫時未能整理查詢"), updated_at: new Date().toISOString() })
+          .eq("id", job.id).eq("creator_id", context.profile.id);
+      } catch (error) {
+        console.error("[mobile reply] background job failed", { jobId: job.id, error });
+        await context.admin.from("egg_reply_generation_jobs").update({ status: "failed", error: "AI 暫時未能整理查詢，請稍後再試", updated_at: new Date().toISOString() })
+          .eq("id", job.id).eq("creator_id", context.profile.id);
+      }
+    });
+    return NextResponse.json({ job }, { status: 202 });
   }
   if (body.action !== "chat") return NextResponse.json({ error: "不支援嘅操作" }, { status: 400 });
   return generateReply(context, body);
@@ -162,7 +218,7 @@ async function generateReply(
       model: MODEL,
       max_tokens: 3500,
       output_config: { format: { type: "json_schema", schema: replyOutputSchema } },
-      system: `${promptProfile.system_prompt}\n\n你而家要一次過完成內部 Enquiry Brief 及對客戶第一輪回覆草稿。不可虛構資料。只輸出有效 JSON，不要 Markdown code fence：\n{"brief":{"summary":"","brand":"","contact":"","collaborationType":"","deliverables":[],"timeline":"","usageRights":"","exclusivity":"","budget":"","missing":[],"risks":[],"nextSteps":[]},"reply":"可直接發給客戶的回覆草稿"}`,
+      system: `${promptProfile.system_prompt}\n\n${buildReplyLanguageInstruction(cleanMessage)}\n\n你要一次過完成內部 Enquiry Brief 及對客戶第一輪回覆草稿。沿用 previous brief 已有而今次沒有推翻的資料；missing 只列真正缺漏，reply 只追問 missing，絕不可重問已在文字、截圖、錄音轉寫或之前對話提供的資料。若來源互相矛盾，保留兩者並放入 conflicts，不可自行選擇。fieldEvidence 要記錄欄位、值、來源、ISO 時間及確認狀態。不可虛構價錢、檔期、合約承諾或替創作者接受合作。只輸出有效 JSON，不要 Markdown code fence。`,
       messages: [...history, { role: "user" as const, content: image ? [
         { type: "image" as const, source: { type: "base64" as const, media_type: image.mediaType as "image/jpeg" | "image/png" | "image/webp", data: image.data! } },
         { type: "text" as const, text: buildContext(project.name, project.brief, context.profile, categories, cleanMessage) },
@@ -208,7 +264,7 @@ function parseResult(raw: string): { brief: EnquiryBrief; reply: string } | null
     if (!value.brief || typeof value.reply !== "string" || !value.reply.trim()) return null;
     const list = (item: unknown) => Array.isArray(item) ? item.map(String).filter(Boolean).slice(0, 20) : [];
     return { brief: {
-      summary: String(value.brief.summary ?? "未提供"), brand: String(value.brief.brand ?? "未提供"), contact: String(value.brief.contact ?? "未提供"), collaborationType: String(value.brief.collaborationType ?? "未提供"), deliverables: list(value.brief.deliverables), timeline: String(value.brief.timeline ?? "未提供"), usageRights: String(value.brief.usageRights ?? "未提供"), exclusivity: String(value.brief.exclusivity ?? "未提供"), budget: String(value.brief.budget ?? "未提供"), missing: list(value.brief.missing), risks: list(value.brief.risks), nextSteps: list(value.brief.nextSteps),
+      summary: String(value.brief.summary ?? "未提供"), brand: String(value.brief.brand ?? "未提供"), contact: String(value.brief.contact ?? "未提供"), collaborationType: String(value.brief.collaborationType ?? "未提供"), deliverables: list(value.brief.deliverables), timeline: String(value.brief.timeline ?? "未提供"), usageRights: String(value.brief.usageRights ?? "未提供"), exclusivity: String(value.brief.exclusivity ?? "未提供"), budget: String(value.brief.budget ?? "未提供"), missing: list(value.brief.missing), risks: list(value.brief.risks), nextSteps: list(value.brief.nextSteps), conflicts: list(value.brief.conflicts), fieldEvidence: Array.isArray(value.brief.fieldEvidence) ? value.brief.fieldEvidence : [],
     }, reply: value.reply.trim() };
   } catch { return null; }
 }

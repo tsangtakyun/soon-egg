@@ -66,7 +66,7 @@ export async function GET(request: Request) {
   const [{ data: profile, error }, { data: links }] = await Promise.all([
     ctx.admin
       .from("egg_creator_profiles")
-      .select(fields)
+      .select(`${fields},instagram_access_token` as const)
       .eq("id", ctx.workspaceId)
       .maybeSingle(),
     ctx.admin
@@ -78,8 +78,9 @@ export async function GET(request: Request) {
   ]);
   if (error || !profile)
     return NextResponse.json({ error: "未能讀取設定" }, { status: 500 });
+  const { instagram_access_token, ...publicProfile } = profile;
   return NextResponse.json({
-    profile,
+    profile: { ...publicProfile, instagram_connected: Boolean(instagram_access_token) },
     links: links ?? [],
     email: ctx.user.email ?? null,
     role: ctx.role,
@@ -182,11 +183,6 @@ export async function POST(request: Request) {
       typeof body.bio === "string" && body.bio.trim()
         ? body.bio.trim().slice(0, 150)
         : null,
-    content_categories: Array.isArray(body.content_categories)
-      ? body.content_categories
-          .filter((item: unknown): item is string => typeof item === "string")
-          .slice(0, 12)
-      : [],
     facebook_handle: cleanHandle(body.facebook_handle),
     threads_handle: cleanHandle(body.threads_handle),
   };

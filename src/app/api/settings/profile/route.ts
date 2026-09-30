@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { display_name, bio, content_categories, avatar_url, username } = body;
+  const { display_name, bio, avatar_url, username } = body;
   const normalizedUsername = typeof username === "string" ? normalizeProfileUsername(username) : "";
   if (!isValidProfileUsername(normalizedUsername)) {
     return NextResponse.json({ error: "用戶名須為 3–30 個英文字母、數字、句點、底線或連字號，首尾必須為字母或數字。" }, { status: 400 });
@@ -45,9 +45,6 @@ export async function POST(req: Request) {
       username: normalizedUsername,
       display_name: typeof display_name === "string" ? display_name.trim() : "",
       bio: typeof bio === "string" && bio.trim() ? bio.trim() : null,
-      content_categories: Array.isArray(content_categories)
-        ? content_categories.filter((category): category is string => typeof category === "string")
-        : [],
       avatar_url: typeof avatar_url === "string" && avatar_url ? avatar_url : null,
     })
     .eq("id", existingProfile.id);

@@ -1,0 +1,17 @@
+const ts = require('typescript');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const output = ts.transpileModule(fs.readFileSync('src/lib/topic-source.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const box = { exports: {}, URL }; vm.runInNewContext(output, box);
+const { topicSourceKey, isPendingTopic, hasChineseEditorialText } = box.exports;
+assert.equal(topicSourceKey('https://www.instagram.com/reel/Da5WZ0LMpvc/?stkn=one'), topicSourceKey('https://instagram.com/p/Da5WZ0LMpvc/?igsh=two'));
+assert.notEqual(topicSourceKey('https://instagram.com/reel/CaseId/'), topicSourceKey('https://instagram.com/reel/caseid/'));
+assert.equal(topicSourceKey('https://youtu.be/AbCd?t=9'), topicSourceKey('https://www.youtube.com/watch?v=AbCd&feature=share'));
+assert.notEqual(topicSourceKey('https://example.org/article?id=1'), topicSourceKey('https://example.org/article?id=2'));
+assert.ok(isPendingTopic({title:'正在整理題材'}));
+assert.ok(isPendingTopic({title:'caption',tags:['AI整理中']}));
+assert.equal(hasChineseEditorialText('Paris butter boutique'),false);
+assert.equal(hasChineseEditorialText('EGG 正在背景讀取內容'),false);
+assert.ok(hasChineseEditorialText('巴黎牛油專門店提供多款牛油試食。'));
+console.log('9 topic identity / unfinished-content assertions passed');

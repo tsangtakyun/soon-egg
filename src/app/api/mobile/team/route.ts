@@ -1,3 +1,4 @@
+import { teamIdentities } from "@/lib/team-identities";
 import { NextResponse } from "next/server";
 import {
   acceptPendingWorkspaceInvitations,
@@ -45,25 +46,28 @@ export async function GET(request: Request) {
       { status: 401 },
     );
   const incomingInvitations = await listIncomingWorkspaceInvitations(ctx.admin, ctx.user.email);
-  if (!canManageWorkspaceMembers(ctx.role)) return NextResponse.json({ members: [], invitations: [], incomingInvitations, currentRole: ctx.role });
-  const [{ data: members, error }, { data: invitations }] = await Promise.all([
+  const canManage = canManageWorkspaceMembers(ctx.role);
+  const [{ data: members, error }, { data: invitations, error: invitationError }, { data: workspace, error: workspaceError }] = await Promise.all([
     ctx.admin
       .from("egg_creator_workspace_members")
       .select("user_id,email,role,created_at")
       .eq("workspace_id", ctx.workspaceId)
       .order("created_at"),
-    ctx.admin
+    canManage ? ctx.admin
       .from("egg_creator_workspace_invitations")
       .select("id,email,role,expires_at,created_at")
       .eq("workspace_id", ctx.workspaceId)
       .eq("status", "pending")
       .gt("expires_at", new Date().toISOString())
-      .order("created_at"),
+      .order("created_at") : Promise.resolve({ data: [], error: null }),
+    ctx.admin.from("egg_creator_profiles").select("display_name,username,avatar_url").eq("id", ctx.workspaceId).single(),
   ]);
-  if (error)
+  if (error || invitationError || workspaceError)
     return NextResponse.json({ error: "未能讀取團隊成員" }, { status: 500 });
   return NextResponse.json({
-    members: members ?? [],
+    members: await teamIdentities(ctx.admin, members ?? [], ctx.user.id, canManage),
+    workspaceAvatar: workspace?.avatar_url ?? null,
+    workspaceName: workspace?.display_name || workspace?.username || "目前工作空間",
     invitations: invitations ?? [],
     currentRole: ctx.role,
     incomingInvitations,

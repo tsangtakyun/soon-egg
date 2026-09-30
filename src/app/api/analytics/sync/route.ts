@@ -1,10 +1,8 @@
-import { analyticsSeries } from "@/lib/mock-data";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  return NextResponse.json({
-    synced_at: new Date().toISOString(),
-    platforms: ["Instagram", "YouTube", "小紅書", "TikTok"],
-    series: analyticsSeries,
-  });
+  return NextResponse.json(
+    { error: "呢個舊同步入口已停用，請使用已連結平台嘅真實數據同步。" },
+    { status: 410 },
+  );
 }

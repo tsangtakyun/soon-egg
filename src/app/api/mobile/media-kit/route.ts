@@ -94,7 +94,7 @@ export async function GET(request: Request) {
     context.admin
       .from("egg_instagram_media")
       .select(
-        "id,media_type,caption,permalink,media_url,thumbnail_url,published_at,views,reach,plays,total_interactions,like_count,comments_count,is_featured,sort_order",
+        "id,media_type,caption,permalink,media_url,thumbnail_url,published_at,views,reach,saved,shares,total_interactions,like_count,comments_count,is_featured,sort_order",
       )
       .eq("creator_id", context.workspaceId)
       .order("is_featured", { ascending: false })

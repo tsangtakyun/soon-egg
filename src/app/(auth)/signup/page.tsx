@@ -7,8 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EggBrandMark } from "@/components/ui/EggBrandMark";
 
 function getAuthRedirectUrl(next: string) {
-  const origin = window.location.hostname === "localhost" ? window.location.origin : "https://egg.sooncreator.network";
-  return `${origin}/auth/callback?next=${next}`;
+  return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
 export default function SignupPage() {

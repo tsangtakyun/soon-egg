@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),ts=require('typescript'),assert=require('node:assert/strict');
+const exportsObject={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/lib/topic-geography-contract.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports:exportsObject});
+const {parseTopicGeography:parse,topicGeographyPatch:patch}=exportsObject;
+const source='荷蘭阿姆斯特丹的 Van Stapele 烘焙店只售一款曲奇。';
+const value={countries:['NL'],regions:[],localities:['阿姆斯特丹'],evidence:'荷蘭阿姆斯特丹的 Van Stapele',confidence:'high'};
+assert.equal(parse(value,source).geography_status,'resolved');
+assert.equal(parse(value,source).countries[0],'NL');
+for(const [code,name] of [['HK','香港'],['MO','澳門'],['TW','台灣'],['NL','荷蘭']])assert.equal(parse({countries:[code],localities:[],regions:[],evidence:name,confidence:'high'},name+'美食介紹').geography_status,'resolved');
+assert.equal(parse({...value,evidence:'沒有提供的地址'},source).geography_status,'pending');
+assert.equal(parse({...value,localities:['巴黎']},source).geography_status,'pending');
+assert.equal(parse({...value,countries:['ZZ']},source).geography_status,'pending');
+assert.equal(parse({confidence:'unknown'},'在香港吃日式料理？地點未確認').geography_status,'unknown');
+assert.deepEqual(Object.keys(patch(null,source)),[],'invalid retry never erases a previous location');
+for(const route of ['src/app/api/topics/route.ts','src/app/api/mobile/topics/route.ts'])assert.match(fs.readFileSync(route,'utf8'),/await extractTopicGeography/);
+for(const path of ['src/app/api/public/topics/route.ts','src/lib/topic-library.ts'])assert.match(fs.readFileSync(path,'utf8'),/countries,regions,localities/);
+console.log('PASS grounded NL extraction, invalid evidence/code rejection, unknown, retry preservation and both read contracts');

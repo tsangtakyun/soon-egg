@@ -7,7 +7,7 @@ import { canCreateCreatorWorkspace, getCreatorWorkspaceContext } from "@/lib/cre
 export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user, workspaces, activeWorkspace: profile } = await getCreatorWorkspaceContext();
+  const { user, workspaces, activeWorkspace: profile, activeRole } = await getCreatorWorkspaceContext();
   const creatorName = profile?.display_name || profile?.username || user?.email?.split("@")[0] || "Creator";
 
   return (
@@ -20,6 +20,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           workspaces={workspaces}
           activeWorkspaceId={profile?.id ?? null}
           canCreateWorkspace={canCreateCreatorWorkspace(user?.email)}
+          canManageWorkspace={activeRole === "owner" || activeRole === "admin"}
         />
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-7xl">{children}</div>

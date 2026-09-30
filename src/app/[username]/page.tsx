@@ -1,3 +1,5 @@
+import { dnaCategories } from "@/lib/creator-dna";
+import { createEggAdmin } from "@/lib/creator-workspace";
 import type { CSSProperties } from "react";
 import {
   PublicPageClient,
@@ -59,6 +61,10 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
     .single();
 
   if (!profile) notFound();
+
+  const { data: publicDNA } = await createEggAdmin().from("creator_dna_profiles").select("primary_industry_code,secondary_industry_codes").eq("workspace_id", profile.id).maybeSingle();
+  profile.content_categories = dnaCategories(publicDNA, profile.content_categories ?? []);
+
 
   const [{ data: blocks }, { data: theme }, followsResult, { data: products }, { data: rateCards }] = await Promise.all([
     supabase

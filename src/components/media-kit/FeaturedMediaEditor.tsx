@@ -14,7 +14,8 @@ type InstagramMedia = {
   thumbnail_url: string | null;
   views: number | null;
   reach: number | null;
-  plays: number | null;
+  saved: number | null;
+  shares: number | null;
   like_count: number;
   comments_count: number;
   is_featured: boolean;
@@ -22,9 +23,9 @@ type InstagramMedia = {
 };
 
 function metric(media: InstagramMedia) {
-  const value = media.views ?? media.plays ?? media.reach ?? (media.like_count + media.comments_count);
-  const label = media.views != null ? "觀看" : media.plays != null ? "播放" : media.reach != null ? "觸及" : "互動";
-  return `${value.toLocaleString()} ${label}`;
+  const value = media.views ?? media.reach ?? (media.like_count + media.comments_count);
+  const label = media.views != null ? "觀看" : media.reach != null ? "觸及" : "互動";
+  return `${value.toLocaleString("en-US")} ${label}`;
 }
 
 export function FeaturedMediaEditor({ profileId, onPreviewChange }: { profileId: string; onPreviewChange: () => void }) {
@@ -129,7 +130,7 @@ export function FeaturedMediaEditor({ profileId, onPreviewChange }: { profileId:
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-blue-950">精選 Instagram 內容（{featured.length}/5）</p>
-            <p className="mt-1 text-xs leading-relaxed text-blue-700">系統會按觀看、播放、觸及或互動推薦；你可以自行揀選及排序。</p>
+            <p className="mt-1 text-xs leading-relaxed text-blue-700">系統會按觀看、觸及或互動推薦；你可以自行揀選及排序。</p>
           </div>
           <button type="button" onClick={sync} disabled={syncing} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
             <RefreshCw size={13} className={syncing ? "animate-spin" : ""} />

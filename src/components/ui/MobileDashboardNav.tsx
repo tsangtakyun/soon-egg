@@ -16,12 +16,14 @@ export function MobileDashboardNav({
   workspaces,
   activeWorkspaceId,
   canCreateWorkspace,
+  canManageWorkspace,
 }: {
   avatarUrl?: string | null;
   creatorName: string;
   workspaces: CreatorWorkspace[];
   activeWorkspaceId: string | null;
   canCreateWorkspace: boolean;
+  canManageWorkspace: boolean;
 }) {
   const pathname = usePathname();
   const [openAtPath, setOpenAtPath] = useState<string | null>(null);
@@ -30,12 +32,22 @@ export function MobileDashboardNav({
   return (
     <>
       <header className="z-40 flex h-16 shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 lg:hidden">
-        <Link href="/dashboard" className="flex items-center gap-2" aria-label="返回 SOON-EGG 主頁">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2"
+          aria-label="返回 SOON-EGG 主頁"
+        >
           <EggBrandMark compact />
         </Link>
         <div className="flex min-w-0 items-center gap-2">
-          <CreatorAvatar avatarUrl={avatarUrl} creatorName={creatorName} className="h-9 w-9" />
-          <span className="max-w-28 truncate text-sm font-semibold text-zinc-800">{creatorName}</span>
+          <CreatorAvatar
+            avatarUrl={avatarUrl}
+            creatorName={creatorName}
+            className="h-9 w-9"
+          />
+          <span className="max-w-28 truncate text-sm font-semibold text-zinc-800">
+            {creatorName}
+          </span>
           <button
             type="button"
             onClick={() => setOpenAtPath(pathname)}
@@ -59,9 +71,15 @@ export function MobileDashboardNav({
           <aside className="absolute inset-y-0 right-0 flex w-[min(88vw,360px)] flex-col bg-zinc-50 px-4 py-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-zinc-200 px-2 pb-4">
               <div className="flex min-w-0 items-center gap-3">
-                <CreatorAvatar avatarUrl={avatarUrl} creatorName={creatorName} className="h-9 w-9" />
+                <CreatorAvatar
+                  avatarUrl={avatarUrl}
+                  creatorName={creatorName}
+                  className="h-9 w-9"
+                />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-zinc-900">{creatorName}</p>
+                  <p className="truncate text-sm font-semibold text-zinc-900">
+                    {creatorName}
+                  </p>
                   <p className="text-xs text-zinc-400">創作者帳戶</p>
                 </div>
               </div>
@@ -86,10 +104,23 @@ export function MobileDashboardNav({
             </div>
 
             <div className="space-y-1 border-t border-zinc-200 pt-4">
-              <MobileAccountLink href="/team" icon={<Users size={17} />} label="邀請團隊成員" />
-              <MobileAccountLink href="/settings" icon={<Settings size={17} />} label="設定" />
+              {canManageWorkspace ? (
+                <MobileAccountLink
+                  href="/team"
+                  icon={<Users size={17} />}
+                  label="邀請團隊成員"
+                />
+              ) : null}
+              <MobileAccountLink
+                href="/settings"
+                icon={<Settings size={17} />}
+                label={canManageWorkspace ? "設定" : "設定（唯讀）"}
+              />
               <form action="/api/auth/signout" method="POST">
-                <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 hover:bg-white">
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 hover:bg-white"
+                >
                   <LogOut size={17} />
                   登出
                 </button>
@@ -102,9 +133,20 @@ export function MobileDashboardNav({
   );
 }
 
-function MobileAccountLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function MobileAccountLink({
+  href,
+  icon,
+  label,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+}) {
   return (
-    <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 hover:bg-white">
+    <Link
+      href={href}
+      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 hover:bg-white"
+    >
       {icon}
       {label}
     </Link>

@@ -1,3 +1,4 @@
+import { dnaCategories } from "@/lib/creator-dna";
 import "server-only";
 
 import { createClient as createAdminClient, type User } from "@supabase/supabase-js";
@@ -162,7 +163,12 @@ export async function getActiveCreatorProfile(select: string) {
   // Supabase parses literal select strings at type level; this helper intentionally
   // accepts dynamic field lists shared by many routes.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { ...context, profile: data as Record<string, any> | null };
+  const profile = data as Record<string, any> | null;
+  if (profile && select.split(",").some(field => field.trim() === "content_categories" || field.trim() === "*")) {
+    const { data: dna } = await context.admin.from("creator_dna_profiles").select("primary_industry_code,secondary_industry_codes").eq("workspace_id",context.activeWorkspace.id).maybeSingle();
+    profile.content_categories = dnaCategories(dna, profile.content_categories ?? []);
+  }
+  return { ...context, profile };
 }
 
 export async function acceptPendingWorkspaceInvitations(

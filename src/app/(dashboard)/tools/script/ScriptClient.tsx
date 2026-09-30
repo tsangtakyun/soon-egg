@@ -135,7 +135,7 @@ export function ScriptClient({
           <p className="mt-2 text-zinc-500">按你的主題、語氣及影片節奏，生成適合 Instagram Reels 的完整劇本。</p>
         </div>
         <div className="w-fit rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-500 shadow-sm">
-          目前餘額 <span className="font-semibold text-zinc-950">{balance.toLocaleString()}</span> credits
+          <span className="font-semibold text-green-700">Beta 期間免費使用</span>
         </div>
       </header>
 

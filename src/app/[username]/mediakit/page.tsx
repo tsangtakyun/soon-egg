@@ -1,3 +1,5 @@
+import { dnaCategories } from "@/lib/creator-dna";
+import { createEggAdmin } from "@/lib/creator-workspace";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
@@ -23,6 +25,7 @@ type CreatorProfile = {
   facebook_handle?: string | null;
   facebook_followers?: number | null;
   threads_followers?: number | null;
+  is_public?: boolean | null;
   mediakit_is_public?: boolean | null;
   mediakit_access_level?: string | null;
   mediakit_bg_color?: string | null;
@@ -87,7 +90,8 @@ type FeaturedMedia = {
   thumbnail_url: string | null;
   views: number | null;
   reach: number | null;
-  plays: number | null;
+  saved: number | null;
+  shares: number | null;
   like_count: number;
   comments_count: number;
   sort_order: number;
@@ -130,7 +134,6 @@ function money(value: number | null | undefined) {
 
 function featuredMetric(media: FeaturedMedia) {
   if (media.views != null) return { label: "觀看", value: media.views };
-  if (media.plays != null) return { label: "播放", value: media.plays };
   if (media.reach != null) return { label: "觸及", value: media.reach };
   return { label: "互動", value: media.like_count + media.comments_count };
 }
@@ -204,9 +207,13 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
   const { data } = await supabase.from("egg_creator_profiles").select("*").eq("username", username).single();
   const profile = data as CreatorProfile | null;
 
-  if (!profile || !profile.mediakit_is_public || profile.mediakit_access_level === "private") {
+  if (!profile || !profile.is_public || !profile.mediakit_is_public || profile.mediakit_access_level === "private") {
     notFound();
   }
+
+
+  const { data: publicDNA } = await createEggAdmin().from("creator_dna_profiles").select("primary_industry_code,secondary_industry_codes").eq("workspace_id", profile.id).maybeSingle();
+  profile.content_categories = dnaCategories(publicDNA, profile.content_categories ?? []);
 
   const [{ data: rateCards }, { data: brandPartners }, { data: caseStudies }, { data: blocks }, { data: featuredMedia }] = await Promise.all([
     supabase.from("egg_rate_cards").select("*").eq("creator_id", profile.id).eq("is_active", true).order("sort_order", { ascending: true }),
@@ -220,7 +227,7 @@ export default async function PublicMediaKitPage({ params }: { params: Promise<{
       .order("sort_order", { ascending: true }),
     supabase
       .from("egg_instagram_media")
-      .select("id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,views,reach,plays,like_count,comments_count,sort_order")
+      .select("id,media_type,media_product_type,caption,permalink,media_url,thumbnail_url,views,reach,saved,shares,like_count,comments_count,sort_order")
       .eq("creator_id", profile.id)
       .eq("is_featured", true)
       .order("sort_order", { ascending: true })

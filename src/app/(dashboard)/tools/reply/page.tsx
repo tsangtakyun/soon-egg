@@ -3,16 +3,17 @@ import { enterTool } from "@/lib/tools";
 import { ReplyClient, type MayanMessage } from "./ReplyClient";
 import { presentReplyMessage } from "@/lib/reply-attachments";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
+import type { ReactNode } from "react";
 
 export default async function ReplyPage() {
   const { user } = await enterTool("reply", "進入回覆中心");
-  const { profile } = await getActiveCreatorProfile("id");
-  if (!profile) return <ReplyClient messages={[]} projects={[]} />;
+  const { profile, activeRole } = await getActiveCreatorProfile("id");
+  if (!profile) return <ReplyPageContent client={<ReplyClient messages={[]} projects={[]} />} />;
   const admin = createEggAdmin();
 
   const { data: projects } = await admin
     .from("egg_reply_projects")
-    .select("id,name,brief,updated_at")
+    .select("id,name,brief,updated_at,lifecycle_status,status_updated_at")
     .eq("creator_id", profile.id)
     .order("updated_at", { ascending: false });
   const activeProject = projects?.[0] ?? null;
@@ -62,5 +63,9 @@ export default async function ReplyPage() {
     .order("created_at", { ascending: true })
     .limit(50);
 
-  return <ReplyClient messages={(messages ?? []).map(presentReplyMessage) as MayanMessage[]} projects={projects ?? []} />;
+  return <ReplyPageContent client={<ReplyClient canManageRules={activeRole === "owner"} messages={(messages ?? []).map(presentReplyMessage) as MayanMessage[]} projects={projects ?? []} />} />;
+}
+
+function ReplyPageContent({ client }: { client: ReactNode }) {
+  return <div>{client}</div>;
 }

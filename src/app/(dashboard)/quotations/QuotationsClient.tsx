@@ -11,10 +11,10 @@ export function QuotationsClient({ projects, initialProjectId, canApprove }: { p
   const project = useMemo(() => projects.find((item) => item.id === projectId) ?? projects[0], [projectId, projects]);
   const riskCount = project?.brief.risks?.length ?? 0;
 
-  if (!project) return <main className="p-5 lg:p-8"><header><h1 className="text-2xl font-black">報價管理</h1></header><section className="mt-6 flex min-h-80 flex-col items-center justify-center rounded-2xl border bg-white p-8 text-center"><FileText className="mb-3 h-8 w-8 text-zinc-400" /><h2 className="font-bold">未有已確認合作</h2><p className="mt-2 max-w-md text-sm text-zinc-500">到回覆中心「項目」嘅 ⋯ 選單確認合作後，項目先會喺呢度出現。</p><Link href="/tools/reply" className="mt-5 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-bold text-white">前往回覆中心</Link></section></main>;
+  if (!project) return <main className="p-5 lg:p-8"><header><h1 className="text-2xl font-black">報價管理</h1></header><section className="mt-6 flex min-h-80 flex-col items-center justify-center rounded-2xl border bg-white p-8 text-center"><FileText className="mb-3 h-8 w-8 text-zinc-400" /><h2 className="font-bold">未有可報價項目</h2><p className="mt-2 max-w-md text-sm text-zinc-500">喺回覆中心建立洽談項目後，就可以整理報價草稿；客戶接受後先再標記「客戶已接受」。</p><Link href="/tools/reply" className="mt-5 rounded-xl bg-zinc-950 px-5 py-3 text-sm font-bold text-white">前往回覆中心</Link></section></main>;
 
   return <main className="p-5 lg:p-8">
-    <header><h1 className="text-2xl font-black">報價管理</h1><p className="mt-1 text-sm text-zinc-500">建立、確認及下載合作報價。</p></header>
+    <header><h1 className="text-2xl font-black">報價管理</h1><p className="mt-1 text-sm text-zinc-500">洽談期間建立及批核報價；客戶接受後先確認合作。</p></header>
     <div className="mt-6 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside className="rounded-2xl border bg-white p-3">
         <h2 className="px-2 pb-2 text-xs font-bold text-zinc-500">合作項目</h2>

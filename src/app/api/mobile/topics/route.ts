@@ -386,7 +386,7 @@ export async function POST(request: Request) {
   const { data: target, error: targetError } = await auth.admin.from("egg_topic_ideas").select("id,workspace_id").eq("id", ideaId).eq("status", "published").maybeSingle();
   if (targetError) return NextResponse.json({ error: "未能讀取題材" }, { status: 500 });
   if (!target || (target.workspace_id && target.workspace_id !== auth.workspaceId)) return NextResponse.json({ error: "找不到題材" }, { status: 404 });
-  const { error } = await auth.admin.from("egg_topic_actions").upsert({
+  const patch: { workspace_id: string; idea_id: string; saved?: boolean; want_to_create?: boolean; dismissed?: boolean; updated_by: string; updated_at: string } = {
     workspace_id: auth.workspaceId,
     idea_id: ideaId,
     // Partial upsert only changes the requested preference; hiding preserves bookmarks.
@@ -395,9 +395,14 @@ export async function POST(request: Request) {
       : action === "create" ? { saved: true, want_to_create: true } : { saved: action === "save" }),
     updated_by: auth.user.id,
     updated_at: new Date().toISOString(),
-  }, { onConflict: "workspace_id,idea_id" });
+  };
+  const { error } = await auth.admin.from("egg_topic_actions").upsert(patch, { onConflict: "workspace_id,idea_id" });
   if (error) return NextResponse.json({ error: "未能儲存操作" }, { status: 500 });
-  return NextResponse.json({ success: true, saved: action === "save" || action === "create" });
+  return NextResponse.json({
+    success: true,
+    saved: action === "save" || action === "create",
+    savedAt: action === "save" || action === "create" ? patch.updated_at : null,
+  });
 }
 
 async function resolveSharedTopicMetadata(sourceUrl: string) {

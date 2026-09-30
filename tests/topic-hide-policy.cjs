@@ -33,6 +33,28 @@ function load(path, dependencies = {}, globals = {}) {
   assert.equal((await post('dismiss')).status,404); assert.equal(updates,before,'cross-workspace target rejected');
   assert.equal((await post('delete')).status,400);
  }
+ const crossSurfacePreference={saved:false,want_to_create:false,dismissed:false,updated_at:null};
+ const crossSurfaceAdmin={auth:{getUser:async()=>({data:{user:{id:'user',email:'creator@example.test'}}})},from(table){
+  const q={select(){return q},eq(){return q},maybeSingle:async()=>({data:{id:'topic',workspace_id:'workspace'}}),
+   upsert:async patch=>{assert.equal(table,'egg_topic_actions');assert.equal(patch.workspace_id,'workspace');Object.assign(crossSurfacePreference,patch);return {error:null};}};
+  return q;
+ }};
+ const deps={
+  'next/server':{NextResponse:{json:(value,init)=>Response.json(value,init)}},
+  '@/lib/supabase/server':{createClient:async()=>crossSurfaceAdmin},
+  '@/lib/creator-workspace':{createEggAdmin:()=>crossSurfaceAdmin,getCreatorWorkspaceContext:async()=>({user:{id:'user'},admin:crossSurfaceAdmin,activeWorkspace:{id:'workspace'}})},
+  '@/lib/topic-library':{getTopicMembership:async()=>({admin:crossSurfaceAdmin,workspaceId:'workspace',role:'member'})},
+  '@/lib/platform-admin':{isEggPlatformAdmin:()=>false}
+ };
+ const webRoute=load('src/app/api/topics/route.ts',deps);
+ const mobileRoute=load('src/app/api/mobile/topics/route.ts',deps);
+ const action=(route,value)=>route.POST(new Request('https://egg.test/api/topics',{method:'POST',headers:{authorization:'Bearer fixture','content-type':'application/json','x-egg-workspace-id':'workspace'},body:JSON.stringify({ideaId:'topic',action:value})}));
+ const savedResponse=await action(webRoute,'save');
+ const savedBody=await savedResponse.json();
+ assert.equal(savedBody.saved,true);assert.ok(savedBody.savedAt);assert.equal(crossSurfacePreference.saved,true,'web save is persisted for mobile');
+ const unsavedResponse=await action(mobileRoute,'unsave');
+ const unsavedBody=await unsavedResponse.json();
+ assert.equal(unsavedBody.saved,false);assert.equal(unsavedBody.savedAt,null);assert.equal(crossSurfacePreference.saved,false,'mobile unsave is persisted for web');
  const local = [
   {id:'hidden',workspace_id:'workspace',created_by:'user',title:'Hidden',tags:[],created_at:'2026-09-21',import_state:'ready'},
   {id:'visible',workspace_id:'workspace',created_by:'user',title:'Visible',tags:[],created_at:'2026-09-21',import_state:'ready'}
@@ -64,5 +86,5 @@ function load(path, dependencies = {}, globals = {}) {
  assert.ok(geo.matchesCountry({countries:['UK']},'GB'));
  assert.equal(geo.countryLabel('GB'),'🇬🇧 英國');
  assert.equal(geo.countryLabel('IT'),'🇮🇹 意大利');
- console.log('PASS web/mobile DELETE fail-closed without DB; hide/restore preserves saved/create; workspace isolation; default feeds exclude hidden; library opt-in restores hidden metadata; country aliases.');
+ console.log('PASS web/mobile bookmark contract and timestamps; DELETE fail-closed without DB; hide/restore preserves saved/create; workspace isolation; default feeds exclude hidden; library opt-in restores hidden metadata; country aliases.');
 })().catch(error=>{console.error(error);process.exitCode=1});

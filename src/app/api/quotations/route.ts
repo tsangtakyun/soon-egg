@@ -9,11 +9,11 @@ export async function GET(request: Request) {
   const projectId = new URL(request.url).searchParams.get('projectId');
   if (!projectId) return NextResponse.json({ error: '請選擇項目' }, { status: 400 });
   const [{ data: project }, { data: profile }, { data: quotations }] = await Promise.all([
-    context.admin.from('egg_reply_projects').select('id,name,brief,lifecycle_status').eq('id', projectId).eq('creator_id', context.workspaceId).eq('lifecycle_status', 'confirmed').maybeSingle(),
+    context.admin.from('egg_reply_projects').select('id,name,brief,lifecycle_status').eq('id', projectId).eq('creator_id', context.workspaceId).neq('lifecycle_status', 'archived').maybeSingle(),
     context.admin.from('egg_quote_profiles').select('currency,commercial_rules,payment_profile,updated_at').eq('workspace_id', context.workspaceId).maybeSingle(),
     context.admin.from('egg_quotations').select('id,quote_number,version,status,snapshot,access_token,approved_at,sent_at,created_at').eq('workspace_id', context.workspaceId).eq('project_id', projectId).order('created_at', { ascending: false }),
   ]);
-  if (!project) return NextResponse.json({ error: '請先喺回覆中心確認合作，先可以查看報價' }, { status: 409 });
+  if (!project) return NextResponse.json({ error: '已封存或無權限嘅項目不可查看報價' }, { status: 409 });
   const currency = profile?.currency || 'HKD';
   return NextResponse.json({ project, profile, prefill: quotationPrefill(project.brief ?? {}, currency), quotations: quotations ?? [], canApprove: context.role === 'owner' || context.role === 'admin' });
 }
@@ -45,10 +45,10 @@ export async function POST(request: Request) {
 
   if (!body.projectId) return NextResponse.json({ error: '請選擇項目' }, { status: 400 });
   const [{ data: project }, { data: profile }] = await Promise.all([
-    context.admin.from('egg_reply_projects').select('id,name,brief,lifecycle_status').eq('id', body.projectId).eq('creator_id', context.workspaceId).eq('lifecycle_status', 'confirmed').maybeSingle(),
+    context.admin.from('egg_reply_projects').select('id,name,brief,lifecycle_status').eq('id', body.projectId).eq('creator_id', context.workspaceId).neq('lifecycle_status', 'archived').maybeSingle(),
     context.admin.from('egg_quote_profiles').select('currency,commercial_rules,payment_profile').eq('workspace_id', context.workspaceId).maybeSingle(),
   ]);
-  if (!project) return NextResponse.json({ error: '請先喺回覆中心確認合作，先可以建立報價' }, { status: 409 });
+  if (!project) return NextResponse.json({ error: '已封存或無權限嘅項目不可建立報價' }, { status: 409 });
   const { snapshot, canIssue } = calculateQuote(project.brief ?? {}, { ...body, currency: body.currency || profile?.currency || 'HKD' }, (profile?.commercial_rules ?? {}) as Record<string, unknown>);
   const { data: prior } = await context.admin.from('egg_quotations').select('version').eq('workspace_id', context.workspaceId).eq('project_id', project.id).order('version', { ascending: false }).limit(1).maybeSingle();
   const version = (prior?.version ?? 0) + 1;

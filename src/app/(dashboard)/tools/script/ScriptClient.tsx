@@ -90,12 +90,12 @@ export function ScriptClient({
     setLoading(true);
     const response = await fetch("/api/tools/script/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify({ brandName, industry, topic, background, hookStyle, transitionStyle, endingStyle }),
     });
     const data = await response.json();
 
-    if (data.error === "Insufficient credits") {
+    if (data.error === "Insufficient credits" || data.error === "insufficient_credits") {
       window.location.href = "/credits?insufficient=tools";
       return;
     }

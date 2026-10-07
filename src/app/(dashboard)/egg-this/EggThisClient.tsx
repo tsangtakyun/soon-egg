@@ -259,7 +259,7 @@ export function EggThisClient({
     try {
       const response = await fetch(`/api/egg/projects/${projectId}/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({
           angleId: selectedAngle,
           recipeId: selectedRecipe,

@@ -13,7 +13,7 @@ export const PLANS = {
   creator: {
     name: "創作者版",
     price_hkd: 98,
-    ai_credits: 300,
+    ai_credits: 150,
     features: ["全部免費功能", ...soonAiMonthlyFeature, "無限品牌配對", "AI Pitch 起稿", "自動更新 Media Kit", "進階數據分析", "10個數位產品", "5% 交易佣金", "自訂域名"],
   },
   pro: {

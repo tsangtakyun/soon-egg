@@ -39,7 +39,7 @@ export function SOONAIPanel() {
     try {
       const response = await fetch("/api/soon-ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
         body: JSON.stringify({ messages: newMessages, context: "dashboard" }),
       });
       const data = await response.json();

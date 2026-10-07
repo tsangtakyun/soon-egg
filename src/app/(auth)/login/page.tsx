@@ -51,21 +51,18 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
     try {
-      const supabase = createClient();
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
-      if (loginError || !data.user) {
-        setError(loginError?.message || "登入失敗，請檢查電郵及密碼。");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json().catch(() => ({})) as { error?: string; next?: string };
+      if (!response.ok) {
+        setError(data.error || "登入失敗，請檢查電郵及密碼。");
         return;
       }
-
-      const { data: profile } = await supabase
-        .from("egg_creator_profiles")
-        .select("onboarding_completed")
-        .eq("user_id", data.user.id)
-        .limit(1)
-        .maybeSingle();
-
-      router.push(profile?.onboarding_completed ? "/dashboard" : "/onboarding");
+      router.push(data.next || "/dashboard");
+      router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "暫時未能連接登入服務，請稍後再試。");
     } finally {

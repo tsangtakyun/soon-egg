@@ -1,14 +1,16 @@
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { consumeSoonAiRateLimit, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { getEggRequestContext } from "@/lib/egg-api-context";
+import { commitCredits, creditErrorResponse, refundCredits, reserveCredits, type CreditReservation } from "@/lib/credits/ledger";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const requestContext = await getEggRequestContext(req);
-  if (!requestContext) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (!requestContext?.user.email) return NextResponse.json({ error: "請先登入" }, { status: 401 });
 
   const minuteLimit = Math.max(1, Number(process.env.SOON_AI_PREVIEW_MINUTE_LIMIT || 5));
   const dayLimit = Math.max(1, Number(process.env.SOON_AI_PREVIEW_DAILY_LIMIT || 30));
+  let reservation: CreditReservation | null = null;
   try {
     const limit = await consumeSoonAiRateLimit({
       workspaceId: requestContext.workspaceId,
@@ -38,6 +40,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    reservation = await reserveCredits({
+      request: req,
+      userId: requestContext.user.id,
+      email: requestContext.user.email,
+      workspaceId: requestContext.workspaceId,
+      action: "soon_ai_chat",
+    });
+
     const model = "claude-sonnet-4-20250514";
     const response = await trackedAnthropicCall({
       workspaceId: requestContext.workspaceId,
@@ -57,8 +67,15 @@ export async function POST(req: NextRequest) {
       }, { maxRetries: 0 }));
 
     const reply = response.content[0]?.type === "text" ? response.content[0].text : "";
-    return NextResponse.json({ reply });
-  } catch {
+    const balance = await commitCredits(reservation);
+    return NextResponse.json({ reply, credits: { deducted: reservation.enabled ? reservation.amount : 0, balance } });
+  } catch (error) {
+    if (reservation) {
+      try { await refundCredits(reservation); }
+      catch (refundError) { console.error("[soon-ai] credit refund pending", refundError instanceof Error ? refundError.name : "unknown_error"); }
+    }
+    const creditResponse = creditErrorResponse(error);
+    if (creditResponse) return creditResponse;
     return NextResponse.json({ error: "SOON AI chat failed" }, { status: 500 });
   }
 }

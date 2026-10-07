@@ -31,7 +31,7 @@ export function SOONAIAssistant({ context, creatorData }: SOONAIProps) {
 
     const response = await fetch("/api/soon-ai/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify({ messages: newMessages, context, creatorData }),
     });
 

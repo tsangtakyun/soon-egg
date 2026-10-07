@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { trackedAnthropicCall } from "@/lib/ai/usage-ledger";
-import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
+import { commitCredits, creditErrorResponse, refundCredits, reserveCredits, type CreditReservation } from "@/lib/credits/ledger";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { ACTIVE_CREATOR_COOKIE, acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 
@@ -31,18 +31,6 @@ export async function POST(req: Request) {
   const workspaceId = memberships?.[0]?.workspace_id;
   if (membershipError || !workspaceId) {
     return NextResponse.json({ error: "你沒有此工作空間的權限" }, { status: 403 });
-  }
-
-  const result = await deductCredits({
-    email: user.email,
-    amount: CREDIT_COSTS.AI_GENERATION,
-    type: "ai_generation",
-    tool: "script",
-    description: "生成劇本",
-  });
-
-  if (!result.success) {
-    return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
   }
 
   const { brandName, industry, topic, background, hookStyle, transitionStyle, endingStyle } = await req.json();
@@ -78,7 +66,15 @@ Ending 風格：${ending.title}（${ending.example}）
 - 每段落標明時間和 [旁白] 或 [鏡頭]
 - 符合 IG Reel 節奏（快、緊湊、有畫面感）`;
 
+  let reservation: CreditReservation | null = null;
   try {
+    reservation = await reserveCredits({
+      request: req,
+      userId: user.id,
+      email: user.email,
+      workspaceId,
+      action: "script_generate",
+    });
     const message = await trackedAnthropicCall({
       workspaceId,
       userId: user.id,
@@ -121,17 +117,28 @@ Ending 風格：${ending.title}（${ending.example}）
 
     if (error) {
       console.error("[script generate] save error:", error);
-      return NextResponse.json({ error: "劇本已生成，但未能儲存，請再試一次" }, { status: 500 });
+      throw new Error("script_save_failed");
     }
+
+    const balance = await commitCredits(reservation);
 
     return NextResponse.json({
       script,
       script_id: saved?.id,
       saved,
-      balance: result.balance,
+      balance,
     });
   } catch (error) {
+    if (reservation) {
+      try { await refundCredits(reservation); }
+      catch (refundError) { console.error("[script generate] credit refund pending", refundError instanceof Error ? refundError.name : "unknown_error"); }
+    }
+    const creditResponse = creditErrorResponse(error);
+    if (creditResponse) return creditResponse;
     console.error("[script generate] error:", error);
+    if (error instanceof Error && error.message === "script_save_failed") {
+      return NextResponse.json({ error: "劇本已生成，但未能儲存，點數已退回，請再試一次" }, { status: 500 });
+    }
     const status = typeof error === "object" && error && "status" in error
       ? Number((error as { status?: unknown }).status)
       : 500;

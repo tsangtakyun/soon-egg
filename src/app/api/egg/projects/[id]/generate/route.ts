@@ -5,15 +5,17 @@ import { NextResponse } from "next/server";
 import { getEggRequestContext } from "@/lib/egg-api-context";
 import { generateContentPack, type EggAngle, type EggRecipe } from "@/lib/egg-content";
 import { isKnowledgePilot, loadCoreKnowledgeForPilot } from "@/lib/core-knowledge";
+import { commitCredits, creditErrorResponse, refundCredits, reserveCredits, type CreditReservation } from "@/lib/credits/ledger";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getEggRequestContext(request);
-  if (!context) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  if (!context?.user.email) return NextResponse.json({ error: "請先登入" }, { status: 401 });
   const { id } = await params;
   const body = await request.json().catch(() => ({})) as { styleFlowVersion?: number; angleId?: string; recipeId?: string; styleChoice?: { recommendationId: string; code: string; materials: string[] }; shootStatus?: "not_visited" | "visited" | "existing_assets" };
   if (!body.angleId || !body.recipeId) return NextResponse.json({ error: "請選擇內容方向及做法" }, { status: 400 });
 
   let pendingPackId = "";
+  let reservation: CreditReservation | null = null;
   try {
     const [{ data: project }, { data: angle }, { data: recipe }, { data: creator }, { data: creatorDna }, { data: preferenceSignals }, { data: dnaRules }] = await Promise.all([
       context.admin.from("egg_content_projects").select("id,topic_summary,source_type,source_data").eq("id", id).eq("workspace_id", context.workspaceId).maybeSingle(),
@@ -61,6 +63,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const {data:pending,error:pendingError}=await context.admin.from('egg_content_packs').insert({workspace_id:context.workspaceId,project_id:id,angle_id:angle.id,recipe_id:recipe.id,content:{_production_style:selection,_generation:{status:'pending'}},status:'draft',created_by:context.user.id}).select('id').single();
     if(pendingError || !pending) throw pendingError || new Error('未能保存生成記錄');
     pendingPackId=pending.id;
+    reservation = await reserveCredits({
+      request,
+      userId: context.user.id,
+      email: context.user.email,
+      workspaceId: context.workspaceId,
+      action: "egg_this_generate",
+    });
     const relevantSignals = (preferenceSignals ?? [])
       .sort((a, b) => Number(Boolean(b.confirmed_at)) - Number(Boolean(a.confirmed_at)) || Number(b.recipe_id === recipe.id) - Number(a.recipe_id === recipe.id))
       .slice(0, 30);
@@ -131,8 +140,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
       if (lineageError) console.error("[core knowledge] pack lineage save failed", lineageError);
     }
-    return NextResponse.json({ pack, recipe, angle, preferenceSignalCount: relevantSignals.length, creatorDnaRules: relevantRules });
+    const balance = await commitCredits(reservation);
+    return NextResponse.json({ pack, recipe, angle, preferenceSignalCount: relevantSignals.length, creatorDnaRules: relevantRules, credits: { deducted: reservation.enabled ? reservation.amount : 0, balance } });
   } catch (error) {
+    if (reservation) {
+      try { await refundCredits(reservation); }
+      catch (refundError) { console.error("[egg pack] credit refund pending", refundError instanceof Error ? refundError.name : "unknown_error"); }
+    }
+    const creditResponse = creditErrorResponse(error);
+    if (creditResponse) return creditResponse;
     console.error("[egg pack] generation failed", error);
     if(pendingPackId) {
       const {data:saved}=await context.admin.from('egg_content_packs').select('content').eq('id',pendingPackId).eq('workspace_id',context.workspaceId).maybeSingle();

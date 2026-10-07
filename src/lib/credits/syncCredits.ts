@@ -1,6 +1,8 @@
 import { getMasterSupabaseAdmin } from "@/lib/supabase-master";
+import { isTrialPreviewBlocked } from "@/lib/credits/preview-admission";
 
 export async function syncUserCredits(eggUserId: string, email: string) {
+  if (isTrialPreviewBlocked()) return;
   const masterSupabaseAdmin = getMasterSupabaseAdmin();
   if (!masterSupabaseAdmin) return;
   const normalizedEmail = email.trim().toLowerCase();

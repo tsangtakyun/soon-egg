@@ -1,109 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Sparkles } from "lucide-react";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
+import type { trialPreviewPolicy } from "@/lib/credits/policy";
 
-const freeFeatures = [
-  ["✓", "Link in Bio 主頁"],
-  ["✓", "基礎 Media Kit"],
-  ["✓", "每月 3 個品牌配對"],
-  ["✓", "30 AI Credits / 月（Preview 規格）"],
-  ["✓", "1 個數位產品"],
-  ["✗", "交易佣金 9%"],
-  ["✗", "自訂域名"],
-  ["✗", "無限電郵發送"],
-];
-
-const soonAiMonthlyLimit = Number(process.env.NEXT_PUBLIC_SOON_AI_MONTHLY_LIMIT ?? "");
-const creatorFeatures: Array<[string, string, boolean?]> = [
-  ["✓", "全部免費功能"],
-  ["✓", "150 AI Credits / 月（Preview 規格）"],
-  ...(Number.isInteger(soonAiMonthlyLimit) && soonAiMonthlyLimit > 0
-    ? [["✓", `SOON AI 對話（每月${soonAiMonthlyLimit}次）`] as [string, string]]
-    : []),
-  ["✓", "0% 交易佣金", true],
-  ["✓", "無限品牌配對"],
-  ["✓", "自動更新 Media Kit"],
-  ["✓", "自訂域名"],
-  ["✓", "無限電郵發送"],
-  ["✓", "Email 自動化"],
-  ["✓", "Buy Now Pay Later"],
-];
-
-export default function PricingSection() {
+export default function PricingSection({ trial }: { trial: ReturnType<typeof trialPreviewPolicy> }) {
   const ref = useScrollReveal();
-  const [annual, setAnnual] = useState(false);
-  const creatorPrice = annual ? 78 : 98;
-
-  return (
-    <section
-      className="relative overflow-hidden py-24 sm:py-32"
-      style={{
-        backgroundImage: "url(/secondbg.jpg)",
-        backgroundPosition: "center center",
-        backgroundRepeat: "no-repeat",
-        backgroundSize: "cover",
-      }}
-    >
-      <div className="absolute inset-0 bg-white/40" />
-      <div ref={ref} className="reveal relative z-10 mx-auto max-w-7xl px-6">
-        <div className="text-center">
-          <div className="text-sm font-black tracking-[0.28em] text-[#9a6200]">定價</div>
-          <h2 className="mt-4 text-4xl font-black text-[#0a0a0a] sm:text-6xl">免費開始，有需要才升級</h2>
-          <div className="mt-8 inline-flex rounded-full bg-white p-1 shadow-sm">
-            <button onClick={() => setAnnual(false)} className={`rounded-full px-5 py-2 text-sm font-bold ${!annual ? "bg-[#0a0a0a] text-white" : "text-zinc-600"}`}>月費</button>
-            <button onClick={() => setAnnual(true)} className={`rounded-full px-5 py-2 text-sm font-bold ${annual ? "bg-[#0a0a0a] text-white" : "text-zinc-600"}`}>年費 8折</button>
-          </div>
-        </div>
-
-        <div className="mx-auto mt-12 grid max-w-5xl gap-6 lg:grid-cols-2">
-          <article className="rounded-2xl bg-white p-8 shadow-sm">
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-black text-[#0a0a0a]">免費版</h3>
-              <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-bold text-zinc-600">永久免費</span>
-            </div>
-            <div className="mt-6 font-mono text-5xl font-black text-[#0a0a0a]">HK$0 <span className="text-base font-bold text-zinc-500">/ 月</span></div>
-            <ul className="mt-8 space-y-3 text-sm text-zinc-700">
-              {freeFeatures.map(([mark, text]) => <Feature key={text as string} mark={mark as string} text={text as string} />)}
-            </ul>
-            <Link href="/signup" className="mt-8 block rounded-full border border-black/20 px-6 py-3 text-center text-sm font-black text-[#0a0a0a]">免費開始</Link>
-          </article>
-
-          <article className="relative rounded-2xl border-2 border-[#f5a623] bg-white p-8 shadow-xl">
-            <div className="absolute -top-4 right-8 inline-flex items-center gap-1 rounded-full bg-[#f5a623] px-4 py-1.5 text-xs font-black text-[#0a0a0a]">
-              <Sparkles size={14} />
-              推薦
-            </div>
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-black text-[#0a0a0a]">創作者版</h3>
-              <span className="rounded-full bg-[#00c853]/10 px-3 py-1 text-xs font-black text-[#008b3a]">多賺 30% 收入</span>
-            </div>
-            <div className="mt-6 font-mono text-5xl font-black text-[#0a0a0a]">HK${creatorPrice} <span className="text-base font-bold text-zinc-500">/ 月</span></div>
-            <ul className="mt-8 space-y-3 text-sm text-zinc-700">
-              {creatorFeatures.map(([mark, text, bold]) => <Feature key={text as string} mark={mark as string} text={text as string} bold={Boolean(bold)} />)}
-            </ul>
-            <Link href="/signup" className="mt-8 block rounded-full bg-[#0a0a0a] px-6 py-3 text-center text-sm font-black text-white">立即升級</Link>
-          </article>
-        </div>
-        <p className="mt-6 text-center text-sm font-semibold text-[#7a4b00]">
-          Credits 為 Preview 規格；扣點及購買功能尚未啟用。
-        </p>
-        <p className="mt-2 text-center text-sm text-zinc-600">
-          免費版每月 1 號重置；創作者版按訂閱週期重置。未用完的月額不累積。
-        </p>
-        <p className="mt-10 text-center text-sm italic text-zinc-500">最有野心的亞洲創作者都選擇 SOON-EGG。你都會。</p>
+  return <section className="relative overflow-hidden bg-[#faf6ef] py-24 sm:py-32">
+    <div ref={ref} className="reveal relative mx-auto max-w-5xl px-6">
+      <h2 className="text-center text-4xl font-black text-zinc-950">先試用，有需要才升級</h2>
+      <p className="mt-4 text-center text-sm text-amber-800">Preview 規格 · 試用、扣點及購買尚未啟用</p>
+      <div className="mt-12 grid gap-6 lg:grid-cols-2">
+        <article className="rounded-2xl border border-zinc-200 bg-white p-8">
+          <h3 className="text-2xl font-black text-zinc-950">{trial.days} 日免信用卡試用</h3>
+          <p className="mt-6 text-5xl font-black text-zinc-950">HK$0</p>
+          <ul className="mt-8 space-y-3 text-sm leading-6 text-zinc-700">
+            <li>{trial.credits} 試用 Credits（可調暫定額度）</li>
+            <li>無需提供信用卡，不自動收費</li>
+            <li>到期停止生成，仍可查看、編輯及下載</li>
+            <li>試用與永久免費方案的關係待確認，不改現有用戶權益</li>
+          </ul>
+          <Link href="/credits" className="mt-8 block rounded-full border border-zinc-300 px-6 py-3 text-center text-sm font-bold text-zinc-950">查看試用規格</Link>
+        </article>
+        <article className="rounded-2xl border-2 border-amber-400 bg-white p-8">
+          <h3 className="text-2xl font-black text-zinc-950">創作者版</h3>
+          <p className="mt-6 text-5xl font-black text-zinc-950">HK$98 <span className="text-base text-zinc-500">／月</span></p>
+          <ul className="mt-8 space-y-3 text-sm leading-6 text-zinc-700">
+            <li>每個工作空間每月 150 Credits，團隊共用</li>
+            <li>輕量 1／標準 3／重度生成 5 Credits</li>
+            <li>字幕每分鐘 3 Credits，包含轉錄，按影片時長向上取整</li>
+            <li>按訂閱週期重置，月額不累積</li>
+          </ul>
+          <Link href="/credits" className="mt-8 block rounded-full bg-zinc-950 px-6 py-3 text-center text-sm font-bold text-white">查看方案規格</Link>
+        </article>
       </div>
-    </section>
-  );
-}
-
-function Feature({ mark, text, bold = false }: { mark: string; text: string; bold?: boolean }) {
-  return (
-    <li className="flex gap-3">
-      <span className={mark === "✓" ? "font-black text-[#00c853]" : "font-black text-zinc-300"}>{mark}</span>
-      <span className={bold ? "font-black text-[#0a0a0a]" : ""}>{text}</span>
-    </li>
-  );
+      <p className="mt-6 text-center text-sm text-zinc-600">既有免費方案每月 30 Credits，香港時間每月 1 號重置。新工作空間錢包尚未配置。</p>
+    </div>
+  </section>;
 }

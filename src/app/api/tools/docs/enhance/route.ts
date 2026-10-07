@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
 import { createClient as createServerClient } from "@/lib/supabase/server";
@@ -8,6 +9,8 @@ export async function POST(req: Request) {
   if (!serverSupabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data: { user } } = await serverSupabase.auth.getUser();
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const result = await deductCredits({ email: user.email, amount: CREDIT_COSTS.AI_GENERATION, type: "ai_generation", tool: "docs", description: "完善文件內容" });
   if (!result.success) return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
   const { content, type } = await req.json();

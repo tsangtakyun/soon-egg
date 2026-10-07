@@ -1,4 +1,5 @@
 import 'server-only'
+import { isTrialPreviewBlocked } from '@/lib/credits/preview-admission'
 import { createHash } from 'node:crypto'
 export type RecordValue = Record<string, unknown>
 export type ProductionStyle = {
@@ -21,6 +22,7 @@ export async function coreRegistry(format:string) {
  return await r.json() as {registryVersion:string;styles:ProductionStyle[]}
 }
 export async function rankProduction(input:RecordValue):Promise<StyleResult> {
+ if(isTrialPreviewBlocked()) throw new Error('工作空間試用錢包尚未配置，暫時不能分析製作風格。')
  const key=process.env.SOON_CORE_KNOWLEDGE_KEY || process.env.SOON_CORE_BUNDLE_KEY
  if(!key) throw new Error('未能連接風格庫，請稍後重試。')
  const r=await fetch(`${(process.env.SOON_CORE_URL || 'https://soon-core.vercel.app').replace(/\/$/,'')}/api/intelligence/styles/production-recommend`,{method:'POST',headers:{'content-type':'application/json','x-soon-knowledge-key':key},body:JSON.stringify(input),cache:'no-store',signal:AbortSignal.timeout(115000)})

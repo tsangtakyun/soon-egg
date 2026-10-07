@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { trialPreviewAdmissionResponse } from '@/lib/credits/preview-admission'
 import { NextResponse } from 'next/server'
 import { getEggRequestContext } from '@/lib/egg-api-context'
 import { coreRegistry, rankProduction, type StyleResult } from '@/lib/production-style'
@@ -7,6 +8,8 @@ export const maxDuration=120
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}) {
  const context=await getEggRequestContext(request)
  if(!context)return NextResponse.json({error:'請先登入'},{status:401})
+ const previewBlock=trialPreviewAdmissionResponse()
+ if(previewBlock)return previewBlock
  const {id}=await params, body=await request.json().catch(()=>({}))
  const {admin,workspaceId}=context
  try {

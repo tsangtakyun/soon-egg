@@ -9,6 +9,7 @@ import { after, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canEditWorkspace, getCreatorWorkspaceContext } from "@/lib/creator-workspace";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
+import { isTrialPreviewBlocked, trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { listTopicIdeas } from "@/lib/topic-library";
 import { persistRemoteTopicCover, removeTopicMedia, uploadTopicImage } from "@/lib/topic-media";
 import { isEggPlatformAdmin } from "@/lib/platform-admin";
@@ -89,6 +90,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, imageUrl, mediaUrls });
   }
   if (body.mode === "import") {
+    const previewBlock = trialPreviewAdmissionResponse();
+    if (previewBlock) return previewBlock;
     if (!canEditWorkspace(activeWorkspace.role)) return NextResponse.json({ error: "只有擁有者或管理員可以匯入題材" }, { status: 403 });
     const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
     const context = typeof body.context === "string" ? body.context.trim().slice(0, 4000) : "";
@@ -159,6 +162,7 @@ export async function POST(request: Request) {
 }
 
 async function resolveSharedTopicMetadata(sourceUrl: string) {
+  if (isTrialPreviewBlocked()) return { image: "", title: "", description: "" };
   try {
     const response = await fetch("https://idea-brainstorm.vercel.app/api/autofill-link", {
       method: "POST",

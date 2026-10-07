@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEggRequestContext } from "@/lib/egg-api-context";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { ensureDefaultRecipes, generateAngles, understandContentInput } from "@/lib/egg-content";
 import { extractUrlContent } from "@/lib/url-content";
 import { isKnowledgePilot, loadCoreKnowledgeForPilot } from "@/lib/core-knowledge";
@@ -7,6 +8,8 @@ import { isKnowledgePilot, loadCoreKnowledgeForPilot } from "@/lib/core-knowledg
 export async function POST(request: Request) {
   const context = await getEggRequestContext(request);
   if (!context) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const contentType = request.headers.get("content-type") ?? "";
   const form = contentType.includes("multipart/form-data") ? await request.formData().catch(() => null) : null;
   const body = form ? {

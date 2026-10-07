@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getEggRequestContext } from "@/lib/egg-api-context";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 
 export async function POST(request: Request) {
   const context = await getEggRequestContext(request);
   if (!context) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const { data: signals, error } = await context.admin.from("egg_preference_signals").select("id,field_path,before_value,after_value").eq("workspace_id", context.workspaceId).eq("is_active", true).order("created_at", { ascending: false }).limit(100);
   if (error) return NextResponse.json({ error: "暫時未能分析 Creator DNA" }, { status: 500 });
   const groups = new Map<string, typeof signals>();

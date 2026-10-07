@@ -1,5 +1,6 @@
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { getCreatorWorkspaceContext } from "@/lib/creator-workspace";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
@@ -8,6 +9,8 @@ export async function POST(req: NextRequest) {
     const { user, activeWorkspace, admin } = await getCreatorWorkspaceContext();
     if (!user || !activeWorkspace || !admin) return NextResponse.json({ error: "請先登入" }, { status: 401 });
     if (!creator_id || creator_id !== activeWorkspace.id) return NextResponse.json({ error: "無權存取此工作空間" }, { status: 403 });
+    const previewBlock = trialPreviewAdmissionResponse();
+    if (previewBlock) return previewBlock;
     const { data: creator, error: creatorError } = await admin.from("egg_creator_profiles").select("*").eq("id", activeWorkspace.id).single();
     if (creatorError || !creator) return NextResponse.json({ error: "找不到創作者資料" }, { status: 404 });
 

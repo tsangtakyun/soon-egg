@@ -2,6 +2,7 @@ import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { getActiveCreatorProfile } from "@/lib/creator-workspace";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 
@@ -31,6 +32,8 @@ export async function POST() {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
 
   const { profile } = await getActiveCreatorProfile("display_name, username, bio, content_categories, instagram_handle, instagram_followers, instagram_access_token, instagram_user_id");
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEggRequestContext } from "@/lib/egg-api-context";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 import { extractCommandIntent, researchCommand } from "@/lib/command-research";
 import { commandMode, requestedCount, uniqueCommandTopics, shortcutLocation, selectCommandTopics, type CommandTopic } from "@/lib/command-policy";
@@ -40,6 +41,8 @@ async function handlePost(request: Request) {
   const context = await getEggRequestContext(request);
   if (!context)
     return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const body = (await request.json().catch(() => ({}))) as {
     prompt?: string;
     scope?: string;

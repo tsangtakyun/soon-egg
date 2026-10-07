@@ -1,9 +1,11 @@
 import "server-only";
+import { isTrialPreviewBlocked } from "@/lib/credits/preview-admission";
 import { createEggAdmin } from "./creator-workspace";
 import { extractTopicGeography, researchTopicGeography } from "./topic-geography-extraction";
 
 /** CAS lease: concurrent cron/import callbacks cannot overwrite a later edit. */
 export async function retryTopicGeography(id?: string) {
+  if (isTrialPreviewBlocked()) return [];
   const admin = createEggAdmin();
   // Recover the final lease if a serverless invocation was terminated mid-attempt.
   const expired = new Date().toISOString();

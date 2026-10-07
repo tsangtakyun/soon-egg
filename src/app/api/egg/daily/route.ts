@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEggRequestContext } from "@/lib/egg-api-context";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
 
 const MODES = [
@@ -37,6 +38,8 @@ export async function GET(request: Request) {
     .order("rank");
   if (!force && existing.data?.length === 3)
     return NextResponse.json({ date: today, recommendations: existing.data });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const [
     { data: creator },
     { data: rules },

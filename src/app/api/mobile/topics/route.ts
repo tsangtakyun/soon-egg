@@ -1,4 +1,5 @@
 import { retryTopicGeography } from "@/lib/topic-geography-retry";
+import { isTrialPreviewBlocked, trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { ensureTopicEditorial } from "@/lib/topic-editorial-repair";
 import { TOPIC_EDITORIAL_PROMPT } from "@/lib/topic-editorial-quality";
 import { isSupportedTopicUrl, fetchTopicPage, isTopicAccessPage, readTikTokMetadata } from "@/lib/topic-url-policy";
@@ -131,6 +132,8 @@ export async function PATCH(request: Request) {
 export async function POST(request: Request) {
   const auth = await context(request);
   if (!auth?.workspaceId) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const body = await request.json().catch(() => ({}));
   if (body.mode === "queue-import") {
     const sourceUrl = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
@@ -406,6 +409,7 @@ export async function POST(request: Request) {
 }
 
 async function resolveSharedTopicMetadata(sourceUrl: string) {
+  if (isTrialPreviewBlocked()) return { image: "", title: "", description: "" };
   try {
     const response = await fetch("https://idea-brainstorm.vercel.app/api/autofill-link", {
       method: "POST",

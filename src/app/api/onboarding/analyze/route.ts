@@ -1,4 +1,6 @@
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
+import { getEggRequestContext } from "@/lib/egg-api-context";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveCreatorProfile } from "@/lib/creator-workspace";
 import { NextRequest, NextResponse } from "next/server";
@@ -295,6 +297,10 @@ function hasCreatorDisplayName(profile: { username?: string | null; display_name
 
 export async function POST(req: NextRequest) {
   try {
+    const context = await getEggRequestContext(req);
+    if (!context) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    const previewBlock = trialPreviewAdmissionResponse();
+    if (previewBlock) return previewBlock;
     const { handles = {}, followerCounts = {} } = await req.json() as {
       handles?: Handles;
       followerCounts?: FollowerCounts;

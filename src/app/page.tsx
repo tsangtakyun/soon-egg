@@ -6,6 +6,7 @@ import OneDoneSection from "@/components/landing/OneDoneSection";
 import PricingSection from "@/components/landing/PricingSection";
 import SOONAISection from "@/components/landing/SOONAISection";
 import ValuePropsSection from "@/components/landing/ValuePropsSection";
+import { trialPreviewPolicy } from "@/lib/credits/policy";
 
 export default function LandingPage() {
   return (
@@ -15,7 +16,7 @@ export default function LandingPage() {
       <OneDoneSection />
       <SOONAISection />
       <ValuePropsSection />
-      <PricingSection />
+      <PricingSection trial={trialPreviewPolicy(process.env.EGG_TRIAL_PREVIEW_CREDITS)} />
       <CTASection />
       <LandingFooter />
     </main>

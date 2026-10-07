@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { cookies } from "next/headers";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { trackedAnthropicCall } from "@/lib/ai/usage-ledger";
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "你沒有此工作空間的權限" }, { status: 403 });
   }
 
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const { brandName, industry, topic, background, hookStyle, transitionStyle, endingStyle } = await req.json();
   const anthropic = getAnthropic();
 

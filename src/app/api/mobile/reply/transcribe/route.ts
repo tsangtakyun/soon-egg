@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getEggRequestContext } from "@/lib/egg-api-context";
 
 export const maxDuration = 300;
@@ -33,6 +34,8 @@ async function subtitleJson(url: string, init: RequestInit) {
 export async function POST(request: Request) {
   const context = await getEggRequestContext(request);
   if (!context) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
 
   try {
     const form = await request.formData();

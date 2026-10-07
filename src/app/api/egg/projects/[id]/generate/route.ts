@@ -1,4 +1,5 @@
 import { eggStyleContext } from '@/lib/egg-style-context';
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { styleSnapshot, validateSelection, type ProductionStyle, type StyleResult } from '@/lib/production-style';
 export const maxDuration = 120;
 import { NextResponse } from "next/server";
@@ -10,6 +11,8 @@ import { commitCredits, creditErrorResponse, refundCredits, reserveCredits, type
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const context = await getEggRequestContext(request);
   if (!context?.user.email) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const { id } = await params;
   const body = await request.json().catch(() => ({})) as { styleFlowVersion?: number; angleId?: string; recipeId?: string; styleChoice?: { recommendationId: string; code: string; materials: string[] }; shootStatus?: "not_visited" | "visited" | "existing_assets" };
   if (!body.angleId || !body.recipeId) return NextResponse.json({ error: "請選擇內容方向及做法" }, { status: 400 });

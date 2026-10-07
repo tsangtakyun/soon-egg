@@ -1,4 +1,5 @@
 import { after, NextResponse } from "next/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { anthropicImageMetadata, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
@@ -152,6 +153,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ job });
   }
   if (body.action === "start_chat") {
+    const previewBlock = trialPreviewAdmissionResponse();
+    if (previewBlock) return previewBlock;
     const cleanMessage = body.message?.trim();
     if (!cleanMessage) return NextResponse.json({ error: "請貼上品牌查詢或上載截圖" }, { status: 400 });
     const { data: project } = body.projectId
@@ -186,6 +189,8 @@ async function generateReply(
   context: NonNullable<Awaited<ReturnType<typeof getContext>>>,
   body: { projectId?: string; message?: string; history?: HistoryMessage[]; feedbackMode?: "project" | "workspace_rule"; image?: { data?: string; mediaType?: string } },
 ) {
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const cleanMessage = body.message?.trim();
   if (!cleanMessage) return NextResponse.json({ error: "請貼上品牌查詢或上載截圖" }, { status: 400 });
   if (cleanMessage.length > 8000) return NextResponse.json({ error: "訊息太長，請縮短至 8,000 字內" }, { status: 400 });

@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { anthropicImageMetadata, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
@@ -86,6 +87,8 @@ export async function POST(request: Request) {
 
   const { profile, activeRole } = await getActiveCreatorProfile("id,display_name,username,bio,content_categories,instagram_handle");
   if (!profile) return NextResponse.json({ error: "找不到目前工作空間。" }, { status: 404 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const admin = createEggAdmin();
   const [{ data: project }, { data: promptProfile }] = await Promise.all([
     body.projectId ? admin.from("egg_reply_projects").select("id,name,brief").eq("id", body.projectId).eq("creator_id", profile.id).maybeSingle() : Promise.resolve({ data: null }),

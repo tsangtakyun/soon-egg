@@ -15,7 +15,7 @@ const policy = moduleBox.exports;
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.monthlyCredits, 30);
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.reset, "calendar_month");
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.timezone, "Asia/Hong_Kong");
-assert.equal(policy.CREDIT_ENTITLEMENTS.free.timezoneConfirmed, false);
+assert.equal(policy.CREDIT_ENTITLEMENTS.free.timezoneConfirmed, true);
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.rollover, false);
 assert.equal(policy.CREDIT_ENTITLEMENTS.creator.monthlyCredits, 150);
 assert.equal(policy.CREDIT_ENTITLEMENTS.creator.priceHkdMonthly, 98);
@@ -26,6 +26,18 @@ assert.equal(policy.creditCost("script_generate"), 3);
 assert.equal(policy.creditCost("egg_this_generate"), 5);
 assert.equal(policy.creditCost("reply_generate"), null);
 assert.equal(policy.creditCost("subtitle_transcribe"), null);
+assert.equal(policy.creditCost("reply_short"), 1);
+assert.equal(policy.creditCost("reply_full"), 3);
+assert.equal(policy.creditCost("reply_image"), 5);
+for (const [duration, expected] of [[0.1,3],[59.999,3],[60,3],[60.001,6],[120,6],[120.001,9]]) {
+  assert.equal(policy.creditCost("subtitle_generate", duration), expected);
+}
+for (const duration of [undefined,0,-1,NaN,Infinity]) assert.equal(policy.creditCost("subtitle_generate", duration), null);
+assert.equal(policy.CREDIT_WALLET_READY, false);
+assert.equal(policy.trialPreviewPolicy().credits, 30);
+assert.equal(policy.trialPreviewPolicy("12").credits, 12);
+for (const bad of ["0","151","1.5","invalid"]) assert.equal(policy.trialPreviewPolicy(bad).credits,30);
+assert.equal(policy.trialPreviewPolicy().activated, false);
 assert.equal(policy.resolveCreditAction("ai_generate", "soon_ai"), "soon_ai_chat");
 assert.equal(policy.resolveCreditAction("ai_generate", "script"), "script_generate");
 assert.equal(policy.resolveCreditAction("ai_generate", "egg_this"), "egg_this_generate");

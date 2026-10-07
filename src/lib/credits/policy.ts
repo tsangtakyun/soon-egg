@@ -1,4 +1,22 @@
-export const CREDIT_POLICY_VERSION = "egg-credits-2026-10-07-v1";
+export const CREDIT_POLICY_VERSION = "egg-credits-2026-10-07-workspace-v2";
+
+// A published specification is not an activated database wallet.
+export const CREDIT_WALLET_READY = false;
+
+export function trialPreviewPolicy(rawCredits?: string) {
+  const value = Number(rawCredits ?? 30);
+  const credits = Number.isSafeInteger(value) && value >= 1 && value <= 150 ? value : 30;
+  return {
+    days: 7,
+    credits,
+    requiresCard: false,
+    provisional: true,
+    activated: false,
+    expiry: "generation_disabled_read_edit_download_retained",
+    existingFreeUsersChanged: false,
+    permanentFreeRelationshipConfirmed: false,
+  } as const;
+}
 
 export const CREDIT_ENTITLEMENTS = {
   free: {
@@ -6,7 +24,7 @@ export const CREDIT_ENTITLEMENTS = {
     monthlyCredits: 30,
     reset: "calendar_month",
     timezone: "Asia/Hong_Kong",
-    timezoneConfirmed: false,
+    timezoneConfirmed: true,
     rollover: false,
   },
   creator: {
@@ -37,6 +55,20 @@ export const CREDIT_ACTIONS = {
     label: "EggThis 內容生成",
     costComponents: ["anthropic_text", "anthropic_vision_optional"],
   },
+  reply_short: {
+    credits: 1, chargeable: true, label: "簡短回覆", costComponents: ["anthropic_text"],
+  },
+  reply_full: {
+    credits: 3, chargeable: true, label: "完整回覆", costComponents: ["anthropic_text"],
+  },
+  reply_image: {
+    credits: 5, chargeable: true, label: "圖片／截圖回覆", costComponents: ["anthropic_vision"],
+  },
+  subtitle_generate: {
+    credits: null, chargeable: true, label: "字幕製作（包含轉錄）",
+    creditsPerMinute: 3, durationSource: "verified_media", rounding: "ceil_minimum_one",
+    costComponents: ["fal_media", "anthropic_text", "audio_duration"],
+  },
   reply_generate: {
     credits: null,
     chargeable: false,
@@ -59,7 +91,7 @@ export const CREDIT_ACTIONS = {
 
 export type CreditAction = keyof typeof CREDIT_ACTIONS;
 export type ChargeableCreditAction = {
-  [K in CreditAction]: (typeof CREDIT_ACTIONS)[K]["chargeable"] extends true ? K : never;
+  [K in CreditAction]: (typeof CREDIT_ACTIONS)[K]["credits"] extends number ? K : never;
 }[CreditAction];
 
 const LEGACY_AI_FEATURES: Record<string, CreditAction> = {
@@ -80,6 +112,11 @@ export function resolveCreditAction(action: unknown, feature?: unknown): CreditA
   return null;
 }
 
-export function creditCost(action: CreditAction): number | null {
+export function creditCost(action: CreditAction, verifiedDurationSeconds?: number): number | null {
+  if (action === "subtitle_generate") {
+    if (typeof verifiedDurationSeconds !== "number" || !Number.isFinite(verifiedDurationSeconds) || verifiedDurationSeconds <= 0) return null;
+    const cost = Math.max(1, Math.ceil(verifiedDurationSeconds / 60)) * 3;
+    return Number.isSafeInteger(cost) ? cost : null;
+  }
   return CREDIT_ACTIONS[action].credits;
 }

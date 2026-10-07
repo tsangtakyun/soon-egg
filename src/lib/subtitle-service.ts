@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 
 const DEFAULT_SERVICE_URL = "https://soon-subtitle.vercel.app";
 
@@ -25,6 +26,10 @@ export async function proxySubtitleService(request: Request, path: string) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  if (["transcribe", "refine", "split-lines", "fal/proxy"].includes(path)) {
+    const previewBlock = trialPreviewAdmissionResponse();
+    if (previewBlock) return previewBlock;
+  }
   const secret = process.env.SOON_SUBTITLE_INTEGRATION_SECRET;
   if (!secret) {
     console.error("[subtitle-service] SOON_SUBTITLE_INTEGRATION_SECRET is missing");

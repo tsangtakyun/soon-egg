@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { getEggRequestContext } from "@/lib/egg-api-context";
@@ -8,6 +9,8 @@ import { masterSupabase } from "@/lib/supabase/master";
 export async function POST(req: Request) {
   const context = await getEggRequestContext(req);
   if (!context?.user.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const user = context.user;
   const email = context.user.email;
 
@@ -48,7 +51,7 @@ ${transcript_text}
     { maxRetries: 0 },
   ));
   const srt = message.content[0]?.type === "text" ? message.content[0].text : "";
-  const { data: session, error } = await (masterSupabase as any).from("subtitle_sessions").insert({
+  const { data: session, error } = await masterSupabase.from("subtitle_sessions").insert({
     user_id: user.id,
     title,
     language,

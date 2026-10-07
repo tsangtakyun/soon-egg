@@ -1,4 +1,5 @@
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { runSoonAiRateLimitGuard } from "@/lib/ai/soon-ai-rate-limit-guard";
 import { consumeSoonAiRateLimit, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { getEggRequestContext } from "@/lib/egg-api-context";
@@ -8,6 +9,8 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(req: NextRequest) {
   const requestContext = await getEggRequestContext(req);
   if (!requestContext?.user.email) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const userEmail = requestContext.user.email;
 
   const minuteLimit = Math.max(1, Number(process.env.SOON_AI_PREVIEW_MINUTE_LIMIT || 5));

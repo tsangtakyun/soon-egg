@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trialPreviewAdmissionResponse } from "@/lib/credits/preview-admission";
 import { getAnthropic } from "@/lib/ai/anthropic";
 import { trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { getEggRequestContext } from "@/lib/egg-api-context";
@@ -9,6 +10,8 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   const context = await getEggRequestContext(request);
   if (!context) return NextResponse.json({ error: "請先登入" }, { status: 401 });
+  const previewBlock = trialPreviewAdmissionResponse();
+  if (previewBlock) return previewBlock;
   const body = await request.json().catch(() => ({}));
   const originalMessage = typeof body.originalMessage === "string" ? body.originalMessage.trim().slice(0, 12_000) : "";
   if (!originalMessage) return NextResponse.json({ error: "未有客戶訊息" }, { status: 400 });

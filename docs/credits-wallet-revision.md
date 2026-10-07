@@ -1,5 +1,10 @@
 # Wallet replacement approval diff — 2026-10-07
 
+Latest pending bundle: [credits-trial-approval.md](credits-trial-approval.md),
+including the full 230000 wallet/trial replacement and exact trial diff.
+The 180000 revision below is retained as the comparison baseline, not the
+current file to apply. No remote database has been changed.
+
 Baseline: 7db96654e3174c5c24093f2087cf6e2352bbb8f5, the un-applied 160000 user-wallet proposal.
 Exact unified comparison: [credits-wallet-latest.diff](credits-wallet-latest.diff).
 This is replacement CREATE DDL for absent tables, not an ALTER migration of a deployed schema.

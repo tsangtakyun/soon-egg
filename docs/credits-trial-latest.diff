@@ -1,0 +1,114 @@
+diff --git a/docs/migrations/20261007180000_egg_workspace_wallet_proposal.sql b/docs/migrations/20261007230000_egg_workspace_trial_proposal.sql
+index 50aa42b..135ff17 100644
+--- a/docs/migrations/20261007180000_egg_workspace_wallet_proposal.sql
++++ b/docs/migrations/20261007230000_egg_workspace_trial_proposal.sql
+@@ -1,5 +1,6 @@
+ -- DESIGN ONLY / NOT APPLIED. Run target would be EGG Supabase, not Master.
+--- Replacement for un-applied 160000/121000 drafts; no ALTER of deployed data.
++-- Full replacement for ALL earlier un-applied wallet drafts; absent tables only.
++-- Trial/free relationship and eligibility below are recommendations awaiting approval.
+ -- No RPC, worker, Stripe mutation, or charging activation is included.
+ BEGIN;
+ CREATE TABLE public.egg_credit_wallets_v2 (
+@@ -10,13 +11,29 @@ CREATE TABLE public.egg_credit_wallets_v2 (
+   current_period_key text,
+   updated_at timestamptz NOT NULL DEFAULT now()
+ );
++-- One immutable enrollment per workspace and per verified owner account.
++-- Eligibility/owner membership/rollout cohort must be verified by future RPC.
++-- Joining teams, re-opening the app or changing owner must not refill a trial.
++CREATE TABLE public.egg_credit_trials_v2 (
++  workspace_id uuid PRIMARY KEY REFERENCES public.egg_credit_wallets_v2(workspace_id),
++  eligibility_owner_user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id),
++  policy_version text NOT NULL CHECK (length(policy_version) BETWEEN 1 AND 200),
++  starts_at timestamptz NOT NULL,
++  expires_at timestamptz NOT NULL,
++  allowance integer NOT NULL CHECK (allowance BETWEEN 1 AND 150),
++  created_at timestamptz NOT NULL DEFAULT now(),
++  UNIQUE (workspace_id, starts_at, expires_at, allowance),
++  CHECK (isfinite(starts_at) AND isfinite(expires_at)),
++  CHECK (expires_at = starts_at + interval '168 hours')
++);
+ -- Retain period snapshots; never delete them on reset, payer transfer or leave.
+ CREATE TABLE public.egg_credit_periods_v2 (
+   workspace_id uuid NOT NULL REFERENCES public.egg_credit_wallets_v2(workspace_id),
+   period_key text NOT NULL CHECK (length(period_key) BETWEEN 1 AND 200),
+   period_start timestamptz NOT NULL,
+   period_end timestamptz NOT NULL,
+-  plan text NOT NULL CHECK (plan IN ('free', 'creator')),
++  plan text NOT NULL CHECK (plan IN ('free', 'creator', 'trial')),
++  trial_workspace_id uuid UNIQUE,
+   allowance integer NOT NULL,
+   available integer NOT NULL,
+   payer_user_id uuid REFERENCES auth.users(id),
+@@ -27,7 +44,14 @@ CREATE TABLE public.egg_credit_periods_v2 (
+   updated_at timestamptz NOT NULL DEFAULT now(),
+   PRIMARY KEY (workspace_id, period_key),
+   CHECK (period_end > period_start),
+-  CHECK (allowance = CASE plan WHEN 'free' THEN 30 ELSE 150 END),
++  CHECK ((plan = 'free' AND allowance = 30)
++    OR (plan = 'creator' AND allowance = 150)
++    OR (plan = 'trial' AND allowance BETWEEN 1 AND 150)),
++  CHECK ((plan = 'trial' AND trial_workspace_id IS NOT NULL AND trial_workspace_id = workspace_id
++      AND payer_user_id IS NULL AND billing_subscription_id IS NULL AND stripe_invoice_id IS NULL)
++    OR (plan <> 'trial' AND trial_workspace_id IS NULL)),
++  FOREIGN KEY (trial_workspace_id, period_start, period_end, allowance)
++    REFERENCES public.egg_credit_trials_v2(workspace_id, starts_at, expires_at, allowance),
+   CHECK (available BETWEEN 0 AND allowance),
+   CHECK (plan <> 'creator' OR (payer_user_id IS NOT NULL AND billing_subscription_id IS NOT NULL AND stripe_invoice_id IS NOT NULL))
+ );
+@@ -92,11 +116,23 @@ CREATE INDEX egg_credit_operations_v2_reconcile
+ CREATE INDEX egg_credit_operations_v2_refund_due
+   ON public.egg_credit_operations_v2(refund_due_at)
+   WHERE credit_status = 'reserved' AND provider_status = 'unknown';
++ALTER TABLE public.egg_credit_trials_v2 ENABLE ROW LEVEL SECURITY;
++REVOKE ALL ON public.egg_credit_trials_v2 FROM PUBLIC, anon, authenticated, service_role;
++-- Enrollment is insert-only for service_role; owner/grant/time snapshots cannot be updated.
++GRANT SELECT, INSERT ON public.egg_credit_trials_v2 TO service_role;
+ ALTER TABLE public.egg_credit_wallets_v2 ENABLE ROW LEVEL SECURITY;
+ ALTER TABLE public.egg_credit_periods_v2 ENABLE ROW LEVEL SECURITY;
+ ALTER TABLE public.egg_credit_operations_v2 ENABLE ROW LEVEL SECURITY;
+ REVOKE ALL ON public.egg_credit_wallets_v2, public.egg_credit_periods_v2, public.egg_credit_operations_v2 FROM PUBLIC, anon, authenticated, service_role;
+-GRANT SELECT, INSERT, UPDATE ON public.egg_credit_wallets_v2, public.egg_credit_periods_v2, public.egg_credit_operations_v2 TO service_role;
++GRANT SELECT, INSERT ON public.egg_credit_wallets_v2, public.egg_credit_periods_v2, public.egg_credit_operations_v2 TO service_role;
++-- Preserve grant and operation identity; future atomic RPCs update only state.
++GRANT UPDATE (payer_user_id, billing_subscription_id, billing_generation, current_period_key, updated_at)
++  ON public.egg_credit_wallets_v2 TO service_role;
++GRANT UPDATE (available, updated_at) ON public.egg_credit_periods_v2 TO service_role;
++GRANT UPDATE (credit_status, provider_status, unknown_since, refund_due_at,
++  refund_restored, refund_expired, refund_reason, refunded_at, result_reference,
++  result_saved_at, dispatch_claim, reconcile_after, updated_at)
++  ON public.egg_credit_operations_v2 TO service_role;
+ -- No cascading deletion, public reads or client writes. Auth/membership and
+ -- terminal state transitions remain server/RPC duties, not DDL guarantees.
+ COMMIT;
+diff --git a/docs/migrations/20261007180000_egg_workspace_wallet_proposal.rollback.sql b/docs/migrations/20261007230000_egg_workspace_trial_proposal.rollback.sql
+index 90890f4..5108c4b 100644
+--- a/docs/migrations/20261007180000_egg_workspace_wallet_proposal.rollback.sql
++++ b/docs/migrations/20261007230000_egg_workspace_trial_proposal.rollback.sql
+@@ -1,18 +1,20 @@
+--- DESIGN ONLY / NOT APPLIED. Stop/drain runtime and refund workers first.
+--- Refuse schema rollback when ANY financial records exist; retain snapshots
+--- and revert runtime only after use. This is not a permission to delete data.
++-- DESIGN ONLY / NOT APPLIED. Stop/drain runtime and workers first.
++-- Financial/enrollment rows must be retained; refuse rollback after any use.
+ BEGIN;
+-LOCK TABLE public.egg_credit_wallets_v2, public.egg_credit_periods_v2, public.egg_credit_operations_v2 IN ACCESS EXCLUSIVE MODE;
++LOCK TABLE public.egg_credit_wallets_v2, public.egg_credit_trials_v2,
++  public.egg_credit_periods_v2, public.egg_credit_operations_v2 IN ACCESS EXCLUSIVE MODE;
+ DO $$
+ BEGIN
+   IF EXISTS (SELECT 1 FROM public.egg_credit_operations_v2)
+      OR EXISTS (SELECT 1 FROM public.egg_credit_periods_v2)
++     OR EXISTS (SELECT 1 FROM public.egg_credit_trials_v2)
+      OR EXISTS (SELECT 1 FROM public.egg_credit_wallets_v2) THEN
+-    RAISE EXCEPTION 'Wallet history exists: preserve ledger; runtime-only rollback required';
++    RAISE EXCEPTION 'Wallet or trial history exists: preserve records; runtime-only rollback required';
+   END IF;
+ END $$;
+ ALTER TABLE public.egg_credit_wallets_v2 DROP CONSTRAINT egg_credit_wallets_v2_current_period;
+ DROP TABLE public.egg_credit_operations_v2;
+ DROP TABLE public.egg_credit_periods_v2;
++DROP TABLE public.egg_credit_trials_v2;
+ DROP TABLE public.egg_credit_wallets_v2;
+ COMMIT;

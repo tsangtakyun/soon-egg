@@ -2,6 +2,10 @@
 
 ## Superseding checkpoint — 2026-10-07
 
+Subsequent UI acceptance is recorded in credits-trial-approval.md. Its minimal
+pending DDL/policy bundle adds durable one-time trial enrollment and isolated
+PostgreSQL constraint/grant/rollback verification. No deployed code changed.
+
 The historical checkpoint below is retained for provenance, not current status.
 Paid route inventory is now complete for this repository: 22 route files plus
 subtitle proxy and hidden provider/autofill/recommendation paths fail closed.

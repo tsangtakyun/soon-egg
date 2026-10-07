@@ -1,3 +1,5 @@
+-- SUPERSEDED by 20261007180000_egg_workspace_wallet_proposal.sql. DO NOT APPLY.
+-- Prior user-wallet proposal preserved for exact comparison.
 -- DESIGN ONLY. NOT APPLIED. Requires approval and the protocol in
 -- docs/credits-wallet-approval-design.md. No public write policies or RPCs.
 -- Supersedes the 121000 proposal; existing runtime RPCs are incompatible.

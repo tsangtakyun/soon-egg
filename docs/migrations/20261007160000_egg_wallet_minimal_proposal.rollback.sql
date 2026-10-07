@@ -1,3 +1,4 @@
+-- SUPERSEDED: rollback for the old unused user-wallet draft only.
 -- DESIGN ONLY. Disable charging and stop/drain workers BEFORE rollback.
 -- This rollback is deliberately limited to an unused schema. Never delete
 -- financial history after usage; snapshot and retain it, revert runtime only.

@@ -1,81 +1,58 @@
-# EGG Credits v2 — Preview gate
+# EGG Credits — current deployment vs latest approved design
 
-This work is Preview-only. The legacy `CREDIT_SYSTEM_ENABLED` remains `false`;
-checkout, Stripe, Production and existing balances are unchanged.
+## Latest decisions (design only until integration)
 
-## Confirmed product policy; remaining timezone proposal
+Creator HK$98/month/150 credits; free30/month resets Asia/Hong_Kong on the first,
+no accumulation. Wallet belongs to creator workspace, payer_user_id separate.
+Light1 conversation/short reply; standard3 script/full reply; heavy5 EggThis/
+image or screenshot reply. Subtitle3 per rounded-up minute, includes transcription.
+Unknown15min refund, no redispatch, late result delivered with no re-debit;
+cross-period reversal only, no new-period credits.
 
-- Free grant amount is 30; reset on the first of each month; unused monthly
-  credits do not roll over. `Asia/Hong_Kong` is proposed, not yet confirmed.
-  The disabled Preview implementation uses this timezone and stores UTC timestamps.
-- Creator price is HK$98/month and grant amount is 150. Confirmed reset: active Stripe subscription billing
-  cycle. No active subscription row means no Creator entitlement; the server
-  must not infer a paid plan from client input.
-- Purchased credits, if re-enabled later, are separate from included credits,
-  never expire at a monthly reset, and are consumed only after included credit.
-- Canonical server actions: `soon_ai_chat` = 1, `script_generate` = 3,
-  `egg_this_generate` = 5.
-- Legacy iOS `ai_generate` is not a price. A caller must provide a feature and
-  the server resolves it through the same canonical action table.
-- `reply_generate` has separate text/optional-image usage evidence. Subtitle
-  transcription has fal/media-duration cost while subtitle refinement has
-  Anthropic text cost. Both remain unpriced until measured usage supports a
-  stable charge; they must not inherit a generic 10-credit price.
+Current migration for review:
+docs/migrations/20261007180000_egg_workspace_wallet_proposal.sql and matching
+.rollback.sql. Design: docs/credits-wallet-approval-design.md.
+Exact comparison: docs/credits-wallet-latest.diff and docs/credits-wallet-revision.md.
+Older 121000/160000 drafts are superseded, never applied and must not be enabled.
 
-The public read-only contract is `GET /api/credits/policy`. Mutation routes do
-not accept a caller-provided cost.
+## Current deployed Preview (7db9665) — not this design's implementation
 
-The latest approval proposal is `docs/migrations/20261007160000_egg_wallet_minimal_proposal.sql`
-with its rollback and `docs/credits-wallet-approval-design.md`. It supersedes the
-earlier 121000 DRAFT, which lacks unknown-outcome and cross-period refund safety.
-Neither draft is applied. The current disabled runtime adapter targets the earlier
-RPC shape and must be replaced/tested before any activation.
+The public API /api/credits/policy still advertises timezoneConfirmed=false,
+reply/subtitle unpriced. EGG_CREDIT_V2_ENABLED defaults false; old Master/user
+RPC adapter is incompatible with workspace design. Legacy CREDIT_SYSTEM_ENABLED
+is hardcoded false. No live wallet reservation/refund/period synchronization.
 
-## Charge lifecycle
+Legacy purchased balances, Basic/Pro 800/2500, welcome300 and Stripe IDs are
+unchanged. Purchased credit expiry/consumption is not decided by the new monthly
+wallet design; do not present any old proposal as confirmed purchased-credit policy.
+The canonical product webhook independently updates old balances; disabling
+checkout does not disable existing subscriptions or product commerce.
 
-1. Validate the authenticated user, workspace membership and request payload.
-2. Require an `Idempotency-Key` for a chargeable request.
-3. Atomically reserve the server-defined amount before a paid provider call.
-4. A duplicate/in-flight/previously completed key never starts another provider
-   call.
-5. Commit only after provider output and required product records are saved.
-6. Provider, validation-after-reserve, or required-save failure calls the
-   idempotent refund RPC.
+## New seven-day Preview work
 
-The reviewed Master Supabase migration is required before enabling
-`EGG_CREDIT_V2_ENABLED=true`. Until then the new integration is a no-op and
-reports zero deducted credits, preserving current free behaviour.
+Latest five-hour instruction authorizes Preview code/mocks, not unapproved DDL.
+Trial30 credits/7days/no card is configurable and explicitly provisional.
+Relationship to permanent free30/month is unresolved. Trial expiry blocks new
+generation but retains read/edit/download in the proposed new-trial cohort;
+never retroactively change existing production users' entitlements.
 
-## Reset provisioning
+No real quota persistence may be claimed from mock tests. Unconfigured required
+trial/quota backend must fail closed before provider calls. Free Beta estimates
+and mock trial reservations are distinct from real wallet balances; existing
+legacy balances must never be rewritten for these previews.
 
-The wallet reset is intentionally not guessed inside the debit RPC. Before an
-enabled debit, a server-only entitlement provisioner must upsert the verified
-period:
+See credits-beta-release-readiness.md for read-only safety gaps. Production
+activation, DB apply, payments and iOS release/install remain approval gates.
 
-- Free: first instant of current/next HK calendar month.
-- Creator: `egg_subscriptions.current_period_start/current_period_end` for an
-  active subscription.
+## Optional login hardening remains outside scope
 
-The Master database RPC rejects expired/unprovisioned wallet periods. This
-prevents a stale paid plan or client-supplied period from silently granting
-credit.
+Email/IP password-login draft and EGG_LOGIN_RATE_LIMIT_ENABLED remain disabled
+and un-applied. Existing authenticated AI limiter is in scope; do not broaden
+this into login-form work. Telemetry remains async/fail-open, while abuse and
+credit admission must be fail-closed.
 
-## Optional login hardening (out of current approved scope)
+## Verification truthfulness
 
-The draft password-login limiter applies both 5 attempts
-per HMACed email per minute and 30 attempts per HMACed IP per hour, stores no
-raw email/IP, returns `429` with `Retry-After`, and fails closed if the limiter
-backend is unavailable. `EGG_LOGIN_RATE_LIMIT_ENABLED` remains false until the
-migration is separately approved; `EGG_LOGIN_RATE_LIMIT_PEPPER` is a dedicated
-server secret. This draft migration is not required for credits Preview review
-and is not part of the approved SOON AI per-user minute/day limit.
-
-## Release gates
-
-- Do not apply either migration without explicit approval.
-- Do not set either new flag in Production.
-- Do not modify Stripe or publish an iOS/TestFlight release.
-- Credits Preview acceptance must cover mobile/web auth, duplicate
-  idempotency, concurrent debit, insufficient credit, provider failure refund,
-  required-save failure refund, confirmed period boundaries and telemetry
-  fail-open. Login-form limiting requires separate scope approval.
+Static SQL checks/mock concurrency do not prove database atomicity, genuine
+authenticated429, App release or device behavior. No paid benchmark/provider
+test is authorized. Tommy performs UI acceptance.

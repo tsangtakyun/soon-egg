@@ -1,108 +1,205 @@
-# Minimal wallet approval design — not implemented or applied
+# Creator-workspace wallet approval design — 2026-10-07 revision
 
-## Confirmed policy and pending decisions
+Design/DDL only. Nothing applied; no RPC, worker, payment flow or deployment added.
+Tommy's latest confirmed rules supersede the user-wallet proposal at commit
+7db96654e3174c5c24093f2087cf6e2352bbb8f5.
 
-Free: 30/month, reset on the first, no accumulation. Creator: HK$98/month,
-150 credits per paid subscription cycle, no accumulation. Actions: conversation
-1, script 3, EggThis 5. Other actions remain unpriced and disabled for charging.
-Asia/Hong_Kong is a proposed free reset timezone, **not confirmed**.
+## Confirmed rules
 
-Two draft tables contain only included monthly credits and logical operations.
-No purchased-credit migration, Stripe configuration change, or alteration to
-legacy balances. The billing account is the authenticated paying user, not the
-selected workspace owner. Workspace membership authorization remains mandatory.
-Any alternative shared-team wallet needs a separate approved policy.
+- Each creator workspace has its own plan/wallet. One payer with multiple
+  workspaces does not share balances or a single subscription entitlement.
+- Free 30/month, Hong Kong time first-of-month reset; Creator HK$98/month,
+  150 per paid subscription cycle. Included credits do not accumulate.
+- Light 1: SOON AI conversation, short reply. Standard 3: script, full reply.
+  Heavy 5: EggThis, image/screenshot reply.
+- Subtitle 3 per minute, includes transcription and refinement;
+  3 × max(1, ceil(server-verified seconds / 60)). This is a commercial decision,
+  not a verified supplier-cost estimate. Fal/retry cost uncertainty stays a risk.
+- Unknown result: refund 15 minutes after first recorded unknown state; no
+  automatic provider redispatch. Late result after refund is delivered, no re-debit.
+- Cross-period refund records reversal only; adds nothing to the new period.
 
-DDL: `migrations/20261007160000_egg_wallet_minimal_proposal.sql`.
-Rollback: matching `.rollback.sql`. Neither has been executed. The prior
-121000 draft and the disabled current RPC implementation must not be enabled.
-This DDL intentionally has **no mutation RPC**: server transactions implementing
-the protocol below and concurrency tests are a required subsequent delivery.
+## Target, scope and minimal schema
 
-## Transaction and idempotency protocol
+New draft: migrations/20261007180000_egg_workspace_wallet_proposal.sql and matching
+.rollback.sql, **EGG Supabase only**, alongside egg_creator_profiles and auth.users.
+Old 160000/121000 drafts targeted a user/Master wallet and must not be applied.
+No existing data or legacy purchased credits are migrated/changed.
 
-1. Authenticate and authorize the workspace. Server determines action/cost;
-   never trust a client amount, entitlement, user ID or subscription period.
-2. Client retains one Idempotency-Key across retries of the same submission.
-   Hash canonical action, workspace, input, model configuration and policy
-   version; store SHA-256 only, not raw prompt/image data in the ledger.
-3. Lock the user's wallet first, then look up/lock the operation. All reserve,
-   finalize, refund and reset paths use this same lock order. Matching key/hash
-   returns existing state/result; changed hash returns 409. This check must
-   occur under the wallet lock, including on concurrent first submissions.
-4. New request atomically checks balance, subtracts amount and inserts operation.
-   Server UUID `call_id` is stable for its lifetime. Insufficient balance creates
-   no operation/provider call. Do not delete completed idempotency tombstones.
-5. Atomically claim dispatch only from `not_started`, assign `dispatch_claim`,
-   commit transaction, then invoke provider outside the DB transaction. Duplicate
-   callers receive pending state and cannot dispatch. A crash after claiming is
-   ambiguous: reconciliation, **not automatic redispatch**.
-6. Persist generated output durably, then atomically mark succeeded/committed
-   with result reference. Delivery retries return that result without calling
-   provider. Save failure refunds credits even if supplier incurred cost.
+Three tables are the minimal proposed scope: workspace wallet identity/current
+period pointer; immutable-identity period snapshots with remaining balance;
+logical operation ledger. The additional period table is proposed for approval
+because a single mutable row cannot retain unique workspace/period grants,
+old payer snapshots and an authoritative cross-period refund association.
 
-One logical call may have separately recorded attempt IDs in usage telemetry.
-Supplier token/cost records remain append-only and survive credit refunds.
-Provider SDK retries need auditing/explicit limits: local dispatch claims alone
-cannot guarantee exactly-once execution at a provider without its own supported
-idempotency or recoverable job ID. Never claim that guarantee.
+- Wallet PK workspace_id; payer_user_id separate; subscription unique to wallet.
+- Period PK (workspace_id, period_key); unique invoice and subscription/start
+  prevent the same paid grant being assigned to two workspaces.
+- Operation global call_id UUID PK; UNIQUE(workspace_id, idempotency_key).
+  actor_user_id records submitter, not wallet owner or payer.
+- Composite FK operation(workspace_id, reserved_period_key) → period, and wallet
+  current pointer → its own period; cannot reference another workspace's period.
+- No cascade deletes. No public/client policies. Explicit service-role DML only.
+  Server-only result references, hashes and payer IDs are not exposed to members.
+- DDL constraints are not a substitute for auth, atomic transitions or trusted
+  duration verification. No RPC/worker is provided; current disabled runtime is
+  incompatible and **must not be enabled**.
 
-## Failure, cancellation, timeout and late results
+Before any apply: confirm target project, table absence/collisions, workspace
+and auth FK schema, role/default grants, locks, backup, and separate approval.
+Draft assumes one paid invoice funds one workspace billing period; proration,
+annual grants and plan changes need an explicit approved grant policy.
 
-Confirmed failure or cancellation atomically refunds once, marks terminal credit
-state and retains key. Abort provider where supported. Cancel request can refund
-even if provider cannot stop; late success never deducts again or uncancels it.
+## Authorization and payer lifecycle
 
-A transport timeout does not prove provider failure. Mark `unknown`, return a
-pending operation reference, and reconcile by provider job/result identifier
-where available. No new provider attempt on the same key. Proposed unresolved
-deadline: 15 minutes, after which automatically refund and retain the blocked
-tombstone; this deadline requires approval. Late successful output after refund
-does not recharge. A new user submission with a new key is a separate explicit
-operation, not a silent retry. Polling and reconciliation never consume credits.
+Use verified Web session or App bearer and membership in the explicitly selected
+workspace on every request; client workspace cookie/header is not authorization.
+Revalidate membership transactionally before reserve/dispatch. Server chooses
+action/price: presence of screenshot/image cannot be disguised as short/text reply.
+Members may use tools; owner/admin may view workspace usage. Proposed conservative
+billing permission is owner only. Payer identity alone does not grant workspace
+access, result access, owner role or permission to transfer billing. Admin billing
+delegation needs an explicit product decision, not inferred team-edit permission.
 
-Same-period refund restores original amount under wallet lock, capped at that
-period's allowance. Unexpected cap conflict must be logged/alerted. Cross-period
-refund records the original credit reversal as `refund_expired`, without adding
-it to the new period, preserving no-rollover. **This expiry interpretation needs
-approval**; UI must say the old-period credit was reversed but has expired, not
-promise spendable credits. If approved instead as compensation, model it in a
-separate adjustment ledger, not silently carry monthly credits forward.
+Billing payer change requires owner authorization plus new payer authenticated
+consent. Preserve former payer/actor snapshots. Membership leave/removal must
+not erase, transfer, merge or refill wallet and must not silently cancel a
+subscription or charge a replacement payer. Former payer can still manage their
+own existing payment instrument/cancellation through a separately verified
+billing relationship, without restoring tool access. Replacing payer/subscription
+increments billing_generation after verified handoff; old-generation webhooks
+cannot change current wallet. Payment/grace timing and owner-transfer behavior
+need a concrete transition contract before paid activation, not DDL guesswork.
 
-## Reset and Stripe period synchronization — design only
+Removed actor's in-flight result remains workspace data but is not accessible
+to that removed actor. Current authorized members can obtain durable result under
+existing content permissions. Workspace deletion must archive/retain financial
+history first; FK restriction is intentional. Auth-account deletion needs a
+separate retention/anonymization policy; never cascade financial rows.
 
-Free period boundaries are computed server-side using the approved timezone.
-Paid period boundaries come from verified Stripe subscription/invoice state,
-not browser dates or checkout redirects. Verify signature and canonical customer
-mapping; consume events through the existing canonical webhook inbox/deduplication
-transaction. If that inbox cannot support atomic dedupe, approve a separate inbox
-migration before implementation; these two tables alone do not solve event dedupe.
+## Reserve, dispatch and idempotency
 
-Same period never regrants allowance. Older/out-of-order period events cannot
-move the wallet backward or refill it. New paid grant requires verified paid
-entitlement and a strictly newer authoritative period; period corrections,
-plan transitions, payment failure/grace and cancellation need explicit handling,
-not a generic 'bounds changed => reset'. At reset replace available with current
-allowance; old reservations retain their period snapshot. Late commit does not
-subtract new-period credits. Late refund follows the expiry policy above.
-No subscription creation, price change, payment or webhook setting was performed.
+1. Derive verified membership and action, canonical payload hash, workspace and
+   policy version. Idempotency key persists through client transport retries.
+   Same workspace/key but different actor/hash returns conflict; do not expose
+   someone else's result. A legitimately shared job uses separately authorized
+   job access, not guessed keys.
+2. Fixed lock order: membership row for the actor (for admission), workspace
+   wallet, relevant period rows in stable key order, then operation. Membership
+   removal, billing transfer/reset and cancellation paths must follow compatible
+   ordering. Worker uses wallet → period → operation (no actor admission).
+3. Under wallet lock, recheck key before creating a new operation; atomically
+   reserve from current unexpired authorized period and insert the ledger.
+   Insufficient balance or membership failure performs no provider dispatch.
+   Workspaces A/B have independent locks, period grants and keys.
+4. One logical call_id is generated server-side and persists forever; attempts
+   have separate telemetry IDs. Claim dispatch once from not_started and commit
+   before provider I/O. Duplicates return pending/result, never another invocation.
+5. Crash after claim is ambiguous, not evidence of provider failure. Mark unknown
+   and reconcile using provider job/request IDs where supported. SDK retries need
+   explicit auditing/limits; no local ledger can promise provider exactly-once
+   without supported provider idempotency/recovery.
+6. Durable result save precedes credit commit. Same-period success commits
+   reserved credits; no additional subtraction. Save failure refunds even if
+   supplier incurred cost. Output storage is idempotent by call_id.
+7. Reset, refund and finalize all serialize on the same workspace wallet.
+   Tombstones are retained; new client UUID per retry is not compliant.
 
-## Release gates and acceptance
+## Subtitle duration and pricing
 
-- Approve timezone, unresolved timeout deadline and cross-period refund policy.
-- Review/apply DDL only with separate authorization; implement replacement RPCs,
-  authorization, billing inbox synchronization and reconciliation worker.
-- Test concurrent duplicate reserve (one debit/one dispatch), hash conflict,
-  insufficient balance, save failure, duplicate refund, cancel/late success,
-  unknown timeout, duplicate/out-of-order webhook and period-boundary refund.
-- Test actual authenticated rate limiting separately; mock guard tests are not
-  live 429 or database atomicity evidence. No paid benchmark needed.
-- Verify Web and App against the shared policy and actual wallet balance.
-- Charging flag remains false until these gates pass. Production must show the
-  actual disabled status or enable real charging after verification; removing
-  the Preview notice alone is **not** charging activation.
-- Stop charging/workers before rollback. If any records exist, preserve financial
-  history and revert runtime only. Guarded schema rollback refuses nonempty tables.
+Never accept client seconds, billable minutes or amount. Server probes immutable,
+authorized uploaded media or uses trusted provider metadata; bind duration to
+stored object version/SHA-256. Verify ownership, MIME/actual decode, byte/length
+bounds, URL allowlist and SSRF protection before fetching. Unverifiable,
+zero/negative/NaN duration rejects or defers **before** reserve/provider dispatch.
+Do not use last spoken timestamp, extension filename, or untrusted Content-Length
+as duration. Metadata preflight needs its own abuse/size/concurrency limits.
 
-UI acceptance is Tommy's. iOS release build, phone install and device acceptance
-are separate gates; passing Web build does not certify any of them.
+Examples: 0.1/59.999/60 seconds → 3; 60.001/120 → 6; 120.001 → 9.
+Precision/rounding policy must preserve verified milliseconds, not round down.
+One subtitle logical action encompasses transcribe + refine; internal retries
+and polling never charge again. A distinct user-requested regeneration is priced
+and explicitly submitted as a new operation. Existing text-only SRT route lacks
+media duration: do not retrofit a guessed minute; product must route it through
+the composite contract or decide its separate pricing.
+
+## Refund worker, races and late results
+
+unknown_since is written once at first ambiguity, refund_due_at exactly +15min;
+repeated polling/worker retries must not postpone it. Server time only.
+Confirmed failure/cancellation refunds once. Provider costs are separate records
+and can remain payable after refund. Abort provider when supported.
+
+Refund worker takes wallet → reserved/current period (stable order) → operation,
+checks reserved state and due time, atomically records full reversal, and restores
+credits only if that original period is still current and unexpired. Otherwise
+refund_expired = amount and current-period balance is unchanged. Never increase
+a new period or archived period available balance. Duplicate workers no-op.
+
+Result-save/finalize uses the same locks:
+- Durable success before deadline commits once; later refund worker no-ops.
+- Unknown success only finalized at/after due time refunds first even if the
+  worker was delayed, then records succeeded/result_reference without committing
+  or deducting again. Persist result independently; it is delivered.
+- If refund worker wins first, late success keeps refunded credit_status and
+  adds saved result. If success wins before deadline, it commits and refund no-ops.
+- Unknown rows already refunded still reconcile for late output; refunding does
+  not stop job recovery or discard results. Worker interval and retention/alerting
+  are engineering gates, not permission to silently drop output.
+- Explicit cancellation is different from timeout: remain cancelled, no re-debit;
+  any recoverable output may be offered without restarting a cancelled task.
+- Delivery uses an idempotent result/poll reference, scoped to current membership;
+  no exactly-once push-notification claim. Removed users cannot receive private output.
+
+A new key after unresolved refund is a new explicit user operation; no silent
+resubmission. Both original late output and new output may exist, not double
+billing of the original. Financial history and supplier telemetry remain separate.
+
+## Period reset and webhook synchronization — design only
+
+Free boundaries: calendar first 00:00 Asia/Hong_Kong; server-generated stable key.
+Paid boundaries: verified canonical invoice/subscription period and workspace
+billing_generation, never browser date/payer-wide latest active subscription.
+Same period/invoice never refills, old period/generation never moves pointer
+backward. Strictly newer verified period creates one new snapshot then moves
+pointer atomically. Old reservations retain FK to their old period; late success
+never subtracts new-period balance. No carry at reset.
+
+Stripe signature and event-ID inbox are necessary but existing handler is not
+sufficient: failed/stale replay claims and grants are not one atomic transaction,
+and legacy invoice handler grants user credits without workspace/generation.
+Replacement grant transactions and durable webhook dedupe/CAS require separate
+implementation/approval. Don't globally disable webhook: existing subscriptions
+and product order/refund/dispute fulfillment must remain operational. Keep legacy
+800/2500 grants isolated; never silently reinterpret as new 150 workspace grant.
+No customer/subscription/price/webhook setting was modified.
+
+## Release gates and test plan
+
+- Approve this replacement DDL/rollback; no need to reconfirm the rules above.
+- Approve billing roles/handoff/grace/proration details before paid activation.
+- Implement atomic replacement RPCs, metadata verifier, refund/recovery worker,
+  workspace billing mapping and webhook generation guards, then test in an
+  isolated DB. SQL has not executed; static text checks do not prove atomicity.
+- Concurrency cases: 20 same-key requests → one reserve/claim; changed hash/actor
+  conflicts; same key in A/B independent; unique invoice across workspaces;
+  cross-workspace period FK rejection; shared payer A/B isolation; balance floor.
+- Role cases: anon/member-nonmember/spoofed workspace/removed member; service-role
+  only table/RPC grants; owner billing vs admin/member; payer not member; removal
+  vs dispatch; transfer vs invoice; old generation event vs new subscription.
+- Lifecycle: duplicate failure/refund/cancel; save failure; provider crash; unknown
+  timeout at 14:59/15:00; refund worker reentry; both late-success race orders;
+  delayed worker but result after deadline; late result delivery with no recharge.
+- Period: Asia/HK month boundary, duplicate/out-of-order webhook, no rollover,
+  cross-period reversal no new balance, reset/finalize/refund concurrency.
+- Media: 0.1/59.999/60/60.001/120/120.001; spoofed client seconds; replaced object;
+  NaN/zero/corrupt media; SSRF; huge upload; transcribe/refine retries billed once.
+- Rollback: refuses any wallet/period/operation row. After usage revert runtime
+  only; preserve financial data. Never execute old draft as an upgrade.
+- Verify Web/App policy and states, real authenticated 429/503 and provider-zero
+  negative tests. No paid benchmark. UI acceptance is Tommy's.
+
+Free Beta may precede this paid wallet only if it does not write/grant/reserve
+real credits and covers all cost-bearing routes with durable abuse controls.
+See credits-beta-release-readiness.md. No production deployment, App release build,
+phone install or device verification was performed for this design revision.

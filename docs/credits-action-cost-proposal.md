@@ -1,8 +1,11 @@
 # EGG action cost proposal — 2026-10-07
 
-Approval proposal only; no additional charging action is enabled. Confirmed:
-Creator HK$98/month; Free 30/month; Creator 150/month; SOON AI 1, script 3,
-EggThis 5. Other prices need Tommy's confirmation. Rule: minimum 1 credit,
+Updated after Tommy's latest decision; no additional charging action is enabled.
+Confirmed: Creator HK$98/month; Free 30/month; Creator 150/month;
+SOON AI/short reply 1, script/full reply 3, EggThis/image or screenshot reply 5;
+subtitle 3/audio-minute **including transcription**, round minutes up, minimum
+one minute. Confirmed prices override the ceil estimates below. Other prices
+need Tommy's confirmation. Estimation rule: minimum 1 credit,
 otherwise `ceil(estimated supplier HKD / 0.2)`. This is an approximate cost
 budget rule, not a promise of cash redemption or actual invoice cost.
 
@@ -42,7 +45,7 @@ they require enforcing/reviewing those scenario bounds before activation.
 | --- | --- | --- | --- | --- | --- |
 | Mobile short reply draft, text | None | 3,000/900 | 0.1766 | 1/draft | `/api/mobile/reply/draft`, output cap900 |
 | Reply Centre full reply + brief, text | None | 6,000/3,500 | 0.5532 | 3/generation | `/api/tools/reply/chat`, cap3500; history may exceed assumption |
-| Reply Centre with screenshot | None | 10,000/3,500 including 4,000 hypothetical image tokens | 0.6474 | 4/generation | same route; bytes/image count are not token measurements |
+| Reply Centre with screenshot | None | 10,000/3,500 including 4,000 hypothetical image tokens | 0.6474 | ceil4; **confirmed charge5** | same route; bytes/image count are not token measurements |
 | Reply long-history stress case | None | 20,000/3,500 | 0.8828 | 5/generation | planning stress case, not normal observed usage |
 | Document enhancement | None | 2,000/2,000 | 0.2825 | 2/generation | `/api/tools/docs/enhance`; input currently unbounded |
 | Media Kit copy | None | 2,000/1,000 | 0.1648 | 1/generation | `/api/media-kit/generate`, cap1000 |
@@ -53,9 +56,11 @@ they require enforcing/reviewing those scenario bounds before activation.
 | DNA preference suggestion | None | 1,000/300 | 0.0589 | 1/generation | `/api/egg/dna-rules/suggest`; retry can add cost |
 | EGG command/idea planning | None | 10,000/4,000 | 0.7062 | 4/generation | `/api/egg/command`, cap4000; downstream calls separate |
 
-Recommendation: distinguish short draft1, full reply3, screenshot reply4 only
-if the UI/API distinguish the actions and enforce context limits. Otherwise
-keep reply unpriced until one fixed full-workflow charge is approved. Do not
+Confirmed product mapping: short draft1, full reply3, screenshot/image reply5.
+UI/API must distinguish those actions and enforce context limits. Runtime
+integration is still pending; the existing deployed policy has reply unpriced.
+The long-history stress estimate5 is a risk against confirmed full-reply3,
+not permission to vary its price. Do not
 silently switch a user between 1 and 5 depending on hidden model token usage.
 Automatic topic enrichment/geography retries should be included in the owning
 saved-topic action or treated as internal cost; charging each background retry
@@ -76,11 +81,12 @@ sample for the composite workflow.
 | Retry/per-line recovery | Unknown extra calls/tokens | Unknown | Unknown | Cannot set an evidence-backed full-workflow number |
 
 `F` is actual fal HKD per audio minute; it is presently unknown. Therefore
-**3 credits/audio-minute is a provisional normal-case suggestion, not a confirmed
-combined cost**; dense subtitles may require5. Keep both subtitle actions
-unpriced until F, normal batch count and failure overhead are checked.
-Suggested billing unit, if approved: `ceil(verified media_duration_seconds/60)`
-times approved per-minute price, minimum1 minute, one composite generation
+**Tommy has confirmed 3 credits/audio-minute including transcription**. Dense
+refinement/retries/fal may exceed this price's HK$0.6/min cost budget. That is an
+explicit business risk; do not increase the agreed price or leave it unpriced in
+the new design merely because cost is unknown. Existing runtime remains
+disabled/unintegrated. Confirmed billing unit:
+`3 * max(1,ceil(verified media_duration_seconds/60))`, one composite generation
 `call_id`. Verify duration from media metadata before reservation (not last
 spoken timestamp, which undercounts silence). Refinement/resume of the same
 generation uses the same call_id; internal retries do not charge again. A new

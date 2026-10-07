@@ -3,11 +3,12 @@
 This work is Preview-only. The legacy `CREDIT_SYSTEM_ENABLED` remains `false`;
 checkout, Stripe, Production and existing balances are unchanged.
 
-## Proposed entitlement/reset policy (awaiting product confirmation)
+## Confirmed product policy; remaining timezone proposal
 
-- Free grant amount is 30. Proposed reset: Hong Kong calendar month. Boundaries are
-  calculated in `Asia/Hong_Kong` and stored as UTC timestamps.
-- Creator grant amount is 150. Proposed reset: exact active Stripe subscription billing
+- Free grant amount is 30; reset on the first of each month; unused monthly
+  credits do not roll over. `Asia/Hong_Kong` is proposed, not yet confirmed.
+  The disabled Preview implementation uses this timezone and stores UTC timestamps.
+- Creator price is HK$98/month and grant amount is 150. Confirmed reset: active Stripe subscription billing
   cycle. No active subscription row means no Creator entitlement; the server
   must not infer a paid plan from client input.
 - Purchased credits, if re-enabled later, are separate from included credits,
@@ -23,6 +24,12 @@ checkout, Stripe, Production and existing balances are unchanged.
 
 The public read-only contract is `GET /api/credits/policy`. Mutation routes do
 not accept a caller-provided cost.
+
+The latest approval proposal is `docs/migrations/20261007160000_egg_wallet_minimal_proposal.sql`
+with its rollback and `docs/credits-wallet-approval-design.md`. It supersedes the
+earlier 121000 DRAFT, which lacks unknown-outcome and cross-period refund safety.
+Neither draft is applied. The current disabled runtime adapter targets the earlier
+RPC shape and must be replaced/tested before any activation.
 
 ## Charge lifecycle
 

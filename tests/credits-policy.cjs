@@ -15,7 +15,11 @@ const policy = moduleBox.exports;
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.monthlyCredits, 30);
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.reset, "calendar_month");
 assert.equal(policy.CREDIT_ENTITLEMENTS.free.timezone, "Asia/Hong_Kong");
+assert.equal(policy.CREDIT_ENTITLEMENTS.free.timezoneConfirmed, false);
+assert.equal(policy.CREDIT_ENTITLEMENTS.free.rollover, false);
 assert.equal(policy.CREDIT_ENTITLEMENTS.creator.monthlyCredits, 150);
+assert.equal(policy.CREDIT_ENTITLEMENTS.creator.priceHkdMonthly, 98);
+assert.equal(policy.CREDIT_ENTITLEMENTS.creator.rollover, false);
 assert.equal(policy.CREDIT_ENTITLEMENTS.creator.reset, "subscription_billing_cycle");
 assert.equal(policy.creditCost("soon_ai_chat"), 1);
 assert.equal(policy.creditCost("script_generate"), 3);
@@ -28,10 +32,11 @@ assert.equal(policy.resolveCreditAction("ai_generate", "egg_this"), "egg_this_ge
 assert.equal(policy.resolveCreditAction("ai_generate"), null);
 assert.equal(policy.resolveCreditAction("unknown"), null);
 
-const ledger = fs.readFileSync(path.join(process.cwd(), "docs/migrations/20261007121000_master_credit_wallets.sql"), "utf8");
+// Static proposal checks only: these do not execute SQL or prove atomicity.
+const ledger = fs.readFileSync(path.join(process.cwd(), "docs/migrations/20261007160000_egg_wallet_minimal_proposal.sql"), "utf8");
 assert.match(ledger, /unique \(user_id, idempotency_key\)/i);
-assert.match(ledger, /for update/i);
-assert.match(ledger, /status='refunded'/i);
-assert.match(ledger, /included_balance\+v_row\.included_amount/i);
+assert.match(ledger, /refund_restored \+ refund_expired = amount/i);
+assert.match(ledger, /'unknown'/i);
+assert.match(ledger, /ENABLE ROW LEVEL SECURITY/i);
 
-console.log("credits policy and atomic ledger contract: PASS");
+console.log("credits policy and static wallet proposal checks: PASS (SQL not executed)");

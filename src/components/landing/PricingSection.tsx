@@ -90,6 +90,9 @@ export default function PricingSection() {
         <p className="mt-6 text-center text-sm font-semibold text-[#7a4b00]">
           Credits 為 Preview 規格；扣點及購買功能尚未啟用。
         </p>
+        <p className="mt-2 text-center text-sm text-zinc-600">
+          免費版每月 1 號重置；創作者版按訂閱週期重置。未用完的月額不累積。
+        </p>
         <p className="mt-10 text-center text-sm italic text-zinc-500">最有野心的亞洲創作者都選擇 SOON-EGG。你都會。</p>
       </div>
     </section>

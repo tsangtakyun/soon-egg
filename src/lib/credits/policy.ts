@@ -2,14 +2,19 @@ export const CREDIT_POLICY_VERSION = "egg-credits-2026-10-07-v1";
 
 export const CREDIT_ENTITLEMENTS = {
   free: {
+    priceHkdMonthly: 0,
     monthlyCredits: 30,
     reset: "calendar_month",
     timezone: "Asia/Hong_Kong",
+    timezoneConfirmed: false,
+    rollover: false,
   },
   creator: {
+    priceHkdMonthly: 98,
     monthlyCredits: 150,
     reset: "subscription_billing_cycle",
     timezone: null,
+    rollover: false,
   },
 } as const;
 

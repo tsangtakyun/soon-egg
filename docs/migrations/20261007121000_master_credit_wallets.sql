@@ -1,4 +1,7 @@
 -- SOON Core / Master Supabase migration DRAFT.
+-- SUPERSEDED for approval by 20261007160000_egg_wallet_minimal_proposal.sql.
+-- Do not apply: this earlier draft does not handle timeout/late completion or
+-- cross-period refunds. Kept only to document the disabled Preview adapter.
 -- Do not apply to the EGG Supabase project. Requires separate approval.
 create table if not exists public.egg_credit_wallets (
   user_id uuid primary key,

@@ -1,5 +1,20 @@
 # EGG 最小待批包：試用規則 + wallet/trial DDL
 
+## 最新狀態：已確認政策；staging 目標未能核實
+
+Tommy 已於 Master Chief turn 01a1184c-51dd-7982-8cb5-c3c5e5bb6359
+直接回覆「確認！」。下列推薦政策已接受，最新 230000 SQL／rollback 包
+可在經核實的獨立 EGG staging 推進；無需重問 UI 或同一政策。
+此次授權不包括 production、建立付費資源、RPC／trial activation、Stripe
+或 App release。SQL 檔保持已批核 SHA-256，尚未套用遠端。
+
+已只讀查看 Supabase：SOON 組織列出的 soon-egg 專案
+`ycqribpphvywibamtjew` 明確為 `main / Production`，並顯示 `No branches`。
+可见清單未找到獨立 EGG staging，因此沒有執行遠端 SQL。
+完整目標證據及待補資料見 `credits-staging-target-evidence.md`。
+
+以下保留原批准包內容作紀錄；其中「待批／推薦」現依本節更新。
+
 2026-10-07。Tommy 已驗收 EGG Preview UI 方向；毋須再批同一套 UI。
 驗收來源：Master Chief 對話 01a0b4df-9d0a-7093-97ec-2a671ac5ffe9，
 用家 turn 01a1183a-a5d5-7b42-a761-7cd9e6134072「其餘 ok！可去！」。

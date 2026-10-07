@@ -1,5 +1,13 @@
 # EGG wallet/trial approval manifest
 
+Approval update: Tommy confirmed the trial policy and this exact 230000 proposal
+bundle in Master Chief turn 01a1184c-51dd-7982-8cb5-c3c5e5bb6359. The permitted
+next apply is limited to an independently verified EGG staging target. Read-only
+dashboard inspection found only the production EGG project and no branches in
+the visible SOON organization. Remote apply remains NOT APPLIED. No additional
+UI/policy confirmation is needed. See credits-staging-target-evidence.md.
+Hashes below were rechecked after confirmation and match the approved files.
+
 2026-10-07. Proposal and local schema tests only. Remote apply status: NOT APPLIED.
 The accepted live Preview still uses code 1dd7806; this documentation/test bundle
 does not redeploy or activate a trial. Complete decision brief: credits-trial-approval.md.
@@ -29,6 +37,6 @@ and rollback checks against minimal local auth/workspace fixtures. No remote DB,
 provider or payment call. This is not Supabase environment, RPC or concurrency
 verification. Each test closes its in-memory database after completion.
 
-The diff is reviewable, not an authorization to run the SQL. SQL approval and
-the recommended trial/free policy decision are the two remaining decisions for
-this bundle; further runtime/RPC implementation must be reviewed before activation.
+The policy and exact bundle have now been accepted as described above. A verified
+independent staging target is still missing; production is outside that approval.
+Further runtime/RPC implementation must be reviewed before activation.

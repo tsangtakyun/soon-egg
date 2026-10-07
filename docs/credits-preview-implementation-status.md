@@ -1,5 +1,21 @@
 # Workspace trial Preview implementation checkpoint
 
+## Superseding checkpoint — 2026-10-07
+
+The historical checkpoint below is retained for provenance, not current status.
+Paid route inventory is now complete for this repository: 22 route files plus
+subtitle proxy and hidden provider/autofill/recommendation paths fail closed.
+Full clean remote Next build passed, including generated route TypeScript checks.
+Existing-project Preview is Ready at deployed code SHA 1dd7806. Live policy 200
+and unauthenticated generation 401 checks passed. Landing specifications and
+credits login redirect were checked in the browser. Authenticated 503 and
+read/edit/export remain NOT TESTED; no EGG session available. App source/typecheck
+passed at bcc7fb1, but binary/build/install/device verification remain NOT DONE.
+See credits-preview-verification-2026-10-07.md and credits-paid-route-inventory.md.
+This is a generation-closed specification Preview, not an active durable trial.
+
+## Historical source-only checkpoint
+
 This is source work, not a production activation or a successful iPhone install.
 
 - Shared policy: 7-day no-card / configurable 30-credit trial, provisional and

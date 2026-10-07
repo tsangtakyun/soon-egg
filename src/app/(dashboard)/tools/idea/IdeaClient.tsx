@@ -27,7 +27,6 @@ const platformOptions = ["IG Reel", "YouTube", "小紅書", "其他"];
 export function IdeaClient({
   trendingIdeas,
   myIdeas,
-  balance,
 }: {
   trendingIdeas: Idea[];
   myIdeas: Idea[];
@@ -60,7 +59,7 @@ export function IdeaClient({
           <p className="mt-2 text-sm text-zinc-500">探索爆款題材，整理你的創作靈感庫。</p>
         </div>
         <div className="rounded-2xl border bg-white px-4 py-3 text-sm text-zinc-500">
-          目前餘額 <span className="font-semibold text-zinc-950">{balance.toLocaleString()}</span> credits
+          Credits Preview · 尚未啟用扣點
         </div>
       </header>
 

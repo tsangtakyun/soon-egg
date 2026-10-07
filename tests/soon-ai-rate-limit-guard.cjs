@@ -8,16 +8,20 @@ const source = fs.readFileSync(
 );
 
 const auth = source.indexOf("getEggRequestContext(req)");
-const limiter = source.indexOf("consumeSoonAiRateLimit({");
+const guard = source.indexOf("runSoonAiRateLimitGuard({");
+const limiter = source.indexOf("check: () => consumeSoonAiRateLimit({");
+const allowedCallback = source.indexOf("onAllowed: async () => {");
 const rejection = source.indexOf("status: 429");
 const provider = source.indexOf("getAnthropic()");
 const trackedCall = source.indexOf("trackedAnthropicCall({");
 
 assert.ok(auth >= 0, "route must authenticate");
+assert.ok(guard > auth, "route must use the shared rate-limit guard after authentication");
 assert.ok(limiter > auth, "limiter must run after authentication");
-assert.ok(rejection > limiter, "limiter must have an explicit 429 branch");
-assert.ok(provider > rejection, "provider lookup must occur after the 429 branch");
+assert.ok(allowedCallback > limiter, "paid work must be isolated in the allowed callback");
+assert.ok(provider > allowedCallback, "provider lookup must occur inside the allowed callback");
 assert.ok(trackedCall > provider, "paid provider call must remain behind the limiter");
+assert.ok(rejection > provider, "limiter result must have an explicit 429 response branch");
 assert.match(source, /Retry-After/);
 assert.match(source, /status:\s*503/);
 

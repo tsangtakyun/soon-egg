@@ -9,7 +9,7 @@ const freeFeatures = [
   ["✓", "Link in Bio 主頁"],
   ["✓", "基礎 Media Kit"],
   ["✓", "每月 3 個品牌配對"],
-  ["✓", "30 AI Credits / 日"],
+  ["✓", "30 AI Credits / 月（Preview 規格）"],
   ["✓", "1 個數位產品"],
   ["✗", "交易佣金 9%"],
   ["✗", "自訂域名"],
@@ -19,6 +19,7 @@ const freeFeatures = [
 const soonAiMonthlyLimit = Number(process.env.NEXT_PUBLIC_SOON_AI_MONTHLY_LIMIT ?? "");
 const creatorFeatures: Array<[string, string, boolean?]> = [
   ["✓", "全部免費功能"],
+  ["✓", "150 AI Credits / 月（Preview 規格）"],
   ...(Number.isInteger(soonAiMonthlyLimit) && soonAiMonthlyLimit > 0
     ? [["✓", `SOON AI 對話（每月${soonAiMonthlyLimit}次）`] as [string, string]]
     : []),
@@ -86,6 +87,9 @@ export default function PricingSection() {
             <Link href="/signup" className="mt-8 block rounded-full bg-[#0a0a0a] px-6 py-3 text-center text-sm font-black text-white">立即升級</Link>
           </article>
         </div>
+        <p className="mt-6 text-center text-sm font-semibold text-[#7a4b00]">
+          Credits 為 Preview 規格；扣點及購買功能尚未啟用。
+        </p>
         <p className="mt-10 text-center text-sm italic text-zinc-500">最有野心的亞洲創作者都選擇 SOON-EGG。你都會。</p>
       </div>
     </section>

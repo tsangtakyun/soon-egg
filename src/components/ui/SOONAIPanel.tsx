@@ -136,7 +136,7 @@ export function SOONAIPanel() {
       )}
 
       <div className="border-t border-gray-100 px-4 py-2">
-        <p className="text-xs text-gray-400">點數功能暫時未公開</p>
+        <p className="text-xs text-gray-500">Preview：每次 1 Credit · 尚未啟用扣點</p>
       </div>
 
       <div className="border-t border-gray-100 p-4">

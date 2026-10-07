@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   } = await serverSupabase.auth.getUser();
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!CREDIT_SYSTEM_ENABLED) {
-    return NextResponse.json({ error: "點數功能暫時未公開，所有工具現時免費使用。" }, { status: 409 });
+    return NextResponse.json({ error: "扣點及購買功能尚未啟用；Preview 現時不會扣除 Credits。" }, { status: 409 });
   }
 
   const { price_id } = await req.json();
@@ -40,14 +40,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid price" }, { status: 400 });
   }
 
-  const supabaseAdmin = getSupabaseAdmin() as any;
-  const { data: existingSub } = await supabaseAdmin
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });
+  const { data: existingSubData } = await supabaseAdmin
     .from("egg_subscriptions")
     .select("stripe_customer_id")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  const existingSub = existingSubData as { stripe_customer_id: string | null } | null;
 
   let customerId = existingSub?.stripe_customer_id as string | undefined;
 

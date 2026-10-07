@@ -46,7 +46,7 @@ export async function POST(req: Request) {
   } = await serverSupabase.auth.getUser();
   if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!CREDIT_SYSTEM_ENABLED) {
-    return NextResponse.json({ error: "點數功能暫時未公開，所有工具現時免費使用。" }, { status: 409 });
+    return NextResponse.json({ error: "扣點及購買功能尚未啟用；Preview 現時不會扣除 Credits。" }, { status: 409 });
   }
 
   const { package_id } = await req.json();

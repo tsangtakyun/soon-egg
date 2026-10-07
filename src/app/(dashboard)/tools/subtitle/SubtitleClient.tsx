@@ -143,7 +143,7 @@ export function SubtitleClient({ sessions: initialSessions }: { sessions: Subtit
       <header className="lg:ml-[10%]">
         <h1 className="text-3xl font-black text-zinc-950">字幕工作台</h1>
         <p className="mt-2 text-zinc-500">上傳影片或錄音，AI 會按真實語音時間生成廣東話字幕。</p>
-        <p className="mt-1 text-xs text-zinc-400">支援 MP4、MOV、MP3、M4A、WAV · 暫時免費使用</p>
+        <p className="mt-1 text-xs text-zinc-400">支援 MP4、MOV、MP3、M4A、WAV · Preview 暫不扣點（媒體成本評估中）</p>
       </header>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">

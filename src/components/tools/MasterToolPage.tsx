@@ -10,7 +10,7 @@ const toolConfig: Record<ToolKey, { table?: string; title: string; subtitle: str
   projects: { table: "projects", title: "工作板", subtitle: "Work Board", empty: "暫時未有項目" },
   schedules: { table: "schedules", title: "日程", subtitle: "Schedule", empty: "暫時未有日程" },
   reply_threads: { table: "reply_threads", title: "回覆中心", subtitle: "Reply Centre", empty: "暫時未有回覆 thread" },
-  soon_ai: { title: "SOON AI", subtitle: "AI Assistant", empty: "SOON AI 暫時免費使用" },
+  soon_ai: { title: "SOON AI", subtitle: "AI Assistant", empty: "SOON AI Credits 規格預覽" },
 };
 
 type MasterRow = {
@@ -181,7 +181,7 @@ export async function MasterToolPage({ tool }: { tool: ToolKey }) {
         <Header title={config.title} subtitle={config.subtitle} />
         <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
           <p className="text-sm leading-6 text-zinc-600">
-            SOON AI 會沿用現有右側對話 panel，點數功能開放前暫時免費使用。
+            SOON AI 會沿用現有右側對話 panel。Preview 規格為每次 1 Credit；扣點功能尚未啟用，現時不會扣點。
           </p>
         </div>
       </div>

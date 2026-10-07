@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { BuyCreditsButton } from "@/components/credits/BuyCreditsButton";
 
+// Legacy Basic/Pro checkout UI: not mounted by the current /credits page.
+// Its purchased/subscription values are not the new Free/Creator monthly grants.
+// Keep this unmounted while the legacy CREDIT_SYSTEM_ENABLED flag is false.
+
 export type CreditPackage = {
   id: string;
   name: string;

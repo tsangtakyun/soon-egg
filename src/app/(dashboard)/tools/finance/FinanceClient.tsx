@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { CreditBadge } from "@/components/ui/CreditBadge";
 
 export type Expense = {
   id: string;
@@ -27,7 +28,7 @@ const incomeCategories = ["品牌合作", "產品銷售", "顧問服務", "其�
 const expenseCategories = ["器材設備", "道具", "交通", "餐飲", "軟體訂閱", "其他支出"];
 const colors = ["bg-purple-500", "bg-blue-500", "bg-green-500", "bg-orange-500", "bg-pink-500", "bg-zinc-500"];
 
-export function FinanceClient({ expenses, balance }: { expenses: Expense[]; balance: number }) {
+export function FinanceClient({ expenses }: { expenses: Expense[]; balance: number }) {
   const [items, setItems] = useState(expenses);
   const [activeTab, setActiveTab] = useState<"records" | "new">("records");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -58,9 +59,7 @@ export function FinanceClient({ expenses, balance }: { expenses: Expense[]; bala
           <h1 className="mt-2 text-3xl font-black text-zinc-950">財務中心</h1>
           <p className="mt-2 text-sm text-zinc-500">追蹤創作者收入、支出和淨收益。</p>
         </div>
-        <div className="rounded-2xl border bg-white px-4 py-3 text-sm text-zinc-500">
-          目前餘額 <span className="font-semibold text-zinc-950">{balance.toLocaleString()}</span> credits
-        </div>
+        <CreditBadge />
       </header>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">

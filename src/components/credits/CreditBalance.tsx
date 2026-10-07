@@ -5,7 +5,7 @@ export function CreditBalance({ compact = false }: { compact?: boolean }) {
     return (
       <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
         <Coins className="h-3.5 w-3.5" aria-hidden />
-        0
+        尚未扣點
       </span>
     );
   }
@@ -13,7 +13,7 @@ export function CreditBalance({ compact = false }: { compact?: boolean }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 shadow-sm">
       <Coins className="h-4 w-4" aria-hidden />
-      <span>🪙 0 Credits</span>
+      <span>Credits Preview · 尚未扣點</span>
     </div>
   );
 }

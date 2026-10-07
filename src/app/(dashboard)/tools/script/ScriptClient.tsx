@@ -135,7 +135,7 @@ export function ScriptClient({
           <p className="mt-2 text-zinc-500">按你的主題、語氣及影片節奏，生成適合 Instagram Reels 的完整劇本。</p>
         </div>
         <div className="w-fit rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-500 shadow-sm">
-          <span className="font-semibold text-green-700">Beta 期間免費使用</span>
+          <span className="font-semibold text-amber-700">Preview：3 Credits · 尚未啟用扣點</span>
         </div>
       </header>
 
@@ -179,7 +179,7 @@ export function ScriptClient({
             {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <FileText className="h-4 w-4" aria-hidden />}
             {loading ? "生成中..." : "AI 生成 IG Reel 劇本"}
           </button>
-          <p className="text-center text-xs text-zinc-400">暫時免費使用</p>
+          <p className="text-center text-xs text-zinc-400">Preview 規格每次 3 Credits；現時不會扣點</p>
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-8 xl:self-start">

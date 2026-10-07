@@ -82,7 +82,20 @@ counter INSERT, and limiter RPC EXECUTE each returned SQLSTATE `42501`
 
 The applied production table was initially created with `model NOT NULL`. The
 correct contract requires actual-provider model semantics, so local code and the
-source migration now use nullable `model`, keep the requested value in
+source migration use nullable `model`, keep the requested value in
 `requested_model`, and write `model = NULL` for started/failed calls with no
-provider response. Production requires a separately approved corrective
-`ALTER COLUMN model DROP NOT NULL`; it has not been run without that approval.
+provider response.
+
+The separately approved corrective migration
+`20261007103000_ai_usage_events_model_nullable.sql` was applied in one explicit
+production transaction. Post-correction verification confirmed:
+
+- `model` and `requested_model` are both nullable.
+- Both usage tables still have RLS enabled.
+- A `service_role` insert with `model = NULL` and a non-null `requested_model`
+  succeeded inside a transaction that was immediately rolled back.
+- For both `anon` and `authenticated`, usage SELECT, usage INSERT, counter
+  SELECT, counter INSERT, and limiter RPC EXECUTE still each return SQLSTATE
+  `42501` under real `SET LOCAL ROLE` transactions.
+- Security Advisor remains at 1 existing error, 4 existing warnings, and 35
+  info suggestions. No new error or warning was introduced by the correction.

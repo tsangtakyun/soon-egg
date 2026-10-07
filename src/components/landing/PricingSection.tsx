@@ -16,11 +16,14 @@ const freeFeatures = [
   ["✗", "無限電郵發送"],
 ];
 
-const creatorFeatures = [
+const soonAiMonthlyLimit = Number(process.env.NEXT_PUBLIC_SOON_AI_MONTHLY_LIMIT ?? "");
+const creatorFeatures: Array<[string, string, boolean?]> = [
   ["✓", "全部免費功能"],
+  ...(Number.isInteger(soonAiMonthlyLimit) && soonAiMonthlyLimit > 0
+    ? [["✓", `SOON AI 對話（每月${soonAiMonthlyLimit}次）`] as [string, string]]
+    : []),
   ["✓", "0% 交易佣金", true],
   ["✓", "無限品牌配對"],
-  ["✓", "SOON AI 無限對話"],
   ["✓", "自動更新 Media Kit"],
   ["✓", "自訂域名"],
   ["✓", "無限電郵發送"],

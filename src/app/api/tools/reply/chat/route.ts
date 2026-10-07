@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { anthropicImageMetadata, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createEggAdmin, getActiveCreatorProfile } from "@/lib/creator-workspace";
 import { saveApprovedReplyRule, suggestReplyProjectName } from "@/lib/reply-workspace-rules";
@@ -145,7 +146,15 @@ export async function POST(request: Request) {
 
   try {
     const categories = Array.isArray(profile.content_categories) ? profile.content_categories.join("、") : "未設定";
-    const response = await anthropic.messages.create({
+    const response = await trackedAnthropicCall({
+      workspaceId: profile.id,
+      userId: user.id,
+      feature: "reply",
+      operation: "generate_reply",
+      requestedModel: MODEL,
+      media: anthropicImageMetadata(imageData ? [{ mediaType: imageData.mediaType ?? "image/jpeg", data: imageData.data! }] : []),
+      maxAttemptsConfigured: 2,
+    }, () => anthropic.messages.create({
       model: MODEL,
       max_tokens: 3500,
       output_config: { format: { type: "json_schema", schema: replyOutputSchema } },
@@ -154,7 +163,7 @@ export async function POST(request: Request) {
         { type: "image" as const, source: { type: "base64" as const, media_type: imageData.mediaType as "image/jpeg" | "image/png" | "image/webp", data: imageData.data! } },
         { type: "text" as const, text: buildUserContext(project.name, project.brief, profile, categories, cleanMessage) },
       ] : buildUserContext(project.name, project.brief, profile, categories, cleanMessage) }],
-    });
+    }, { maxRetries: 0 }));
     const raw = response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
     const parsed = parseResult(raw);
     if (!parsed) {

@@ -2,7 +2,10 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAnthropic, parseJsonFromText } from "@/lib/ai/anthropic";
+import { anthropicImageMetadata, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { knowledgePrompt, type CoreKnowledgeSelection } from "@/lib/core-knowledge";
+
+type AiTrackingContext = { workspaceId: string; userId: string };
 
 export type EggRecipe = {
   id: string;
@@ -128,17 +131,24 @@ function collectWebSearchSources(content: unknown[]): Array<{ title: string; url
   return [...sources.values()];
 }
 
-async function researchConfirmedVenue(name: string, context: string) {
+async function researchConfirmedVenue(name: string, context: string, tracking: AiTrackingContext) {
   const fallback = { research_topics: [] as EggInputUnderstanding["research_topics"], sources: [] as EggInputUnderstanding["sources"] };
   const anthropic = getAnthropic();
   if (!anthropic || !name.trim()) return fallback;
-  const response = await anthropic.messages.create({
-    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+  const requestedModel = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+  const response = await trackedAnthropicCall({
+    ...tracking,
+    feature: "egg_this",
+    operation: "research_confirmed_venue",
+    requestedModel,
+    maxAttemptsConfigured: 2,
+  }, () => anthropic.messages.create({
+    model: requestedModel,
     max_tokens: 2400,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }] as never,
     tool_choice: { type: "any" },
     messages: [{ role: "user", content: `請研究已確認的實體店「${name}」。使用者提供的地點或補充資料：${context}\n\n先以店名、英文名、城市或地址的不同組合搜尋，避免只搜尋完整句子。搜尋官方資料核實身分，再尋找獨立食記、媒體或評論。至少嘗試三組搜尋字詞。只整理搜尋結果真正支持的內容，不可憑常識補充。把不同獨立網域反覆提及的主題聚合；同一網域只計一次。即使只有一至兩個來源也要如實保留，不可當成零個來源，只是不可稱為熱門。所有文字使用繁體中文書面語。\n\n只輸出 JSON：{"research_topics":[{"topic":"","summary":"","mention_count":1,"source_urls":[""]}],"sources":[{"title":"","url":""}]}` }],
-  });
+  }, { maxRetries: 0 }));
   const text = response.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
   const parsed = parseJsonFromText<Partial<typeof fallback>>(text, fallback);
   const directSources = collectWebSearchSources(response.content as unknown[]);
@@ -157,6 +167,7 @@ async function researchConfirmedVenue(name: string, context: string) {
 export async function understandContentInput(input: {
   text: string;
   images?: Array<{ mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string }>;
+  tracking: AiTrackingContext;
 }): Promise<EggInputUnderstanding> {
   const fallback: EggInputUnderstanding = {
     understood_summary: input.text.trim() || "圖片素材",
@@ -172,8 +183,16 @@ export async function understandContentInput(input: {
   };
   const anthropic = getAnthropic();
   if (!anthropic) throw new Error("AI 服務未設定");
-  const response = await anthropic.messages.create({
-    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+  const requestedModel = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+  const response = await trackedAnthropicCall({
+    ...input.tracking,
+    feature: "egg_this",
+    operation: "understand_content_input",
+    requestedModel,
+    media: anthropicImageMetadata(input.images),
+    maxAttemptsConfigured: 2,
+  }, () => anthropic.messages.create({
+    model: requestedModel,
     max_tokens: 1600,
     tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 }] as never,
     messages: [{ role: "user", content: [
@@ -190,7 +209,7 @@ export async function understandContentInput(input: {
 
 只輸出 JSON：{"understood_summary":"","needs_clarification":false,"clarification_question":"","clarification_options":[],"subject_type":"physical_venue|product|person|general","identified_name":"","venue_identity_status":"confirmed|candidate|unknown","grounded_facts":[],"research_topics":[{"topic":"","summary":"","mention_count":0,"source_urls":[""]}],"sources":[{"title":"","url":""}]}` },
     ] }],
-  });
+  }, { maxRetries: 0 }));
   const text = response.content.filter((item) => item.type === "text").map((item) => item.text).join("\n");
   const parsed = parseJsonFromText<Partial<EggInputUnderstanding>>(text, fallback);
   const subjectType = ["physical_venue", "product", "person", "general"].includes(String(parsed.subject_type)) ? parsed.subject_type as EggInputUnderstanding["subject_type"] : "general";
@@ -202,7 +221,7 @@ export async function understandContentInput(input: {
   let sources = [...new Map([...embeddedSources, ...parsedSources].map((source) => [source.url, source])).values()].slice(0, 20);
   let researchTopics = Array.isArray(parsed.research_topics) ? parsed.research_topics.filter((topic) => topic?.topic).slice(0, 8).map((topic) => ({ topic: String(topic.topic).slice(0, 60), summary: String(topic.summary || "").slice(0, 180), mention_count: Math.max(0, Math.min(20, Number(topic.mention_count) || 0)), source_urls: Array.isArray(topic.source_urls) ? [...new Set(topic.source_urls.map(String).filter((url) => /^https?:\/\//.test(url)))].slice(0, 8) : [] })).sort((a, b) => b.mention_count - a.mention_count) : [];
   if (subjectType === "physical_venue" && venueIdentityStatus === "confirmed" && identifiedName && sources.length < 3) {
-    const supplemental = await researchConfirmedVenue(identifiedName, input.text);
+    const supplemental = await researchConfirmedVenue(identifiedName, input.text, input.tracking);
     sources = [...new Map([...sources, ...supplemental.sources].map((source) => [source.url, source])).values()].slice(0, 20);
     if (supplemental.research_topics.length) researchTopics = supplemental.research_topics;
   }
@@ -235,19 +254,28 @@ export async function generateAngles(input: {
   recipes: EggRecipe[];
   images?: Array<{ mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string }>;
   knowledge?: CoreKnowledgeSelection | null;
+  tracking: AiTrackingContext;
 }) {
   const fallback = fallbackAngles(input.topic);
   const anthropic = getAnthropic();
   if (!anthropic) throw new Error("AI 服務未設定");
-  const response = await anthropic.messages.create({
-    model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+  const requestedModel = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+  const response = await trackedAnthropicCall({
+    ...input.tracking,
+    feature: "egg_this",
+    operation: "generate_angles",
+    requestedModel,
+    media: anthropicImageMetadata(input.images),
+    maxAttemptsConfigured: 2,
+  }, () => anthropic.messages.create({
+    model: requestedModel,
     max_tokens: 1500,
     messages: [{ role: "user", content: [
       ...(input.images ?? []).map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mediaType, data: image.data } })),
       { type: "text" as const, text: "選題優先次序：第一，research_topics 中由最多獨立來源反覆提及、而且與現場相片素材相符的主題；第二，已由可靠來源確認且符合 Creator DNA 的主題；第三，找不到足夠網上資料時才使用純相片視覺方向。不可把單一來源描述成熱門或多人提及。" },
       { type: "text" as const, text: `你是 Egg 的內容策略編輯。只根據來源資料內的 grounded_facts、使用者文字及圖片直接可見內容，提出三個真正不同、令人一眼想拍的內容方向，不可只改寫標題，不可虛構事實或聲稱存在爭議。嚴禁自行加入或推斷營業時段（例如深夜、午夜、早餐）、地址、價錢、歷史、人氣、招牌產品或服務。亦不可由食物相片推斷味道、口感、材料、製法、正確／最佳食法、食用次序、推薦配搭或效果；除非使用者文字或 grounded_facts 明確提供。risk_flags 不能令未核實說法變成可用 premise。若資料不足，就以環境、餐點外觀、構圖觀察、現場探索及使用者想介紹的主體設計方向。所有面向使用者的文字必須使用自然、簡潔的繁體中文書面語。每個 angle 必須選一個最貼切的 hook_pattern_code；hook_modifiers 可以是空陣列；knowledge_refs 只填真正影響該 angle 的 Core ref，沒有便留空。每個 label 最多 7 個中文字；premise 最多 38 個中文字，只描述一個清楚切入點；audience_promise 最多 24 個中文字；rationale 最多 30 個中文字。\n\n${knowledgePrompt(input.knowledge ?? null)}\n\n題材：${input.topic}\n來源資料：${JSON.stringify(input.sourceData)}\n創作者資料：${JSON.stringify(input.creator ?? {})}\n可用製作方式：${JSON.stringify(input.recipes.map((recipe) => ({ name: recipe.name, mode: recipe.production_mode, config: recipe.config })))}\n\n只輸出 JSON：{"angles":[{"label":"吸引的短標題","premise":"一句具體切入點","audience_promise":"觀眾閱讀後得到甚麼","editorial_lens":"自由文字標籤","rationale":"一句說明為何適合這位創作者","risk_flags":["需要核實的事項"],"hook_pattern_code":"taxonomy code","hook_modifiers":["modifier code"],"knowledge_refs":["direction:uuid:v1"]}]}` },
     ] }],
-  });
+  }, { maxRetries: 0 }));
   const text = response.content.find((item) => item.type === "text")?.text ?? "";
   const parsed = parseJsonFromText<{ angles?: GeneratedAngle[] }>(text, { angles: fallback });
   const angles = Array.isArray(parsed.angles) ? parsed.angles.filter((angle) => angle?.premise && angle?.label).slice(0, 3) : [];
@@ -295,6 +323,7 @@ export async function generateContentPack(input: {
   preferenceSignals?: Array<{ recipe_id: string | null; field_path: string; before_value: unknown; after_value: unknown; created_at: string }>;
   dnaRules?: Array<{ category: string; scope: string; rule_text: string; evidence_count: number }>;
   knowledge?: CoreKnowledgeSelection | null;
+  tracking: AiTrackingContext;
 }) {
   const anthropic = getAnthropic();
   if (!anthropic) throw new Error("AI 服務未設定");
@@ -330,14 +359,22 @@ ${knowledgePrompt(input.knowledge ?? null)}
 本次素材狀態特別規則：${statusRule}
 
 只輸出有效 JSON。真人短片只可輸出 title、topic、script_flow、caption、post_notes；script_flow 格式是 [{"section":"HOOK／主體／轉場／ENDING","time":"0:00–0:05","visual":"一句畫面","dialogue":"一句或一小段對白"}]。其他格式共同欄位：title、core_concept、hook、caption（純文字，不可包成 JSON object）。full_vo 加 vo、scenes、b_roll_keywords；ai_visual 加 vo、scenes、visual_prompts；carousel 加 cover、slides、visual_direction；single_image 加 image_concept、image_prompt；snapshot_reference 加 references、visual_notes、source_warnings。陣列內容使用 JSON array。不要輸出 id、recipe_id、creator、language、platform、format、production_mode。`;
-  const response = await anthropic.messages.create({
-    model: process.env.ANTHROPIC_SCRIPT_MODEL?.trim() || "claude-sonnet-4-6",
+  const requestedModel = process.env.ANTHROPIC_SCRIPT_MODEL?.trim() || "claude-sonnet-4-6";
+  const response = await trackedAnthropicCall({
+    ...input.tracking,
+    feature: "egg_this",
+    operation: "generate_content_pack",
+    requestedModel,
+    media: anthropicImageMetadata(input.images),
+    maxAttemptsConfigured: 2,
+  }, () => anthropic.messages.create({
+    model: requestedModel,
     max_tokens: 3000,
     messages: [{ role: "user", content: [
       ...(input.images ?? []).map((image) => ({ type: "image" as const, source: { type: "base64" as const, media_type: image.mediaType, data: image.data } })),
       { type: "text" as const, text: prompt },
     ] }],
-  }, { timeout: 45_000, maxRetries: 1 });
+  }, { timeout: 45_000, maxRetries: 0 }));
   const text = response.content.find((item) => item.type === "text")?.text ?? "";
   const generation={model:response.model,inputTokens:response.usage.input_tokens,outputTokens:response.usage.output_tokens,output:text,status:'completed',createdAt:new Date().toISOString()};
   await input.recordGeneration?.(generation);

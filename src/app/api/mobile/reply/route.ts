@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { anthropicImageMetadata, trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
 import { saveApprovedReplyRule, suggestReplyProjectName } from "@/lib/reply-workspace-rules";
 import { presentReplyMessage, saveReplyAttachment, withReplyAttachment } from "@/lib/reply-attachments";
@@ -214,7 +215,15 @@ async function generateReply(
   if (!anthropic) return NextResponse.json({ error: "AI 服務暫時未設定" }, { status: 503 });
   try {
     const categories = Array.isArray(context.profile.content_categories) ? context.profile.content_categories.join("、") : "未設定";
-    const response = await anthropic.messages.create({
+    const response = await trackedAnthropicCall({
+      workspaceId: context.profile.id,
+      userId: context.userId,
+      feature: "reply",
+      operation: "generate_reply",
+      requestedModel: MODEL,
+      media: anthropicImageMetadata(image ? [{ mediaType: image.mediaType ?? "image/jpeg", data: image.data! }] : []),
+      maxAttemptsConfigured: 2,
+    }, () => anthropic.messages.create({
       model: MODEL,
       max_tokens: 3500,
       output_config: { format: { type: "json_schema", schema: replyOutputSchema } },
@@ -223,7 +232,7 @@ async function generateReply(
         { type: "image" as const, source: { type: "base64" as const, media_type: image.mediaType as "image/jpeg" | "image/png" | "image/webp", data: image.data! } },
         { type: "text" as const, text: buildContext(project.name, project.brief, context.profile, categories, cleanMessage) },
       ] : buildContext(project.name, project.brief, context.profile, categories, cleanMessage) }],
-    });
+    }, { maxRetries: 0 }));
     const raw = response.content[0]?.type === "text" ? response.content[0].text.trim() : "";
     const parsed = parseResult(raw);
     if (!parsed) {

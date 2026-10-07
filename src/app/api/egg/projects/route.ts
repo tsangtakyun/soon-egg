@@ -59,7 +59,11 @@ export async function POST(request: Request) {
     const imagePaths: string[] = [];
     const understanding = topic || extractedUrl
       ? { understood_summary: topicSummary, needs_clarification: false, clarification_question: "", clarification_options: [], grounded_facts: [], sources: [] }
-      : await understandContentInput({ text: input, images: imageData });
+      : await understandContentInput({
+        text: input,
+        images: imageData,
+        tracking: { workspaceId: context.workspaceId, userId: context.user.id },
+      });
     if (understanding.needs_clarification && understanding.clarification_question) {
       return NextResponse.json({
         needsClarification: true,
@@ -98,6 +102,7 @@ export async function POST(request: Request) {
       sourceData,
       creator: { ...(creator || {}), creator_dna: creatorDna || null },
       recipes,
+      tracking: { workspaceId: context.workspaceId, userId: context.user.id },
       images: imageData,
       knowledge,
     });

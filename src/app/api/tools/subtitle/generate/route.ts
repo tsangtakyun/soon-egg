@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { trackedAnthropicCall } from "@/lib/ai/usage-ledger";
+import { getEggRequestContext } from "@/lib/egg-api-context";
 import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
-import { createClient as createServerClient } from "@/lib/supabase/server";
 import { masterSupabase } from "@/lib/supabase/master";
 
 export async function POST(req: Request) {
-  const serverSupabase = await createServerClient();
-  if (!serverSupabase) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data: { user } } = await serverSupabase.auth.getUser();
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const context = await getEggRequestContext(req);
+  if (!context?.user.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = context.user;
+  const email = context.user.email;
 
-  const result = await deductCredits({ email: user.email, amount: CREDIT_COSTS.AI_GENERATION, type: "ai_generation", tool: "subtitle", description: "整理字幕" });
+  const result = await deductCredits({ email, amount: CREDIT_COSTS.AI_GENERATION, type: "ai_generation", tool: "subtitle", description: "整理字幕" });
   if (!result.success) return NextResponse.json({ error: "Insufficient credits" }, { status: 402 });
 
   const { title, language, transcript_text } = await req.json();
@@ -34,7 +35,18 @@ ${transcript_text}
 2
 ...`;
 
-  const message = await anthropic.messages.create({ model: "claude-sonnet-4-20250514", max_tokens: 2000, messages: [{ role: "user", content: prompt }] });
+  const requestedModel = "claude-sonnet-4-20250514";
+  const message = await trackedAnthropicCall({
+    workspaceId: context.workspaceId,
+    userId: user.id,
+    feature: "subtitle",
+    operation: "format_srt",
+    requestedModel,
+    maxAttemptsConfigured: 2,
+  }, () => anthropic.messages.create(
+    { model: requestedModel, max_tokens: 2000, messages: [{ role: "user", content: prompt }] },
+    { maxRetries: 0 },
+  ));
   const srt = message.content[0]?.type === "text" ? message.content[0].text : "";
   const { data: session, error } = await (masterSupabase as any).from("subtitle_sessions").insert({
     user_id: user.id,

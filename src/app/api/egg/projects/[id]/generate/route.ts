@@ -82,6 +82,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       preferenceSignals: relevantSignals,
       dnaRules: relevantRules,
       knowledge,
+      tracking: { workspaceId: context.workspaceId, userId: context.user.id },
     });
     const content = {
       ...generatedContent,

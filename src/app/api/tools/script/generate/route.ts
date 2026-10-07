@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getAnthropic } from "@/lib/ai/anthropic";
+import { trackedAnthropicCall } from "@/lib/ai/usage-ledger";
 import { CREDIT_COSTS, deductCredits } from "@/lib/credits";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { ACTIVE_CREATOR_COOKIE, acceptPendingWorkspaceInvitations, createEggAdmin } from "@/lib/creator-workspace";
@@ -78,11 +79,18 @@ Ending 風格：${ending.title}（${ending.example}）
 - 符合 IG Reel 節奏（快、緊湊、有畫面感）`;
 
   try {
-    const message = await anthropic.messages.create({
+    const message = await trackedAnthropicCall({
+      workspaceId,
+      userId: user.id,
+      feature: "script",
+      operation: "generate_script",
+      requestedModel: model,
+      maxAttemptsConfigured: 2,
+    }, () => anthropic.messages.create({
       model,
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
-    });
+    }, { maxRetries: 0 }));
 
     const script = message.content[0]?.type === "text" ? message.content[0].text : "";
     const { data: saved, error } = await admin

@@ -3,11 +3,11 @@
 This work is Preview-only. The legacy `CREDIT_SYSTEM_ENABLED` remains `false`;
 checkout, Stripe, Production and existing balances are unchanged.
 
-## Authoritative policy
+## Proposed entitlement/reset policy (awaiting product confirmation)
 
-- Free: 30 included credits per Hong Kong calendar month. Boundaries are
+- Free grant amount is 30. Proposed reset: Hong Kong calendar month. Boundaries are
   calculated in `Asia/Hong_Kong` and stored as UTC timestamps.
-- Creator: 150 included credits per exact active Stripe subscription billing
+- Creator grant amount is 150. Proposed reset: exact active Stripe subscription billing
   cycle. No active subscription row means no Creator entitlement; the server
   must not infer a paid plan from client input.
 - Purchased credits, if re-enabled later, are separate from included credits,
@@ -53,21 +53,22 @@ The Master database RPC rejects expired/unprovisioned wallet periods. This
 prevents a stale paid plan or client-supplied period from silently granting
 credit.
 
-## Login rate limit
+## Optional login hardening (out of current approved scope)
 
-Password login moves behind `POST /api/auth/login`. It applies both 5 attempts
+The draft password-login limiter applies both 5 attempts
 per HMACed email per minute and 30 attempts per HMACed IP per hour, stores no
 raw email/IP, returns `429` with `Retry-After`, and fails closed if the limiter
 backend is unavailable. `EGG_LOGIN_RATE_LIMIT_ENABLED` remains false until the
-migration is approved; `EGG_LOGIN_RATE_LIMIT_PEPPER` is a dedicated server
-secret. The EGG database migration must be reviewed and applied before this
-Preview can be accepted.
+migration is separately approved; `EGG_LOGIN_RATE_LIMIT_PEPPER` is a dedicated
+server secret. This draft migration is not required for credits Preview review
+and is not part of the approved SOON AI per-user minute/day limit.
 
 ## Release gates
 
 - Do not apply either migration without explicit approval.
 - Do not set either new flag in Production.
 - Do not modify Stripe or publish an iOS/TestFlight release.
-- Preview acceptance must cover cookie login, mobile bearer auth, duplicate
+- Credits Preview acceptance must cover mobile/web auth, duplicate
   idempotency, concurrent debit, insufficient credit, provider failure refund,
-  required-save failure refund, period boundaries and telemetry fail-open.
+  required-save failure refund, confirmed period boundaries and telemetry
+  fail-open. Login-form limiting requires separate scope approval.

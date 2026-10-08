@@ -19,8 +19,10 @@ function fixture() {
   const box = { exports: {} };
   const context = { module: box, exports: box.exports, crypto: require('node:crypto').webcrypto, AbortSignal,
     fetch: (_url, options) => {
-      assert.equal(options.cache, 'no-store');
-      assert.ok(options.signal);
+      if (options.method !== 'POST') {
+        assert.equal(options.cache, 'no-store');
+        assert.ok(options.signal);
+      }
       return new Promise((resolve, reject) => { finish = { resolve, reject }; });
     },
     require: name => name === 'react' ? hooks : name === 'react/jsx-runtime' ? require(name) : (() => { throw Error(name); })(),
@@ -61,6 +63,20 @@ async function main() {
 
   f = fixture(); f.html(); const cleanup = f.begin(); cleanup(); f.response(401, {}); await flush();
   assert.doesNotMatch(f.html(), /<form/); // unmounted request cannot reveal stale UI
+
+  const session = (role, actor = 'owner', available = 5) => ({ userId: role, members: [], status: {
+    workspaceId: 'workspace', role, period: { available, allowance: 30 }, results: [],
+    operations: [{ call_id: 'call', actor_user_id: actor, credit_status: 'reserved', provider_status: 'unknown', amount: 5 }],
+  } });
+  f = fixture(); f.html(); f.begin(); f.response(200, session('member')); await flush();
+  assert.doesNotMatch(f.html(), /啟用／重試啟用試用|模擬遲到結果/);
+  const run = buttons(f.tree()).find(button => button.props.children === '執行／相同識別碼重試');
+  const pending = run.props.onClick();
+  f.response(409, { error: 'insufficient_credits' }); await flush(); // refresh starts after rejected POST
+  f.response(200, session('member', 'owner', 0)); await pending;
+  assert.match(f.html(), /點數：0 \/ 30/); assert.match(f.html(), /insufficient_credits/);
+  f = fixture(); f.html(); f.begin(); f.response(200, session('owner')); await flush();
+  assert.match(f.html(), /啟用／重試啟用試用|模擬遲到結果/);
   console.log('PASS auth-loading render/state regression: pending, authenticated, 401, failure, retry, cleanup. Mocked response evidence, not live login proof.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

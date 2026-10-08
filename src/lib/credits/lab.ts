@@ -48,7 +48,7 @@ export async function labStatus(context: Awaited<ReturnType<typeof labContext>>)
   const { admin, workspaceId } = context;
   const [period, operations, results] = await Promise.all([
     admin.from("egg_credit_periods_v2").select("available,allowance,period_end").eq("workspace_id", workspaceId).eq("period_key", "trial").maybeSingle(),
-    admin.from("egg_credit_operations_v2").select("call_id,action,amount,credit_status,provider_status,refund_due_at,result_saved_at,created_at")
+    admin.from("egg_credit_operations_v2").select("call_id,actor_user_id,action,amount,credit_status,provider_status,refund_due_at,result_saved_at,created_at")
       .eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(30),
     admin.from("egg_credit_mock_results_v2").select("call_id,payload,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(30),
   ]);

@@ -1,14 +1,17 @@
 import type { NextConfig } from "next";
 
-// Register this isolated branch without deploying the legacy application against
-// inherited Preview credentials. Remove this hold only with the reviewed staging
-// Lab implementation and verified branch-scoped staging connection in place.
-// No environment switch can bypass the hold; other branches are unaffected.
-if (process.env.VERCEL_GIT_COMMIT_REF === "codex/credits-wallet-staging") {
-  throw new Error("EGG_STAGING_REGISTRATION_HOLD: staging Lab is not ready to deploy");
+const stagingBranch = process.env.VERCEL_GIT_COMMIT_REF === "codex/credits-wallet-staging";
+// This branch compiles only explicitly named staging entrypoints. No legacy
+// product/auth/payment/provider route is included in the deployed route graph.
+if (stagingBranch && (process.env.VERCEL_ENV !== "preview"
+  || process.env.EGG_CREDIT_STAGING_ENABLED !== "true"
+  || process.env.NEXT_PUBLIC_SUPABASE_URL !== "https://netzschelivdhfkznfrq.supabase.co"
+  || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY)) {
+  throw new Error("EGG_STAGING_REGISTRATION_HOLD: isolated staging configuration is incomplete");
 }
 
 const nextConfig: NextConfig = {
+  ...(stagingBranch ? { pageExtensions: ["staging.tsx", "staging.ts"] } : {}),
   async headers() {
     return [
       {

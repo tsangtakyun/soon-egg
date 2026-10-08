@@ -8,7 +8,7 @@ type Session = { userId: string; members: { workspace_id: string; role: string }
 const inputStyle = { padding: 12, border: "1px solid #a9a19b", borderRadius: 8, color: "#211b19", background: "#fff", width: "100%" };
 const buttonStyle = { padding: "12px 18px", borderRadius: 8, background: "#78474c", color: "#fff", border: 0, margin: "8px 8px 8px 0", cursor: "pointer" };
 async function readSession(): Promise<Session | null> {
-  const response = await fetch("/api/staging-credits", { cache: "no-store" });
+  const response = await fetch("/api/staging-credits", { cache: "no-store", signal: AbortSignal.timeout(15000) });
   const data = await response.json();
   if (response.status === 401) return null;
   if (!response.ok) throw new Error(data.error ?? "載入失敗");
@@ -16,6 +16,8 @@ async function readSession(): Promise<Session | null> {
 }
 export default function Lab() {
   const [session, setSession] = useState<Session | null>(null);
+  const [authState, setAuthState] = useState<"checking" | "ready" | "error">("checking");
+  const [authAttempt, setAuthAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("載入中…");
   const [key, setKey] = useState("");
@@ -27,10 +29,10 @@ export default function Lab() {
   useEffect(() => {
     let active = true;
     readSession().then(data => {
-      if (active) { setSession(data); setKey(crypto.randomUUID()); setNotice(""); }
-    }).catch(() => { if (active) setNotice("無法載入，請重試"); });
+      if (active) { setSession(data); setKey(crypto.randomUUID()); setNotice(""); setAuthState("ready"); }
+    }).catch(() => { if (active) { setAuthState("error"); setNotice("無法確認登入狀態，請重試"); } });
     return () => { active = false; };
-  }, []);
+  }, [authAttempt]);
   async function send(body: Record<string, unknown>) {
     if (busy) return;
     setBusy(true); setNotice("處理中…");
@@ -38,7 +40,7 @@ export default function Lab() {
       const response = await fetch("/api/staging-credits", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "操作失敗");
-      await refresh(); setNotice(data.reused ? "重複請求：沿用已保存狀態，冇再扣點。" : "操作完成，以下為資料庫最新狀態。");
+      await refresh(); setNotice(body.action === "logout" ? "已登出，請登入另一個測試帳戶。" : data.reused ? "重複請求：沿用已保存狀態，冇再扣點。" : "操作完成，以下為資料庫最新狀態。");
     } catch (error) { setNotice(error instanceof Error ? error.message : "操作失敗"); }
     finally { setBusy(false); }
   }
@@ -55,14 +57,16 @@ export default function Lab() {
     <h1 style={{ fontSize: 28 }}>EGG 點數測試 Lab</h1>
     <p>獨立 staging · 真實登入／資料庫 · 固定 mock · 非 AI 生成 · 不收費</p>
     <p role="status" aria-live="polite">{notice}</p>
-    {!session ? <form onSubmit={login} style={{ maxWidth: 440 }}>
+    {authState === "checking" ? <p role="status" aria-live="polite">正在確認登入…</p> : authState === "error" ? <button style={buttonStyle} onClick={() => { setAuthState("checking"); setNotice(""); setAuthAttempt(value => value + 1); }}>重新確認登入</button> : !session ? <form onSubmit={login} style={{ maxWidth: 440 }}>
+      <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
       <label>測試帳戶電郵<input required type="email" name="email" autoComplete="username" style={inputStyle} /></label>
       <label>密碼<input required type="password" name="password" autoComplete="current-password" style={inputStyle} /></label>
       <button disabled={busy} style={buttonStyle}>登入 staging</button>
+      </fieldset>
       <p>只用 staging 測試帳戶；不會建立會員／接受邀請或初始化舊點數。</p>
     </form> : <>
       <p>已登入：{session.userId}</p>
-      <button disabled={busy} style={buttonStyle} onClick={() => send({ action: "logout" })}>登出</button>
+      <button disabled={busy} style={buttonStyle} onClick={() => send({ action: "logout" })}>登出／切換帳戶</button>
       <button disabled={busy} style={buttonStyle} onClick={() => { setNotice("重新載入…"); refresh().then(() => setNotice("重新載入完成")).catch(() => setNotice("載入失敗")); }}>重新讀取資料庫</button>
       <h2>工作空間（只列已確認成員資格）</h2>
       {session.members.length === 0 && <p>此測試帳戶未加入任何工作空間，不能啟用或扣點。</p>}
